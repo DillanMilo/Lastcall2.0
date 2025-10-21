@@ -1,10 +1,51 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { CSVImporter } from "@/components/forms/CSVImporter";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function ImportPage() {
-  // In a real app, this would come from the authenticated user's session
-  const orgId = "00000000-0000-0000-0000-000000000000"; // Placeholder
+  const [orgId, setOrgId] = useState<string>(
+    "00000000-0000-0000-0000-000000000001"
+  );
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUserOrg();
+  }, []);
+
+  const fetchUserOrg = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        // Get user's organization
+        const { data: userData } = await supabase
+          .from("users")
+          .select("org_id")
+          .eq("id", user.id)
+          .single();
+
+        if (userData?.org_id) {
+          setOrgId(userData.org_id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user org:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -23,17 +64,30 @@ export default function ImportPage() {
           Your CSV file should include the following columns:
         </p>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-          <li><strong>name</strong> (required) - Product name</li>
-          <li><strong>sku</strong> (optional) - Stock keeping unit</li>
-          <li><strong>quantity</strong> (optional) - Current stock quantity</li>
-          <li><strong>reorder_threshold</strong> (optional) - Minimum quantity before reorder</li>
-          <li><strong>expiration_date</strong> (optional) - Format: YYYY-MM-DD</li>
+          <li>
+            <strong>name</strong> (required) - Product name
+          </li>
+          <li>
+            <strong>sku</strong> (optional) - Stock keeping unit
+          </li>
+          <li>
+            <strong>quantity</strong> (optional) - Current stock quantity
+          </li>
+          <li>
+            <strong>reorder_threshold</strong> (optional) - Minimum quantity
+            before reorder
+          </li>
+          <li>
+            <strong>expiration_date</strong> (optional) - Format: YYYY-MM-DD
+          </li>
         </ul>
         <p className="text-sm text-muted-foreground mt-3">
-          Example: <code className="bg-background px-2 py-1 rounded">name,sku,quantity,reorder_threshold,expiration_date</code>
+          Example:{" "}
+          <code className="bg-background px-2 py-1 rounded">
+            name,sku,quantity,reorder_threshold,expiration_date
+          </code>
         </p>
       </div>
     </div>
   );
 }
-

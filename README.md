@@ -22,80 +22,103 @@ LastCall is an AI-powered inventory management platform built by **Creative Curr
 
 ## 📦 Installation
 
+### Quick Start (UI Only - No Backend)
+
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd Lastcall2.0
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
-3. **Set up environment variables**
+3. **Run development server**
+
    ```bash
-   cp .env.local.example .env.local
+   npm run dev
    ```
-   
-   Then edit `.env.local` and add your credentials:
-   - Supabase project URL and anon key
-   - OpenAI API key
 
-4. **Set up Supabase database**
-   
-   Run the following SQL in your Supabase SQL editor:
+4. **Open your browser**
 
-   ```sql
-   -- USERS
-   CREATE TABLE users (
-     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-     email text UNIQUE NOT NULL,
-     full_name text,
-     org_id uuid,
-     created_at timestamptz DEFAULT now()
-   );
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
-   -- ORGANIZATIONS
-   CREATE TABLE organizations (
-     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-     name text NOT NULL,
-     subscription_tier text DEFAULT 'growth',
-     created_at timestamptz DEFAULT now()
-   );
+✨ **The UI will work immediately!** You can browse all pages and see the interface.
 
-   -- INVENTORY ITEMS
-   CREATE TABLE inventory_items (
-     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-     org_id uuid REFERENCES organizations (id),
-     name text NOT NULL,
-     sku text,
-     quantity int DEFAULT 0,
-     reorder_threshold int DEFAULT 0,
-     ai_label text,
-     category text,
-     expiration_date date,
-     last_restock timestamptz DEFAULT now(),
-     created_at timestamptz DEFAULT now()
-   );
+### Full Setup (With Backend)
 
-   -- IMPORT LOGS
-   CREATE TABLE imports (
-     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-     org_id uuid REFERENCES organizations (id),
-     source text,
-     status text DEFAULT 'completed',
-     created_at timestamptz DEFAULT now()
-   );
-   ```
+For complete functionality with data persistence and AI features:
+
+📘 **Follow the detailed guide**: `SUPABASE_SETUP.md`
+
+Quick summary:
+
+1. Create Supabase project
+2. Add credentials to `.env.local`
+3. Run SQL schema in Supabase
+4. Restart dev server
+
+Or use the **Setup Checklist**: `SETUP_CHECKLIST.md`
+
+### Legacy Instructions (Database Schema)
+
+If you prefer to set up manually, run the following SQL in your Supabase SQL editor:
+
+```sql
+-- USERS
+CREATE TABLE users (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email text UNIQUE NOT NULL,
+  full_name text,
+  org_id uuid,
+  created_at timestamptz DEFAULT now()
+);
+
+-- ORGANIZATIONS
+CREATE TABLE organizations (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  subscription_tier text DEFAULT 'growth',
+  created_at timestamptz DEFAULT now()
+);
+
+-- INVENTORY ITEMS
+CREATE TABLE inventory_items (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id uuid REFERENCES organizations (id),
+  name text NOT NULL,
+  sku text,
+  quantity int DEFAULT 0,
+  reorder_threshold int DEFAULT 0,
+  ai_label text,
+  category text,
+  expiration_date date,
+  last_restock timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now()
+);
+
+-- IMPORT LOGS
+CREATE TABLE imports (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id uuid REFERENCES organizations (id),
+  source text,
+  status text DEFAULT 'completed',
+  created_at timestamptz DEFAULT now()
+);
+```
 
 5. **Run the development server**
+
    ```bash
    npm run dev
    ```
 
 6. **Open your browser**
-   
+
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## 🗂️ Project Structure
@@ -107,7 +130,7 @@ lastcall-2.0/
 │   ├── dashboard/           # Main dashboard and features
 │   ├── layout.tsx           # Root layout
 │   └── page.tsx             # Landing page
-├── components/              
+├── components/
 │   ├── ui/                  # ShadCN UI components
 │   ├── dashboard/           # Dashboard-specific components
 │   └── forms/               # Form components (CSV importer, etc.)
@@ -143,6 +166,7 @@ lastcall-2.0/
 ### Dashboard Overview
 
 The dashboard shows:
+
 - Total inventory items
 - Low stock alerts
 - Items expiring soon
@@ -151,9 +175,11 @@ The dashboard shows:
 ## 🧠 AI Features
 
 ### Label Generator
+
 Automatically categorizes products and suggests reorder frequency based on product names.
 
 ### Reorder Predictor (Phase 2)
+
 Predicts optimal reorder dates based on historical usage patterns.
 
 ## 🔒 Environment Variables
@@ -167,6 +193,7 @@ Required environment variables:
 ## 🚧 Roadmap
 
 ### Phase 1 (Current) - MVP
+
 - ✅ Authentication with Supabase
 - ✅ Inventory CRUD operations
 - ✅ CSV import system
@@ -174,12 +201,14 @@ Required environment variables:
 - ✅ Dashboard UI
 
 ### Phase 2
+
 - [ ] Predictive reordering with AI
 - [ ] Email/SMS notifications
 - [ ] Analytics dashboard with charts
 - [ ] Historical data tracking
 
 ### Phase 3
+
 - [ ] Stripe billing integration
 - [ ] Multi-tenant team management
 - [ ] API integrations (Shopify, Square)
@@ -218,4 +247,3 @@ For questions or issues, contact the development team at Creative Currents LLC.
 **Alpha Client**: Angus Biltong (`angus.lastcall.ai`)  
 **Built by**: Creative Currents LLC  
 **Version**: 2.0.0 (Phase 1 MVP)
-
