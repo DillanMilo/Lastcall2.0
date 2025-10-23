@@ -50,13 +50,16 @@ export async function POST(request: NextRequest) {
         }
 
         // Optional AI labeling
-        let aiData = { category: null, ai_label: null };
+        let aiData: { category: string | null; ai_label: string | null } = { 
+          category: null, 
+          ai_label: null 
+        };
         if (enable_ai_labeling) {
           const aiResult = await generateAiLabel(item.name);
           if (aiResult.status === 'success') {
             aiData = {
-              category: aiResult.category || null,
-              ai_label: aiResult.label || null,
+              category: aiResult.category ?? null,
+              ai_label: aiResult.label ?? null,
             };
           }
         }

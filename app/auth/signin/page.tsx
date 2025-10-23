@@ -6,7 +6,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -65,8 +71,8 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center p-4 md:p-8">
+      <Card className="w-full max-w-md mx-auto">
         <CardHeader>
           <CardTitle>Sign In to LastCall</CardTitle>
           <CardDescription>
@@ -132,4 +138,3 @@ export default function SignInPage() {
     </div>
   );
 }
-

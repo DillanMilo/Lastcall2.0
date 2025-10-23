@@ -21,10 +21,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, AlertCircle, Edit2, Package } from "lucide-react";
+import {
+  Plus,
+  Search,
+  AlertCircle,
+  Edit2,
+  Package,
+  Grid3x3,
+  List,
+} from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
+import { InventoryCard } from "@/components/inventory/InventoryCard";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -33,10 +42,20 @@ export default function InventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [bulkEditInvoice, setBulkEditInvoice] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const orgId = "00000000-0000-0000-0000-000000000001";
 
   useEffect(() => {
     fetchInventory();
+    // Auto-set to card view on mobile
+    const handleResize = () => {
+      if (window.innerWidth < 768 && viewMode === "table") {
+        setViewMode("grid");
+      }
+    };
+    handleResize(); // Check on mount
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const fetchInventory = async () => {
@@ -94,17 +113,23 @@ export default function InventoryPage() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-muted-foreground">
-            Manage your stock items and track batches by invoice
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            Inventory
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage stock and track batches
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
+        <Button
+          onClick={() => setShowAddModal(true)}
+          size="sm"
+          className="md:h-10"
+        >
+          <Plus className="h-4 w-4 md:mr-2" />
+          <span className="hidden sm:inline">Add Item</span>
         </Button>
       </div>
 
@@ -124,7 +149,7 @@ export default function InventoryPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1">
               <Label htmlFor="search" className="sr-only">
                 Search
@@ -133,12 +158,32 @@ export default function InventoryPage() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Search by name, SKU, or invoice..."
+                  placeholder="Search name, SKU, invoice..."
                   className="pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === "table" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("table")}
+                className="flex-1 sm:flex-none"
+              >
+                <List className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Table</span>
+              </Button>
+              <Button
+                variant={viewMode === "grid" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                className="flex-1 sm:flex-none"
+              >
+                <Grid3x3 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Cards</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -163,7 +208,27 @@ export default function InventoryPage() {
                 </Button>
               </div>
             </div>
+          ) : viewMode === "grid" ? (
+            // Card View (Mobile-friendly)
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredItems.map((item) => (
+                <InventoryCard
+                  key={item.id}
+                  item={item}
+                  onEdit={() => setEditingItem(item)}
+                  onBulkEdit={
+                    item.invoice && invoiceCounts[item.invoice] > 1
+                      ? () => setBulkEditInvoice(item.invoice!)
+                      : undefined
+                  }
+                  invoiceCount={
+                    item.invoice ? invoiceCounts[item.invoice] : undefined
+                  }
+                />
+              ))}
+            </div>
           ) : (
+            // Table View (Desktop)
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>

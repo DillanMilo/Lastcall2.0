@@ -134,18 +134,19 @@ export function CSVImporter({ orgId }: { orgId: string }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Import CSV</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-2xl">Import CSV</CardTitle>
+          <CardDescription className="text-sm">
             Upload a CSV file with your inventory data. Required columns: name.
-            Optional: sku, quantity, reorder_threshold, expiration_date.
+            Optional: sku, invoice, quantity, reorder_threshold,
+            expiration_date.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 md:p-6">
           <div
-            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-2xl p-4 md:p-8 text-center transition-colors ${
               dragActive
                 ? "border-primary bg-primary/5"
                 : "border-border hover:border-primary/50"

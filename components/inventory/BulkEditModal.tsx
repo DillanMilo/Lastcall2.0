@@ -95,90 +95,92 @@ export function BulkEditModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Bulk Edit by Invoice</CardTitle>
-            <CardDescription>
-              Editing {itemCount} item(s) from invoice:{" "}
-              <strong>{invoice}</strong>
-            </CardDescription>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new_invoice">Update Invoice Number</Label>
-              <Input
-                id="new_invoice"
-                value={formData.new_invoice}
-                onChange={(e) =>
-                  setFormData({ ...formData, new_invoice: e.target.value })
-                }
-                placeholder={invoice}
-              />
-              <p className="text-xs text-muted-foreground">
-                Leave as-is or enter new invoice number for all items
-              </p>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="min-h-full flex items-center justify-center py-4">
+        <Card className="w-full max-w-lg my-auto">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Bulk Edit by Invoice</CardTitle>
+              <CardDescription>
+                Editing {itemCount} item(s) from invoice:{" "}
+                <strong>{invoice}</strong>
+              </CardDescription>
             </div>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new_invoice">Update Invoice Number</Label>
+                <Input
+                  id="new_invoice"
+                  value={formData.new_invoice}
+                  onChange={(e) =>
+                    setFormData({ ...formData, new_invoice: e.target.value })
+                  }
+                  placeholder={invoice}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave as-is or enter new invoice number for all items
+                </p>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="expiration_date">Update Expiry Date</Label>
-              <Input
-                id="expiration_date"
-                type="date"
-                value={formData.expiration_date}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    expiration_date: e.target.value,
-                  })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Set new expiry date for all items in this batch
-              </p>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="expiration_date">Update Expiry Date</Label>
+                <Input
+                  id="expiration_date"
+                  type="date"
+                  value={formData.expiration_date}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      expiration_date: e.target.value,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Set new expiry date for all items in this batch
+                </p>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="adjust_quantity">Adjust Quantity</Label>
-              <Input
-                id="adjust_quantity"
-                type="number"
-                value={formData.adjust_quantity}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    adjust_quantity: e.target.value,
-                  })
-                }
-                placeholder="0"
-              />
-              <p className="text-xs text-muted-foreground">
-                Add or subtract from current quantities (e.g., +50 or -10)
-              </p>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="adjust_quantity">Adjust Quantity</Label>
+                <Input
+                  id="adjust_quantity"
+                  type="number"
+                  value={formData.adjust_quantity}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      adjust_quantity: e.target.value,
+                    })
+                  }
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add or subtract from current quantities (e.g., +50 or -10)
+                </p>
+              </div>
 
-            <div className="flex gap-2 justify-end pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Updating..." : `Update ${itemCount} Item(s)`}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="flex gap-2 justify-end pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Updating..." : `Update ${itemCount} Item(s)`}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
