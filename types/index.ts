@@ -20,6 +20,7 @@ export interface InventoryItem {
   org_id: string;
   name: string;
   sku?: string;
+  invoice?: string;
   quantity: number;
   reorder_threshold: number;
   ai_label?: string;

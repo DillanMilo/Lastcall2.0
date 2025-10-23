@@ -85,6 +85,7 @@ export function CSVImporter({ orgId }: { orgId: string }) {
               org_id: orgId,
               name: row.name.trim(),
               sku: row.sku?.trim() || null,
+              invoice: row.invoice?.trim() || null,
               quantity: parseInt(row.quantity || "0", 10),
               reorder_threshold: parseInt(row.reorder_threshold || "0", 10),
               category:

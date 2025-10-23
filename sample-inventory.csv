@@ -1,12 +1,12 @@
-name,sku,quantity,reorder_threshold,expiration_date
-Angus Biltong Original 100g,ANG-ORIG-100,250,50,2025-06-30
-Angus Biltong Peri-Peri 100g,ANG-PERI-100,180,40,2025-06-30
-Angus Biltong BBQ 100g,ANG-BBQ-100,220,50,2025-07-15
-Angus Biltong Original 250g,ANG-ORIG-250,120,30,2025-06-30
-Angus Biltong Peri-Peri 250g,ANG-PERI-250,95,25,2025-06-30
-Beef Jerky Teriyaki,BJ-TERI-100,75,20,2025-05-20
-Beef Jerky Original,BJ-ORIG-100,85,20,2025-05-20
-Dried Mango Slices,SNACK-MANGO,45,15,2025-08-01
-Mixed Nuts 500g,SNACK-NUTS-500,30,10,2025-12-31
-Protein Bars Chocolate,BAR-CHOC,60,15,2025-09-15
+name,sku,invoice,quantity,reorder_threshold,expiration_date
+Angus Biltong Original 100g,ANG-ORIG-100,INV-12345,250,50,2026-03-30
+Angus Biltong Peri-Peri 100g,ANG-PERI-100,INV-12345,180,40,2026-03-30
+Angus Biltong BBQ 100g,ANG-BBQ-100,INV-12345,220,50,2026-03-30
+Angus Biltong Original 250g,ANG-ORIG-250,INV-123456,120,30,2026-08-30
+Angus Biltong Peri-Peri 250g,ANG-PERI-250,INV-123456,95,25,2026-08-30
+Beef Jerky Teriyaki,BJ-TERI-100,INV-789,75,20,2025-05-20
+Beef Jerky Original,BJ-ORIG-100,INV-789,85,20,2025-05-20
+Mixed Nuts 500g,SNACK-NUTS-500,INV-321,30,10,2025-12-31
+Mixed Nuts 500g,SNACK-NUTS-500,INV-654,45,10,2026-06-30
+Protein Bars Chocolate,BAR-CHOC,INV-999,60,15,2025-09-15
 

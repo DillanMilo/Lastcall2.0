@@ -71,6 +71,10 @@ export default function ImportPage() {
             <strong>sku</strong> (optional) - Stock keeping unit
           </li>
           <li>
+            <strong>invoice</strong> (optional) - Invoice/batch number for
+            tracking lots
+          </li>
+          <li>
             <strong>quantity</strong> (optional) - Current stock quantity
           </li>
           <li>
@@ -84,8 +88,12 @@ export default function ImportPage() {
         <p className="text-sm text-muted-foreground mt-3">
           Example:{" "}
           <code className="bg-background px-2 py-1 rounded">
-            name,sku,quantity,reorder_threshold,expiration_date
+            name,sku,invoice,quantity,reorder_threshold,expiration_date
           </code>
+        </p>
+        <p className="text-xs text-muted-foreground mt-2">
+          💡 Tip: Use the same invoice number for products from the same batch
+          to easily track and edit them together!
         </p>
       </div>
     </div>
