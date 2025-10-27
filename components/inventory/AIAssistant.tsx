@@ -24,11 +24,11 @@ interface AIAssistantProps {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "What items are running low on stock?",
-  "Which products are expiring soon?",
-  "What should I reorder today?",
-  "Show me critical stock levels",
-  "Which invoices need attention?",
+  "What's running low?",
+  "Expiring soon?",
+  "What to reorder?",
+  "Critical items?",
+  "Invoice status?",
 ];
 
 export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
@@ -36,7 +36,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     {
       role: "assistant",
       content:
-        "👋 Hi! I'm your AI inventory assistant. I can help you with stock levels, reorder recommendations, expiring items, and more. What would you like to know?",
+        "👋 Hi! I'm your Inventory assistant. Im here to help you with stock levels, reorder recommendations, expiring items, and more. What would you like to know?",
       timestamp: new Date(),
     },
   ]);
@@ -117,51 +117,60 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   };
 
   return (
-    <Card className="flex flex-col h-[600px] max-h-[80vh]">
-      <CardHeader className="border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
+    <Card className="flex flex-col h-[500px] md:h-[600px] max-h-[85vh] w-full">
+      <CardHeader className="border-b p-4 md:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <div className="p-1.5 md:p-2 rounded-full bg-primary/10 flex-shrink-0">
+              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             </div>
-            <div>
-              <CardTitle>AI Inventory Assistant</CardTitle>
-              <CardDescription>
-                Ask me anything about your stock
+            <div className="min-w-0">
+              <CardTitle className="text-base md:text-lg truncate">
+                AI Inventory Assistant
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm truncate">
+                Ask me about your stock
               </CardDescription>
             </div>
           </div>
           {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="flex-shrink-0"
+            >
               <X className="h-4 w-4" />
             </Button>
           )}
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0">
+      <CardContent className="flex-1 flex flex-col p-0 min-h-0">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`flex gap-3 ${
+              className={`flex gap-2 md:gap-3 ${
                 message.role === "user" ? "justify-end" : "justify-start"
               }`}
             >
               {message.role === "assistant" && (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Bot className="h-4 w-4 text-primary" />
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Bot className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
                 </div>
               )}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                className={`max-w-[85%] md:max-w-[80%] rounded-2xl px-3 py-2 md:px-4 ${
                   message.role === "user"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted"
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p className="text-xs md:text-sm whitespace-pre-wrap break-words">
+                  {message.content}
+                </p>
                 <p className="text-xs opacity-70 mt-1">
                   {message.timestamp.toLocaleTimeString([], {
                     hour: "2-digit",
@@ -170,20 +179,20 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
                 </p>
               </div>
               {message.role === "user" && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <User className="h-4 w-4 text-primary-foreground" />
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
                 </div>
               )}
             </div>
           ))}
 
           {loading && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bot className="h-4 w-4 text-primary" />
+            <div className="flex gap-2 md:gap-3 justify-start">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Bot className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
               </div>
-              <div className="bg-muted rounded-2xl px-4 py-3">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="bg-muted rounded-2xl px-3 py-2 md:px-4 md:py-3">
+                <Loader2 className="h-3.5 w-3.5 md:h-4 md:w-4 animate-spin" />
               </div>
             </div>
           )}
@@ -193,9 +202,9 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
         {/* Suggested Questions */}
         {messages.length === 1 && (
-          <div className="px-4 py-2 border-t">
+          <div className="px-3 md:px-4 py-2 border-t bg-muted/30">
             <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 md:gap-2">
               {SUGGESTED_QUESTIONS.map((question, index) => (
                 <Button
                   key={index}
@@ -203,7 +212,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
                   size="sm"
                   onClick={() => handleSend(question)}
                   disabled={loading}
-                  className="text-xs"
+                  className="text-xs h-7 md:h-8 px-2 md:px-3"
                 >
                   {question}
                 </Button>
@@ -213,7 +222,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         )}
 
         {/* Input */}
-        <div className="p-4 border-t">
+        <div className="p-3 md:p-4 border-t">
           <div className="flex gap-2">
             <Input
               value={input}
@@ -221,12 +230,13 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask about your inventory..."
               disabled={loading}
-              className="flex-1"
+              className="flex-1 text-sm"
             />
             <Button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
               size="icon"
+              className="flex-shrink-0"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -235,7 +245,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-xs text-muted-foreground mt-2 hidden sm:block">
             Press Enter to send, Shift+Enter for new line
           </p>
         </div>

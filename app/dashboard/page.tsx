@@ -10,12 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Package, AlertCircle, TrendingUp, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Package,
+  AlertCircle,
+  TrendingUp,
+  Clock,
+  Sparkles,
+} from "lucide-react";
 import { daysUntilExpiration } from "@/lib/utils";
+import { AIAssistant } from "@/components/inventory/AIAssistant";
 
 export default function DashboardPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const orgId = "00000000-0000-0000-0000-000000000001";
 
   useEffect(() => {
     fetchInventory();
@@ -86,13 +96,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 md:space-y-8">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Overview of your inventory and key metrics
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            Dashboard
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Overview of your inventory and key metrics
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowAIAssistant(true)}
+          size="sm"
+          variant="outline"
+          className="md:h-10"
+        >
+          <Sparkles className="h-4 w-4 md:mr-2" />
+          <span className="hidden sm:inline">Ask AI</span>
+        </Button>
       </div>
 
       <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
@@ -203,6 +224,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {showAIAssistant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
+          <div className="w-full max-w-2xl my-auto">
+            <AIAssistant
+              orgId={orgId}
+              onClose={() => setShowAIAssistant(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -356,8 +356,8 @@ export default function InventoryPage() {
       )}
 
       {showAIAssistant && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
+          <div className="w-full max-w-2xl my-auto">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}
