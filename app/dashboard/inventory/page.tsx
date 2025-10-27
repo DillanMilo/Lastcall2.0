@@ -29,11 +29,13 @@ import {
   Package,
   Grid3x3,
   List,
+  Sparkles,
 } from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
+import { AIAssistant } from "@/components/inventory/AIAssistant";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -43,6 +45,7 @@ export default function InventoryPage() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [bulkEditInvoice, setBulkEditInvoice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const orgId = "00000000-0000-0000-0000-000000000001";
 
   useEffect(() => {
@@ -123,14 +126,25 @@ export default function InventoryPage() {
             Manage stock and track batches
           </p>
         </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          size="sm"
-          className="md:h-10"
-        >
-          <Plus className="h-4 w-4 md:mr-2" />
-          <span className="hidden sm:inline">Add Item</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowAIAssistant(true)}
+            size="sm"
+            variant="outline"
+            className="md:h-10"
+          >
+            <Sparkles className="h-4 w-4 md:mr-2" />
+            <span className="hidden sm:inline">AI Assistant</span>
+          </Button>
+          <Button
+            onClick={() => setShowAddModal(true)}
+            size="sm"
+            className="md:h-10"
+          >
+            <Plus className="h-4 w-4 md:mr-2" />
+            <span className="hidden sm:inline">Add Item</span>
+          </Button>
+        </div>
       </div>
 
       {lowStockItems.length > 0 && (
@@ -339,6 +353,17 @@ export default function InventoryPage() {
           onClose={() => setBulkEditInvoice(null)}
           onSuccess={fetchInventory}
         />
+      )}
+
+      {showAIAssistant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
+          <div className="w-full max-w-2xl my-auto">
+            <AIAssistant
+              orgId={orgId}
+              onClose={() => setShowAIAssistant(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
