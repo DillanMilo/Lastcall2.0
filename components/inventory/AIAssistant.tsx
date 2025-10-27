@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Send, Loader2, Bot, User, X, Sparkles } from "lucide-react";
+import { Send, Loader2, Bot, User, X, Sparkles, RotateCcw } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -31,15 +31,18 @@ const SUGGESTED_QUESTIONS = [
   "Invoice status?",
 ];
 
+// Helper to create welcome message
+function getWelcomeMessage(): Message {
+  return {
+    role: "assistant",
+    content:
+      "👋 Hi! I'm your Inventory assistant. I'm here to help you with stock levels, reorder recommendations, expiring items, and more. What would you like to know?",
+    timestamp: new Date(),
+  };
+}
+
 export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "👋 Hi! I'm your Inventory assistant. Im here to help you with stock levels, reorder recommendations, expiring items, and more. What would you like to know?",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -47,6 +50,37 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem(`ai-chat-${orgId}`);
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages);
+        // Convert timestamp strings back to Date objects
+        const messagesWithDates = parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
+        // Keep only last 10 messages (5 pairs)
+        setMessages(messagesWithDates.slice(-10));
+      } catch (error) {
+        console.error("Error loading saved messages:", error);
+        setMessages([getWelcomeMessage()]);
+      }
+    } else {
+      setMessages([getWelcomeMessage()]);
+    }
+  }, [orgId]);
+
+  // Save messages to localStorage whenever they change
+  // Keep only last 12 messages (6 pairs including welcome) to limit storage
+  useEffect(() => {
+    if (messages.length > 0) {
+      const messagesToSave = messages.slice(-12);
+      localStorage.setItem(`ai-chat-${orgId}`, JSON.stringify(messagesToSave));
+    }
+  }, [messages, orgId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -68,6 +102,13 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     setLoading(true);
 
     try {
+      // Get last 10 messages (5 pairs of user/assistant) for context
+      // Skip the initial welcome message, keep recent conversation
+      const recentMessages = messages.slice(-10).filter((m) => {
+        // Don't send the initial welcome message to save tokens
+        return !(m.role === "assistant" && m.content.includes("👋 Hi!"));
+      });
+
       // Send to AI API
       const response = await fetch("/api/ai/assistant", {
         method: "POST",
@@ -75,7 +116,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         body: JSON.stringify({
           message: userMessage,
           orgId,
-          conversationHistory: messages.map((m) => ({
+          conversationHistory: recentMessages.map((m) => ({
             role: m.role,
             content: m.content,
           })),
@@ -116,6 +157,13 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     }
   };
 
+  const handleClearHistory = () => {
+    if (confirm("Clear conversation history? This cannot be undone.")) {
+      setMessages([getWelcomeMessage()]);
+      localStorage.removeItem(`ai-chat-${orgId}`);
+    }
+  };
+
   return (
     <Card className="flex flex-col h-[500px] md:h-[600px] max-h-[85vh] w-full">
       <CardHeader className="border-b p-4 md:p-6">
@@ -133,16 +181,22 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               </CardDescription>
             </div>
           </div>
-          {onClose && (
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
-              className="flex-shrink-0"
+              onClick={handleClearHistory}
+              title="Clear conversation"
+              className="hidden sm:flex"
             >
-              <X className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4" />
             </Button>
-          )}
+            {onClose && (
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
 
