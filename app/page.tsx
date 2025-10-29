@@ -11,7 +11,7 @@ export default function Home() {
           AI-Driven Inventory Management SaaS
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full max-w-md px-4">
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full max-w-xl px-4">
           <Link
             href="/auth/signin"
             className="rounded-2xl border border-solid border-transparent transition-colors flex items-center justify-center bg-primary text-primary-foreground gap-2 hover:bg-primary/90 text-sm sm:text-base h-12 px-6 w-full sm:w-auto"
@@ -24,7 +24,34 @@ export default function Home() {
           >
             Dashboard
           </Link>
+          <Link
+            href="/auth/signup"
+            className="rounded-2xl border border-solid border-transparent transition-colors flex items-center justify-center bg-slate-900 text-white hover:bg-slate-800 shadow-lg text-sm sm:text-base h-12 px-6 w-full sm:w-auto"
+          >
+            Night Sign Up
+          </Link>
         </div>
+        <section className="w-full max-w-3xl px-6 py-8 mt-8 bg-slate-900 text-slate-100 rounded-3xl shadow-xl border border-slate-800">
+          <h2 className="text-2xl font-semibold mb-4">Night Sign-Up Procedure</h2>
+          <p className="text-sm md:text-base text-slate-300 mb-4">
+            Set your team up for success even after hours with this quick evening checklist.
+            Follow these steps to register a new account and be ready for the next business day.
+          </p>
+          <ol className="list-decimal list-inside space-y-3 text-sm md:text-base text-slate-200">
+            <li>
+              Click the <span className="font-semibold">Night Sign Up</span> button to open the registration form.
+            </li>
+            <li>
+              Use a monitored email address so overnight notifications reach the right person.
+            </li>
+            <li>
+              Choose a strong password and enable two-factor authentication during setup.
+            </li>
+            <li>
+              Review the confirmation email before morning operations to verify access.
+            </li>
+          </ol>
+        </section>
       </div>
     </main>
   );

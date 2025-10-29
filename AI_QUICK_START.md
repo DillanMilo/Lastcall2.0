@@ -74,10 +74,10 @@ The AI knows your **entire inventory** and provides:
 
 2. Mixed Nuts 500g
    - Only 8 units left!
-   - CRITICAL - order immediately
+   - CRITICAL - order immediately (reorder at 20)
 
 3. Protein Bars
-   - 12 units (reorder at 15)
+   - 12 units (reorder at 25)
 ```
 
 ---

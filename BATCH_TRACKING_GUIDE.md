@@ -17,8 +17,8 @@ LastCall 2.0 now supports full batch tracking using invoice numbers! This allows
 You can now have multiple entries of the same product with different invoice numbers and expiry dates:
 
 ```
-Mixed Nuts 500g | INV-321  | Expires: 2025-12-31 | Qty: 30
-Mixed Nuts 500g | INV-654  | Expires: 2026-06-30 | Qty: 45
+Mixed Nuts 500g | INV-321  | Expires: 2025-12-31 | Qty: 8
+Mixed Nuts 500g | INV-654  | Expires: 2026-06-30 | Qty: 26
 ```
 
 This means:
@@ -53,10 +53,10 @@ Update your CSV to include the `invoice` column:
 
 ```csv
 name,sku,invoice,quantity,reorder_threshold,expiration_date
-Angus Biltong Original 100g,ANG-ORIG-100,INV-12345,250,50,2026-03-30
-Angus Biltong Peri-Peri 100g,ANG-PERI-100,INV-12345,180,40,2026-03-30
-Mixed Nuts 500g,SNACK-NUTS-500,INV-321,30,10,2025-12-31
-Mixed Nuts 500g,SNACK-NUTS-500,INV-654,45,10,2026-06-30
+Angus Biltong Original 100g,ANG-ORIG-100,INV-12345,45,50,2026-03-30
+Angus Biltong Peri-Peri 100g,ANG-PERI-100,INV-12345,120,40,2026-03-30
+Mixed Nuts 500g,SNACK-NUTS-500,INV-321,8,20,2025-12-31
+Mixed Nuts 500g,SNACK-NUTS-500,INV-654,26,20,2026-06-30
 ```
 
 ### Import via UI
@@ -88,8 +88,8 @@ Mixed Nuts 500g,SNACK-NUTS-500,INV-654,45,10,2026-06-30
 You receive a new shipment:
 
 - Invoice: INV-789
-- 3 products in this shipment
-- All expire on 2025-05-20
+- 2 products in this shipment
+- Teriyaki expires 2025-02-28, Original expires 2025-03-15
 
 Add each product with invoice "INV-789" - now you can track this entire shipment together!
 

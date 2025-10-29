@@ -53,11 +53,11 @@ curl "http://localhost:3000/api/inventory?org_id=00000000-0000-0000-0000-0000000
       "org_id": "uuid",
       "name": "Angus Biltong Original 100g",
       "sku": "ANG-ORIG-100",
-      "quantity": 250,
+      "quantity": 45,
       "reorder_threshold": 50,
       "category": "meat",
       "ai_label": "weekly",
-      "expiration_date": "2025-06-30",
+      "expiration_date": "2026-03-30",
       "created_at": "2025-01-15T10:30:00Z"
     }
   ]
@@ -87,7 +87,7 @@ curl "http://localhost:3000/api/inventory/550e8400-e29b-41d4-a716-446655440000"
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Angus Biltong Original 100g",
     "sku": "ANG-ORIG-100",
-    "quantity": 250,
+    "quantity": 45,
     ...
   }
 }
