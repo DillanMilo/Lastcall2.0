@@ -26,6 +26,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const orgId = "00000000-0000-0000-0000-000000000001";
+  const isSupabaseConfigured =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    !String(process.env.NEXT_PUBLIC_SUPABASE_URL).includes("placeholder") &&
+    String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) !== "placeholder-key";
 
   useEffect(() => {
     fetchInventory();
@@ -33,18 +38,31 @@ export default function DashboardPage() {
 
   const fetchInventory = async () => {
     try {
+      if (!isSupabaseConfigured) {
+        console.warn(
+          "Supabase credentials are not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local to enable live data."
+        );
+        setItems([]);
+        return;
+      }
       const { data, error } = await supabase
         .from("inventory_items")
         .select("*");
 
       if (error) {
-        console.error("Error fetching inventory:", error);
+        console.error("Error fetching inventory:", {
+          message: (error as any)?.message,
+          status: (error as any)?.status,
+          details: (error as any)?.details,
+          hint: (error as any)?.hint,
+          original: error,
+        });
         setItems([]);
       } else {
         setItems(data || []);
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Unexpected error fetching inventory:", error);
       setItems([]);
     } finally {
       setLoading(false);
