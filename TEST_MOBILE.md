@@ -89,7 +89,7 @@ Products as cards instead of table:
 │ SKU: ANG-ORIG-100    │
 │ 📋 INV-12345         │
 │                      │
-│ Qty: 250  Reorder: 50│
+│ Qty: 45   Reorder: 50│
 │ Expires: 2026-03-30  │
 │ [Category] [Edit]    │
 └──────────────────────┘

@@ -106,12 +106,12 @@ The AI responds with:
    - Recommendation: Order 100 units within 3 days
 
 2. Mixed Nuts 500g
-   - Current: 8 units (Below reorder point of 10)
+   - Current: 8 units (Below reorder point of 20)
    - Invoice: INV-321
    - ⚠️ CRITICAL: Only 8 units left!
 
 3. Protein Bars Chocolate
-   - Current: 12 units (Reorder point: 15)
+   - Current: 12 units (Reorder point: 25)
    - Invoice: INV-999
 
 📊 Total low stock items: 3 out of 10 items
@@ -127,14 +127,14 @@ The AI responds with:
 ⏰ EXPIRING SOON (Next 30 days):
 
 1. Beef Jerky Teriyaki
-   - Expires: 2025-05-20 (18 days)
-   - Quantity: 75 units
+   - Expires: 2025-02-28 (14 days)
+   - Quantity: 18 units (Reorder at 30)
    - Invoice: INV-789
    - Action: Plan to sell or discount
 
 2. Mixed Nuts 500g
-   - Expires: 2025-12-31 (67 days)
-   - Quantity: 30 units
+   - Expires: 2025-12-31
+   - Quantity: 8 units (Reorder at 20)
    - Invoice: INV-321
 
 ✅ No items expiring this week
@@ -151,17 +151,17 @@ The AI responds with:
 📋 INVOICE INV-12345 SUMMARY:
 
 Items in this batch: 3 products
-Total units: 650
+Total units: 325
 All expire: 2026-03-30
 
 1. Angus Biltong Original 100g
-   - Qty: 250 | Status: 🚨 LOW STOCK
+   - Qty: 45 | Status: 🚨 LOW STOCK
 
 2. Angus Biltong Peri-Peri 100g
-   - Qty: 180 | Status: ✅ Good
+   - Qty: 120 | Status: ✅ Good
 
 3. Angus Biltong BBQ 100g
-   - Qty: 220 | Status: ✅ Good
+   - Qty: 160 | Status: ✅ Good
 
 ⚠️ Recommendation: Reorder Biltong Original from this batch
 ```
