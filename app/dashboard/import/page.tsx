@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CSVImporter } from "@/components/forms/CSVImporter";
+import { APIImporter } from "@/components/forms/APIImporter";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function ImportPage() {
@@ -55,11 +56,12 @@ export default function ImportPage() {
           Import Data
         </h1>
         <p className="text-sm md:text-base text-muted-foreground">
-          Upload a CSV file to add items to your inventory
+          Upload a CSV file or connect your own API to keep inventory in sync.
         </p>
       </div>
 
       <CSVImporter orgId={orgId} />
+      <APIImporter orgId={orgId} />
 
       <div className="mt-6 md:mt-8 p-3 md:p-4 bg-muted rounded-2xl">
         <h3 className="text-sm md:text-base font-semibold mb-2">

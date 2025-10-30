@@ -132,31 +132,23 @@ export default function SettingsPage() {
     try {
       if (!user) throw new Error("No user logged in");
 
-      // Try to update first
-      const { error: updateError } = await supabase
+      // Upsert to ensure the row is created if missing
+      const { error: upsertError } = await supabase
         .from("users")
-        .update({
-          full_name: formData.full_name || null,
-          phone: formData.phone || null,
-        })
-        .eq("id", user.id);
+        .upsert(
+          [
+            {
+              id: user.id,
+              email: formData.email || user.email,
+              full_name: formData.full_name || null,
+              phone: formData.phone || null,
+              org_id: user.org_id || "00000000-0000-0000-0000-000000000001",
+            },
+          ],
+          { onConflict: "id" }
+        );
 
-      // If update fails because user doesn't exist, insert instead
-      if (updateError && updateError.code === "PGRST116") {
-        const { error: insertError } = await supabase.from("users").insert([
-          {
-            id: user.id,
-            email: user.email,
-            full_name: formData.full_name || null,
-            phone: formData.phone || null,
-            org_id: "00000000-0000-0000-0000-000000000001",
-          },
-        ]);
-
-        if (insertError) throw insertError;
-      } else if (updateError) {
-        throw updateError;
-      }
+      if (upsertError) throw upsertError;
 
       // Update email through Supabase auth if changed
       if (formData.email !== user.email) {
