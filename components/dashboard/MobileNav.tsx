@@ -1,9 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { LayoutDashboard, Package, Upload, Settings } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  LayoutDashboard,
+  Package,
+  Upload,
+  Settings,
+  LogOut,
+  Loader2,
+} from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,10 +23,25 @@ const navItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+
+    try {
+      await supabase.auth.signOut();
+      router.push("/auth/signin");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      setSigningOut(false);
+    }
+  };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden">
-      <div className="grid grid-cols-4 gap-1 p-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden pb-[env(safe-area-inset-bottom)]">
+      <div className="grid grid-cols-4 gap-1 p-2 pb-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -38,6 +62,31 @@ export function MobileNav() {
             </Link>
           );
         })}
+      </div>
+      <div className="px-2 pb-2 pt-0">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className={cn(
+            "w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+            signingOut
+              ? "bg-muted text-muted-foreground"
+              : "text-destructive hover:bg-destructive/10"
+          )}
+        >
+          {signingOut ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Signing out
+            </>
+          ) : (
+            <>
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </>
+          )}
+        </button>
       </div>
     </nav>
   );

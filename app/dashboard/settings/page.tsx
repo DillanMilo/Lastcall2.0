@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { User, Organization } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -14,9 +15,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UserCircle, Upload, Save, Loader2, CheckCircle } from "lucide-react";
+import {
+  UserCircle,
+  Upload,
+  Save,
+  Loader2,
+  CheckCircle,
+  LogOut,
+} from "lucide-react";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +33,7 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -211,6 +221,21 @@ export default function SettingsPage() {
       setError(error.message || "Failed to change password");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setError(null);
+
+    try {
+      await supabase.auth.signOut();
+      router.push("/auth/signin");
+    } catch (error: any) {
+      console.error("Error signing out:", error);
+      setError(error.message || "Failed to sign out");
+      setSigningOut(false);
     }
   };
 
@@ -552,6 +577,34 @@ export default function SettingsPage() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sign out</CardTitle>
+          <CardDescription>Leave your account securely on this device</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="w-full sm:w-auto"
+          >
+            {signingOut ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing out...
+              </>
+            ) : (
+              <>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
     </div>
