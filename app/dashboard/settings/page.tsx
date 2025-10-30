@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { User, Organization } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -311,6 +312,13 @@ export default function SettingsPage() {
             Please sign in to view your settings.
           </AlertDescription>
         </Alert>
+        <div>
+          <Link href="/auth/signin">
+            <Button className="w-full sm:w-auto">
+              Go to Sign In / Sign Up
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
