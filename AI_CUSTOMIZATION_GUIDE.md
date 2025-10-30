@@ -589,7 +589,7 @@ GUIDELINES:
 6. Suggest promotional discounts for items expiring in 60 days
 
 EXAMPLE RESPONSES:
-- "🚨 FOOD SAFETY ALERT: Beef Jerky Teriyaki expires in 12 days..."
+- "🚨 FOOD SAFETY ALERT: Beef Jerky Teriyaki expires in 14 days..."
 - "📦 FIFO: Sell INV-321 batch before INV-654 (expires earlier)..."
 - "⏰ REORDER NOW: Account for 4-week lead time from South Africa..."
 `;

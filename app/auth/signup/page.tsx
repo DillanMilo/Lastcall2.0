@@ -2,47 +2,53 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import Link from "next/link";
+import { CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import AuthLayout from "@/components/auth/AuthLayout";
 
-export default function SignInPage() {
+export default function SignUpPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setMessage(null);
 
+    if (password !== confirm) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        },
       });
 
       if (error) throw error;
 
-      if (data.session) {
+      if (data.user && !data.session) {
+        setMessage("Check your email to confirm your account.");
+      } else if (data.session) {
         router.push("/dashboard");
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during sign in");
+      setError(err.message || "An error occurred during sign up");
     } finally {
       setLoading(false);
     }
@@ -63,7 +69,6 @@ export default function SignInPage() {
       });
 
       if (error) throw error;
-
       setMessage("Check your email for a magic link!");
     } catch (err: any) {
       setError(err.message || "An error occurred");
@@ -73,13 +78,13 @@ export default function SignInPage() {
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to continue to your dashboard.">
+    <AuthLayout title="Create your account" subtitle="Start managing your inventory with AI-powered tools.">
       <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>Enter your credentials to access LastCall</CardDescription>
+        <CardTitle className="text-2xl">Sign up</CardTitle>
+        <CardDescription>Create your account to get started</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <form onSubmit={handleSignIn} className="space-y-4">
+        <form onSubmit={handleSignUp} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -93,16 +98,25 @@ export default function SignInPage() {
             />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link href="#" className="text-sm text-primary hover:underline">Forgot password?</Link>
-            </div>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Create a strong password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm">Confirm password</Label>
+            <Input
+              id="confirm"
+              type="password"
+              placeholder="Re-enter your password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
               required
               disabled={loading}
             />
@@ -122,7 +136,7 @@ export default function SignInPage() {
 
           <div className="flex flex-col gap-2">
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? "Creating account..." : "Create account"}
             </Button>
             <Button
               type="button"
@@ -137,10 +151,12 @@ export default function SignInPage() {
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account? {" "}
-          <Link href="/auth/signup" className="text-primary hover:underline">Sign up</Link>
+          Already have an account? {" "}
+          <Link href="/auth/signin" className="text-primary hover:underline">Sign in</Link>
         </div>
       </CardContent>
     </AuthLayout>
   );
 }
+
+
