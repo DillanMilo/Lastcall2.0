@@ -9,10 +9,8 @@ import {
   Package,
   Upload,
   Settings,
-  LogOut,
   UserCircle,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { User } from "@/types";
 
@@ -48,11 +46,6 @@ export function Navigation() {
     } catch (error) {
       console.error("Error fetching user:", error);
     }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/auth/signin";
   };
 
   return (
@@ -113,14 +106,6 @@ export function Navigation() {
           </Link>
         )}
 
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-5 w-5" />
-          <span className="text-sm font-medium">Sign Out</span>
-        </Button>
       </div>
     </nav>
   );
