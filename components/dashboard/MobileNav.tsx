@@ -17,6 +17,12 @@ export function MobileNav() {
   const pathname = usePathname();
   const handleSignOut = async () => {
     try {
+      // Clear AI chat history from localStorage
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("ai-chat-")) {
+          localStorage.removeItem(key);
+        }
+      });
       await supabase.auth.signOut();
       window.location.href = "/auth/signin";
     } catch (e) {

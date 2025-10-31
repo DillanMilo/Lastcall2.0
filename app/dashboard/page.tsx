@@ -33,8 +33,12 @@ export default function DashboardPage() {
     String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) !== "placeholder-key";
 
   useEffect(() => {
+    // Clear AI chat history when dashboard loads (fresh start)
+    const aiChatKey = `ai-chat-${orgId}`;
+    localStorage.removeItem(aiChatKey);
+    
     fetchInventory();
-  }, []);
+  }, [orgId]);
 
   const fetchInventory = async () => {
     try {
