@@ -211,7 +211,7 @@ Required environment variables:
 
 - [ ] Stripe billing integration
 - [ ] Multi-tenant team management
-- [ ] API integrations (Shopify, Square)
+- [ ] API integrations (Shopify, Square, BigCommerce)
 - [ ] AI chat assistant
 
 ## 📝 Development Guidelines

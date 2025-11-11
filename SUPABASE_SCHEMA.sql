@@ -27,11 +27,14 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   org_id uuid REFERENCES organizations (id) ON DELETE CASCADE,
   name text NOT NULL,
   sku text,
+  invoice text,
   quantity int DEFAULT 0,
   reorder_threshold int DEFAULT 0,
   ai_label text,
   category text,
   expiration_date date,
+  bigcommerce_product_id text,
+  bigcommerce_variant_id text,
   last_restock timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now()
 );
@@ -48,6 +51,8 @@ CREATE TABLE IF NOT EXISTS imports (
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_inventory_org_id ON inventory_items(org_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_sku ON inventory_items(sku);
+CREATE INDEX IF NOT EXISTS idx_inventory_bigcommerce_product ON inventory_items(bigcommerce_product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_bigcommerce_variant ON inventory_items(bigcommerce_variant_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_created_at ON inventory_items(created_at);
 CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(org_id);
 

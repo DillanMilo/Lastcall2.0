@@ -28,6 +28,8 @@ export interface InventoryItem {
   ai_label?: string;
   category?: string;
   expiration_date?: string;
+  bigcommerce_product_id?: string;
+  bigcommerce_variant_id?: string;
   last_restock: string;
   created_at: string;
 }
@@ -36,7 +38,7 @@ export interface Import {
   id: string;
   org_id: string;
   source: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'completed_with_errors' | 'failed';
   created_at: string;
 }
 
