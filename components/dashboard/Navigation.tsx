@@ -51,6 +51,12 @@ export function Navigation() {
   };
 
   const handleSignOut = async () => {
+    // Clear AI chat history from localStorage
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("ai-chat-")) {
+        localStorage.removeItem(key);
+      }
+    });
     await supabase.auth.signOut();
     window.location.href = "/auth/signin";
   };

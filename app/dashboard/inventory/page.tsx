@@ -36,6 +36,7 @@ import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
 import { AIAssistant } from "@/components/inventory/AIAssistant";
+import { demoInventoryItems } from "@/lib/demoInventory";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -74,22 +75,29 @@ export default function InventoryPage() {
           error.message?.includes("FetchError") ||
           error.message?.includes("fetch failed")
         ) {
-          setItems([]);
+          setItems(demoInventoryItems);
           setLoading(false);
           return;
         }
         throw error;
       }
-      setItems(data || []);
+
+      if (!data || data.length === 0) {
+        setItems(demoInventoryItems);
+        return;
+      }
+
+      setItems(data);
     } catch (error: any) {
       if (
         error.message?.includes("fetch") ||
         error.message?.includes("network") ||
         error.code === "PGRST"
       ) {
-        setItems([]);
+        setItems(demoInventoryItems);
       } else {
         console.error("Error fetching inventory:", error);
+        setItems(demoInventoryItems);
       }
     } finally {
       setLoading(false);

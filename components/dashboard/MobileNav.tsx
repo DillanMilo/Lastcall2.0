@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { LayoutDashboard, Package, Upload, Settings } from "lucide-react";
+import { LayoutDashboard, Package, Upload, Settings, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,10 +15,24 @@ const navItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
+  const handleSignOut = async () => {
+    try {
+      // Clear AI chat history from localStorage
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("ai-chat-")) {
+          localStorage.removeItem(key);
+        }
+      });
+      await supabase.auth.signOut();
+      window.location.href = "/auth/signin";
+    } catch (e) {
+      window.location.href = "/auth/signin";
+    }
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden">
-      <div className="grid grid-cols-4 gap-1 p-2">
+      <div className="grid grid-cols-5 gap-1 p-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -38,6 +53,16 @@ export function MobileNav() {
             </Link>
           );
         })}
+        <button
+          onClick={handleSignOut}
+          className={cn(
+            "flex flex-col items-center gap-1 rounded-xl px-2 py-2 transition-colors hover:bg-accent hover:text-accent-foreground"
+          )}
+          aria-label="Sign Out"
+        >
+          <LogOut className="h-5 w-5" />
+          <span className="text-xs font-medium">Sign Out</span>
+        </button>
       </div>
     </nav>
   );

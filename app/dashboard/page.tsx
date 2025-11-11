@@ -33,8 +33,12 @@ export default function DashboardPage() {
     String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) !== "placeholder-key";
 
   useEffect(() => {
+    // Clear AI chat history when dashboard loads (fresh start)
+    const aiChatKey = `ai-chat-${orgId}`;
+    localStorage.removeItem(aiChatKey);
+    
     fetchInventory();
-  }, []);
+  }, [orgId]);
 
   const fetchInventory = async () => {
     try {
@@ -80,6 +84,7 @@ export default function DashboardPage() {
     return days > 0 && days <= 7;
   });
   const restockNeeded = lowStockItems.length;
+  const restockItems = lowStockItems;
 
   const stats = [
     {
@@ -234,6 +239,83 @@ export default function DashboardPage() {
                         {item.quantity}
                       </p>
                       <p className="text-xs text-amber-600">Low Stock!</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Expiring Soon</CardTitle>
+            <CardDescription>Products expiring within 7 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                Loading...
+              </div>
+            ) : expiringSoonItems.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                🎉 No items expiring in the next week
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {expiringSoonItems.slice(0, 5).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                  >
+                    <div>
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Expires in {daysUntilExpiration(item.expiration_date!)} days
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{item.quantity}</p>
+                      <p className="text-xs text-muted-foreground">units</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Restock Needed</CardTitle>
+            <CardDescription>Below reorder threshold</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                Loading...
+              </div>
+            ) : restockItems.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                ✅ Nothing needs restocking right now
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {restockItems.slice(0, 5).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                  >
+                    <div>
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Qty {item.quantity} / Reorder at {item.reorder_threshold}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-amber-600">Order soon</p>
                     </div>
                   </div>
                 ))}
