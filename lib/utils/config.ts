@@ -14,3 +14,12 @@ export function isOpenAIConfigured(): boolean {
   return !!(key && key !== 'placeholder-key' && key !== '');
 }
 
+/**
+ * Check if BigCommerce credentials are configured
+ */
+export function isBigCommerceConfigured(): boolean {
+  const storeHash = process.env.BIGCOMMERCE_STORE_HASH;
+  const clientId = process.env.BIGCOMMERCE_CLIENT_ID;
+  const token = process.env.BIGCOMMERCE_ACCESS_TOKEN;
+  return Boolean(storeHash && clientId && token);
+}

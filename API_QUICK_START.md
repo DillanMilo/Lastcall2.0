@@ -10,7 +10,7 @@ Get up and running with the LastCall API in 5 minutes!
 
 - `/api/inventory` - List & Create items
 - `/api/inventory/[id]` - Get, Update, Delete specific items
-- `/api/inventory/sync` - Sync from external sources (Shopify, Square, etc.)
+- `/api/inventory/sync` - Sync from external sources (Shopify, Square, BigCommerce, etc.)
 
 ---
 
@@ -262,7 +262,7 @@ Includes:
 - All endpoints and parameters
 - Request/response examples
 - Error handling
-- Integration examples for Shopify, Square, etc.
+- Integration examples for Shopify, Square, BigCommerce, etc.
 - Security best practices
 
 ---

@@ -110,7 +110,7 @@ Use this checklist to get LastCall 2.0 up and running.
 ### Long Term (Phase 3)
 
 - [ ] Stripe billing integration
-- [ ] API integrations (Shopify, Square)
+- [ ] API integrations (Shopify, Square, BigCommerce)
 - [ ] AI chat assistant
 - [ ] Advanced reporting
 - [ ] Custom domains per org

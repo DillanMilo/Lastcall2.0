@@ -269,7 +269,7 @@ Sync inventory from external sources with smart upsert (create or update).
 **Parameters:**
 
 - `org_id` (required) - Organization UUID
-- `source` (required) - Source name: "shopify", "square", "custom", etc.
+- `source` (required) - Source name: "shopify", "square", "bigcommerce", "custom", etc.
 - `enable_ai_labeling` (optional) - Enable AI categorization (default: false)
 - `items` (required) - Array of items to sync
 
@@ -308,6 +308,79 @@ curl -X POST http://localhost:3000/api/inventory/sync \
 - If item with matching SKU exists → **Updates** it
 - If item doesn't exist → **Creates** it
 - Logs import in `imports` table
+
+---
+
+### 8. BigCommerce Catalog Sync
+
+**POST** `/api/integrations/bigcommerce/sync`
+
+Pull the latest catalog (products and variants) from BigCommerce and upsert them into LastCall inventory.
+
+**Environment prerequisites:**
+
+- `BIGCOMMERCE_STORE_HASH`
+- `BIGCOMMERCE_CLIENT_ID`
+- `BIGCOMMERCE_ACCESS_TOKEN`
+
+**Request Body:**
+
+```json
+{
+  "org_id": "00000000-0000-0000-0000-000000000001",
+  "enable_ai_labeling": false
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "results": {
+    "created": 10,
+    "updated": 42,
+    "failed": 0,
+    "errors": []
+  },
+  "summary": "Created: 10, Updated: 42, Failed: 0",
+  "imported": 52
+}
+```
+
+---
+
+### 9. BigCommerce Webhook
+
+**POST** `/api/webhooks/bigcommerce`
+
+Accepts webhook calls from BigCommerce for product and variant create/update/delete events.
+
+**Environment prerequisites:**
+
+- `BIGCOMMERCE_WEBHOOK_SECRET`
+- `BIGCOMMERCE_DEFAULT_ORG_ID` (or include `org_id` in the webhook payload)
+
+**Behavior:**
+
+- Validates the `X-BC-Signature` header using the configured webhook secret.
+- Fetches the latest product/variant inventory from BigCommerce and upserts it locally.
+- Removes the corresponding record when a product or variant is deleted.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "summary": "Created: 0, Updated: 1, Failed: 0",
+  "results": {
+    "created": 0,
+    "updated": 1,
+    "failed": 0,
+    "errors": []
+  }
+}
+```
 
 ---
 
