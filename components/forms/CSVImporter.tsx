@@ -102,13 +102,14 @@ export function CSVImporter({ orgId }: { orgId: string }) {
             if (error) throw error;
 
             importResult.success++;
-          } catch (error: any) {
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Unknown error";
             importResult.failed++;
-            const errorMsg = error.message || "Unknown error";
             // Check if it's a backend configuration issue
             if (
-              errorMsg.includes("fetch") ||
-              errorMsg.includes("Failed to fetch")
+              message.includes("fetch") ||
+              message.includes("Failed to fetch")
             ) {
               importResult.errors.push(
                 "Backend not configured. Add Supabase credentials to .env.local"
@@ -116,7 +117,7 @@ export function CSVImporter({ orgId }: { orgId: string }) {
               break; // Stop processing
             } else {
               importResult.errors.push(
-                `Row ${importResult.success + importResult.failed}: ${errorMsg}`
+                `Row ${importResult.success + importResult.failed}: ${message}`
               );
             }
           }

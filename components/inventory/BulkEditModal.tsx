@@ -34,12 +34,12 @@ export function BulkEditModal({
     adjust_quantity: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const updates: any = {};
+      const updates: Record<string, string> = {};
 
       if (formData.new_invoice && formData.new_invoice !== invoice) {
         updates.invoice = formData.new_invoice;
@@ -86,9 +86,11 @@ export function BulkEditModal({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unexpected error occurred";
       console.error("Error bulk updating items:", error);
-      alert("Failed to update items: " + error.message);
+      alert("Failed to update items: " + message);
     } finally {
       setLoading(false);
     }

@@ -31,7 +31,7 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
     expiration_date: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
@@ -52,9 +52,11 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unexpected error occurred";
       console.error("Error adding item:", error);
-      alert("Failed to add item: " + error.message);
+      alert("Failed to add item: " + message);
     } finally {
       setLoading(false);
     }

@@ -56,9 +56,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     const savedMessages = localStorage.getItem(`ai-chat-${orgId}`);
     if (savedMessages) {
       try {
-        const parsed = JSON.parse(savedMessages);
-        // Convert timestamp strings back to Date objects
-        const messagesWithDates = parsed.map((m: any) => ({
+        const parsed: Message[] = JSON.parse(savedMessages);
+        const messagesWithDates = parsed.map((m) => ({
           ...m,
           timestamp: new Date(m.timestamp),
         }));
@@ -123,7 +122,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         }),
       });
 
-      const data = await response.json();
+      const data: { response?: string; error?: string } = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to get response");
@@ -137,11 +136,13 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error getting AI response:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: `❌ Sorry, I encountered an error: ${error.message}. Please try again or check your OpenAI API key configuration.`,
+        content: `❌ Sorry, I encountered an error: ${message}. Please try again or check your OpenAI API key configuration.`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
