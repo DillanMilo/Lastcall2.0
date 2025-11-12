@@ -80,12 +80,23 @@ export default function DashboardPage() {
         router.push('/auth/signin');
         return;
       }
+      // Wait for orgId to be set (it might be created automatically)
+      // Only redirect if we've finished loading and still no orgId after a delay
       if (orgId) {
         // Clear AI chat history when dashboard loads (fresh start)
         const aiChatKey = `ai-chat-${orgId}`;
         localStorage.removeItem(aiChatKey);
 
         fetchInventory();
+      } else {
+        // Give it a moment for orgId to be set (user record might be created)
+        const timeout = setTimeout(() => {
+          if (!orgId && user) {
+            console.warn('User authenticated but no orgId found. User record may need to be created.');
+            // Don't redirect - let the useAuth hook create the user record
+          }
+        }, 2000);
+        return () => clearTimeout(timeout);
       }
     }
   }, [authLoading, user, orgId, router]);

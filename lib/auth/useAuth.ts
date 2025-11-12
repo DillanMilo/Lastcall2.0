@@ -27,6 +27,7 @@ export function useAuth() {
       if (session?.user) {
         setUser(session.user);
         await fetchUserWithOrg(session.user.id);
+        // fetchUserWithOrg will set loading to false when done
       } else {
         setLoading(false);
       }
@@ -40,12 +41,13 @@ export function useAuth() {
         if (session?.user) {
           setUser(session.user);
           await fetchUserWithOrg(session.user.id);
+          // fetchUserWithOrg will set loading to false when done
         } else {
           setUser(null);
           setUserWithOrg(null);
           setOrgId(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -64,14 +66,65 @@ export function useAuth() {
         .single();
 
       if (error) {
+        // If user doesn't exist in users table, create a basic record
+        if (error.code === 'PGRST116') {
+          // User not found - get auth user to create record
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            // Create a default organization for the user
+            const { data: newOrg, error: orgError } = await supabase
+              .from('organizations')
+              .insert({
+                name: `${authUser.email?.split('@')[0] || 'User'}'s Organization`,
+                subscription_tier: 'growth',
+              })
+              .select()
+              .single();
+
+            if (orgError) {
+              console.error('Error creating organization:', orgError);
+              setLoading(false);
+              return;
+            }
+
+            // Create user record with the new organization
+            const { data: newUser, error: userError } = await supabase
+              .from('users')
+              .insert({
+                id: userId,
+                email: authUser.email || '',
+                full_name: authUser.user_metadata?.full_name || null,
+                org_id: newOrg.id,
+              })
+              .select(`
+                *,
+                organization:organizations(*)
+              `)
+              .single();
+
+            if (userError) {
+              console.error('Error creating user:', userError);
+              setLoading(false);
+              return;
+            }
+
+            setUserWithOrg(newUser);
+            setOrgId(newUser.org_id);
+            setLoading(false);
+            return;
+          }
+        }
         console.error('Error fetching user with org:', error);
+        setLoading(false);
         return;
       }
 
       setUserWithOrg(data);
       setOrgId(data.org_id);
+      setLoading(false);
     } catch (error) {
       console.error('Error in fetchUserWithOrg:', error);
+      setLoading(false);
     }
   };
 

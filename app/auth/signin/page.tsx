@@ -100,10 +100,18 @@ export default function SignInPage() {
       }
 
       if (data.session) {
-        // Small delay to ensure session is saved
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Use window.location for more reliable redirect
-        window.location.href = "/dashboard";
+        // Wait a bit for session to be saved and auth state to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verify session is still valid
+        const { data: { session: verifySession } } = await supabase.auth.getSession();
+        if (verifySession) {
+          // Use window.location for more reliable redirect
+          window.location.href = "/dashboard";
+        } else {
+          setError("Session expired. Please try signing in again.");
+          setLoading(false);
+        }
       } else {
         setError("Sign in failed. Please try again.");
         setLoading(false);
