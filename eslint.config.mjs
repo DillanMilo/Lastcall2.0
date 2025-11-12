@@ -14,7 +14,10 @@ const withProjectOptions = (config) => ({
   },
 });
 
+const nextCoreWebVitals = nextPlugin.configs["core-web-vitals"];
+
 export default tseslint.config(
+  nextCoreWebVitals,
   {
     ignores: ["node_modules", ".next", "out"],
   },

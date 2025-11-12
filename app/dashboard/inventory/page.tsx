@@ -51,26 +51,6 @@ export default function InventoryPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [showAIAssistant, setShowAIAssistant] = useState(false);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push('/auth/signin');
-      return;
-    }
-    if (orgId) {
-      fetchInventory();
-    }
-    // Auto-set to card view on mobile
-    const handleResize = () => {
-      if (window.innerWidth < 768 && viewMode === "table") {
-        setViewMode("grid");
-      }
-    };
-    handleResize(); // Check on mount
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [authLoading, user, orgId, router, viewMode, fetchInventory]);
-
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
@@ -104,6 +84,25 @@ export default function InventoryPage() {
       setLoading(false);
     }
   }, [orgId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+    if (orgId) {
+      fetchInventory();
+    }
+    const handleResize = () => {
+      if (window.innerWidth < 768 && viewMode === "table") {
+        setViewMode("grid");
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [authLoading, user, orgId, router, viewMode, fetchInventory]);
 
   const filteredItems = items.filter(
     (item) =>
