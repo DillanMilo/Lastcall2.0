@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -57,9 +57,11 @@ export function EditItemModal({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unexpected error occurred";
       console.error("Error updating item:", error);
-      alert("Failed to update item: " + error.message);
+      alert("Failed to update item: " + message);
     } finally {
       setLoading(false);
     }
@@ -86,9 +88,11 @@ export function EditItemModal({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unexpected error occurred";
       console.error("Error deleting item:", error);
-      alert("Failed to delete item: " + error.message);
+      alert("Failed to delete item: " + message);
     } finally {
       setLoading(false);
     }

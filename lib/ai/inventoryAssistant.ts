@@ -143,9 +143,11 @@ Always base your answers ONLY on the provided inventory data. Never make up stoc
     }
 
     return assistantMessage;
-  } catch (error: any) {
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to get AI response';
     console.error('Error getting AI response:', error);
-    return `Error: ${error.message || 'Failed to get AI response'}`;
+    return `Error: ${message}`;
   }
 }
 
@@ -194,4 +196,3 @@ export function getQuickInsights(items: InventoryItem[]): {
     topRecommendations: recommendations,
   };
 }
-

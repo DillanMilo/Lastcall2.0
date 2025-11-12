@@ -200,10 +200,12 @@ export async function syncInventoryItems({
 
       if (insertError) throw insertError;
       results.created += 1;
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to sync item';
       results.failed += 1;
       results.errors.push(
-        `${item.name || 'Unknown'}: ${error?.message || 'Failed to sync item'}`
+        `${item.name || 'Unknown'}: ${message}`
       );
     }
   }
