@@ -40,6 +40,10 @@ export default function SettingsPage() {
     new: "",
     confirm: "",
   });
+  const [orgForm, setOrgForm] = useState({
+    name: "",
+  });
+  const [orgSaving, setOrgSaving] = useState(false);
 
   const callBootstrapProfile = async () => {
     try {
@@ -142,6 +146,9 @@ export default function SettingsPage() {
           email: profile.email || authUser.email || "",
           phone: profile.phone || "",
         });
+        setOrgForm({
+          name: profile.organization?.name || "",
+        });
         return;
       }
 
@@ -162,6 +169,7 @@ export default function SettingsPage() {
         email: fallbackUser.email || "",
         phone: fallbackUser.phone || "",
       });
+      setOrgForm({ name: "" });
     } catch (error: any) {
       console.error("Error fetching user data:", error);
       const {
@@ -185,6 +193,7 @@ export default function SettingsPage() {
           email: fallbackUser.email,
           phone: "",
         });
+        setOrgForm({ name: "" });
       }
     } finally {
       setLoading(false);
@@ -410,6 +419,78 @@ export default function SettingsPage() {
     }
   };
 
+  const handleOrganizationSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      setError("You must be signed in to manage an organization.");
+      return;
+    }
+
+    setOrgSaving(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
+      const desiredName =
+        orgForm.name.trim() ||
+        `${formData.full_name || user.email?.split("@")[0] || "My"}'s Organization`;
+
+      if (organization) {
+        const { data: updatedOrg, error: orgError } = await supabase
+          .from("organizations")
+          .update({
+            name: desiredName,
+          })
+          .eq("id", organization.id)
+          .select("*")
+          .single();
+
+        if (orgError) throw orgError;
+
+        if (updatedOrg) {
+          setOrganization(updatedOrg as Organization);
+          setOrgForm({ name: updatedOrg.name || "" });
+        }
+      } else {
+        const { data: newOrg, error: createError } = await supabase
+          .from("organizations")
+          .insert({
+            name: desiredName,
+            subscription_tier: "growth",
+          })
+          .select("*")
+          .single();
+
+        if (createError) throw createError;
+
+        const { data: updatedUser, error: userUpdateError } = await supabase
+          .from("users")
+          .update({
+            org_id: newOrg.id,
+          })
+          .eq("id", user.id)
+          .select("*")
+          .single();
+
+        if (userUpdateError) throw userUpdateError;
+
+        setOrganization(newOrg as Organization);
+        setOrgForm({ name: newOrg.name || "" });
+        setUser({
+          ...(updatedUser as User),
+        });
+      }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (error: any) {
+      console.error("Error saving organization:", error);
+      setError(error.message || "Failed to save organization");
+    } finally {
+      setOrgSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -521,6 +602,54 @@ export default function SettingsPage() {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Organization */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization</CardTitle>
+          <CardDescription>
+            {organization
+              ? "Update your organization details"
+              : "Create an organization to unlock team features"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleOrganizationSave} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="organization-name">Organization Name</Label>
+              <Input
+                id="organization-name"
+                placeholder="Add your organization name"
+                value={orgForm.name}
+                onChange={(e) =>
+                  setOrgForm({
+                    ...orgForm,
+                    name: e.target.value,
+                  })
+                }
+                disabled={orgSaving}
+              />
+            </div>
+            {organization && (
+              <div className="text-xs text-muted-foreground">
+                Subscription tier: {organization.subscription_tier}
+              </div>
+            )}
+            <Button type="submit" disabled={orgSaving} className="w-full sm:w-auto">
+              {orgSaving ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </span>
+              ) : organization ? (
+                "Update Organization"
+              ) : (
+                "Create Organization"
+              )}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
