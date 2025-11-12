@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getSiteUrl } from "@/lib/utils/site-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,9 +36,14 @@ export default function SignInPage() {
       ? "Check your inbox for the confirmation email to finish creating your account."
       : null
   );
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState(prefilledEmail);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     setEmail(prefilledEmail);
+    setResetEmail(prefilledEmail);
   }, [prefilledEmail]);
 
   useEffect(() => {
@@ -193,6 +199,38 @@ export default function SignInPage() {
     }
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      setResetFeedback("Enter the email associated with your account.");
+      return;
+    }
+
+    setResetLoading(true);
+    setResetFeedback(null);
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        resetEmail,
+        {
+          redirectTo: `${getSiteUrl()}/auth/reset`,
+        }
+      );
+
+      if (resetError) {
+        throw resetError;
+      }
+
+      setResetFeedback(
+        "Password reset email sent! Check your inbox for the link."
+      );
+    } catch (err: any) {
+      setResetFeedback(err.message || "Unable to send password reset email.");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <AuthLayout
       title="Welcome back"
@@ -222,14 +260,14 @@ export default function SignInPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link
-                href="https://supabase.com/docs/guides/auth/auth-password-reset#reset-password"
-                className="text-sm text-primary hover:underline"
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => setShowReset((prev) => !prev)}
+                className="text-sm text-primary hover:underline disabled:opacity-50"
+                disabled={disableForm}
               >
                 Forgot password?
-              </Link>
+              </button>
             </div>
             <Input
               id="password"
@@ -277,6 +315,47 @@ export default function SignInPage() {
             </Button>
           </div>
         </form>
+
+        {showReset && (
+          <div className="mt-6 rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Enter your email and we&apos;ll send you a secure reset link.
+            </p>
+            <form onSubmit={handlePasswordReset} className="space-y-3">
+              <Label htmlFor="reset-email" className="sr-only">
+                Reset email
+              </Label>
+              <Input
+                id="reset-email"
+                type="email"
+                placeholder="you@example.com"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                disabled={resetLoading}
+                autoComplete="email"
+              />
+              {resetFeedback && (
+                <div
+                  className={`text-sm ${
+                    resetFeedback.includes("sent")
+                      ? "text-green-600"
+                      : "text-destructive"
+                  }`}
+                >
+                  {resetFeedback}
+                </div>
+              )}
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={resetLoading || !resetEmail}
+                className="w-full"
+              >
+                {resetLoading ? "Sending link..." : "Send password reset link"}
+              </Button>
+            </form>
+          </div>
+        )}
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}

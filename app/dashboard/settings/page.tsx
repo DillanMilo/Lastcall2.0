@@ -17,6 +17,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserCircle, Upload, Save, Loader2, CheckCircle } from "lucide-react";
 
+const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
+
 export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -39,6 +41,36 @@ export default function SettingsPage() {
     confirm: "",
   });
 
+  const callBootstrapProfile = async () => {
+    try {
+      const response = await fetch("/api/auth/bootstrap", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error(
+          "Bootstrap profile error:",
+          payload?.error || response.statusText
+        );
+        return null;
+      }
+
+      if (!payload?.user) {
+        console.error("Bootstrap profile error: invalid response payload");
+        return null;
+      }
+
+      return payload;
+    } catch (error) {
+      console.error("Bootstrap profile error:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     fetchUserData();
   }, []);
@@ -54,67 +86,103 @@ export default function SettingsPage() {
         return;
       }
 
-      // Get user data from users table
-      const { data: userData, error: userError } = await supabase
+      let profile: (User & { organization?: Organization | null }) | null =
+        null;
+
+      const { data: userRow, error: userError } = await supabase
         .from("users")
-        .select("*, organization:organizations(*)")
+        .select("*")
         .eq("id", authUser.id)
-        .single();
+        .maybeSingle();
 
-      // If user doesn't exist in users table, create a basic user object
-      if (userError || !userData) {
-        console.log("User not found in users table, creating default user");
+      if (userError && userError.code !== "PGRST116") {
+        console.error("Error fetching user data:", userError?.message || userError);
+      }
 
-        // Create a minimal user object from auth data
-        const defaultUser: User = {
-          id: authUser.id,
-          email: authUser.email || "",
-          full_name: authUser.user_metadata?.full_name || "",
-          phone: authUser.user_metadata?.phone || "",
-          avatar_url: authUser.user_metadata?.avatar_url || "",
-          org_id: "00000000-0000-0000-0000-000000000001", // Default org
-          created_at: authUser.created_at,
+      if (userRow) {
+        let organizationRecord: Organization | null = null;
+        if (userRow.org_id) {
+          const { data: orgData, error: orgError } = await supabase
+            .from("organizations")
+            .select("*")
+            .eq("id", userRow.org_id)
+            .maybeSingle();
+
+          if (orgError) {
+            console.error(
+              "Error fetching organization data:",
+              orgError.message || orgError
+            );
+          } else {
+            organizationRecord = orgData as Organization;
+          }
+        }
+
+        profile = {
+          ...(userRow as User),
+          organization: organizationRecord,
         };
+      }
 
-        setUser(defaultUser);
+      if (!profile) {
+        const bootstrap = await callBootstrapProfile();
+        if (bootstrap?.user) {
+          profile = {
+            ...bootstrap.user,
+            organization: bootstrap.organization ?? null,
+          };
+        }
+      }
+
+      if (profile) {
+        setUser(profile);
+        setOrganization(profile.organization ?? null);
         setFormData({
-          full_name: defaultUser.full_name || "",
-          email: defaultUser.email || "",
-          phone: defaultUser.phone || "",
+          full_name: profile.full_name || "",
+          email: profile.email || authUser.email || "",
+          phone: profile.phone || "",
         });
-
-        setLoading(false);
         return;
       }
 
-      setUser(userData);
-      setOrganization(userData.organization);
+      const fallbackUser: User = {
+        id: authUser.id,
+        email: authUser.email || "",
+        full_name: authUser.user_metadata?.full_name || "",
+        phone: authUser.user_metadata?.phone || "",
+        avatar_url: authUser.user_metadata?.avatar_url || "",
+        org_id: DEFAULT_ORG_ID,
+        created_at: authUser.created_at,
+      };
 
-      // Set form data
+      setUser(fallbackUser);
+      setOrganization(null);
       setFormData({
-        full_name: userData.full_name || "",
-        email: userData.email || authUser.email || "",
-        phone: userData.phone || "",
+        full_name: fallbackUser.full_name || "",
+        email: fallbackUser.email || "",
+        phone: fallbackUser.phone || "",
       });
     } catch (error: any) {
       console.error("Error fetching user data:", error);
-      // Don't set error, just use defaults
       const {
         data: { user: authUser },
       } = await supabase.auth.getUser();
 
       if (authUser) {
-        const defaultUser: User = {
+        const fallbackUser: User = {
           id: authUser.id,
           email: authUser.email || "",
           full_name: "",
-          org_id: "00000000-0000-0000-0000-000000000001",
+          phone: "",
+          avatar_url: "",
+          org_id: DEFAULT_ORG_ID,
           created_at: authUser.created_at,
         };
-        setUser(defaultUser);
+        setUser(fallbackUser);
+        setOrganization(null);
         setFormData({
           full_name: "",
-          email: authUser.email || "",
+          email: fallbackUser.email,
           phone: "",
         });
       }
@@ -132,36 +200,61 @@ export default function SettingsPage() {
     try {
       if (!user) throw new Error("No user logged in");
 
-      // Upsert to ensure the row is created if missing
-      const { error: upsertError } = await supabase
-        .from("users")
-        .upsert(
-          [
-            {
-              id: user.id,
-              email: formData.email || user.email,
-              full_name: formData.full_name || null,
-              phone: formData.phone || null,
-              org_id: user.org_id || "00000000-0000-0000-0000-000000000001",
-            },
-          ],
-          { onConflict: "id" }
-        );
+      const normalizedEmail = (formData.email || user.email || "").trim();
+      const normalizedName = formData.full_name.trim();
+      const normalizedPhone = formData.phone.trim();
 
-      if (upsertError) throw upsertError;
+      if (!normalizedEmail) {
+        throw new Error("Email is required");
+      }
 
-      // Update email through Supabase auth if changed
-      if (formData.email !== user.email) {
+      if (normalizedEmail !== user.email) {
         const { error: emailError } = await supabase.auth.updateUser({
-          email: formData.email,
+          email: normalizedEmail,
         });
 
         if (emailError) throw emailError;
       }
 
-      setSuccess(true);
-      await fetchUserData();
+      const { data: updatedUser, error: upsertError } = await supabase
+        .from("users")
+        .upsert(
+          {
+            id: user.id,
+            email: normalizedEmail,
+            full_name: normalizedName || null,
+            phone: normalizedPhone || null,
+            avatar_url: user.avatar_url || null,
+            org_id: user.org_id || DEFAULT_ORG_ID,
+          },
+          { onConflict: "id" }
+        )
+        .select("*")
+        .single();
 
+      if (upsertError) throw upsertError;
+
+      if (updatedUser) {
+        let organizationRecord: Organization | null = null;
+        if (updatedUser.org_id) {
+          const { data: orgData } = await supabase
+            .from("organizations")
+            .select("*")
+            .eq("id", updatedUser.org_id)
+            .maybeSingle();
+          organizationRecord = (orgData as Organization) ?? null;
+        }
+
+        setUser(updatedUser as User);
+        setOrganization(organizationRecord);
+        setFormData({
+          full_name: updatedUser.full_name || "",
+          email: updatedUser.email || normalizedEmail,
+          phone: updatedUser.phone || "",
+        });
+      }
+
+      setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error: any) {
       console.error("Error updating profile:", error);
@@ -173,6 +266,16 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user) {
+      setError("Please sign in again before changing your password.");
+      return;
+    }
+
+    if (!passwordData.current) {
+      setError("Enter your current password to continue.");
+      return;
+    }
 
     if (passwordData.new !== passwordData.confirm) {
       setError("New passwords do not match");
@@ -189,6 +292,15 @@ export default function SettingsPage() {
     setSuccess(false);
 
     try {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: formData.email || user.email,
+        password: passwordData.current,
+      });
+
+      if (verifyError) {
+        throw new Error("Current password is incorrect.");
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: passwordData.new,
       });
@@ -251,33 +363,43 @@ export default function SettingsPage() {
 
       console.log("Public URL:", publicUrl);
 
-      // Try to update user record, or insert if doesn't exist
-      const { error: updateError } = await supabase
+      const { data: updatedUser, error: profileError } = await supabase
         .from("users")
-        .update({ avatar_url: publicUrl })
-        .eq("id", user.id);
-
-      // If update fails because user doesn't exist, insert
-      if (updateError && updateError.code === "PGRST116") {
-        const { error: insertError } = await supabase.from("users").insert([
+        .upsert(
           {
             id: user.id,
             email: user.email,
+            full_name: user.full_name || null,
+            phone: user.phone || null,
             avatar_url: publicUrl,
-            org_id: "00000000-0000-0000-0000-000000000001",
+            org_id: user.org_id || DEFAULT_ORG_ID,
           },
-        ]);
+          { onConflict: "id" }
+        )
+        .select("*")
+        .single();
 
-        if (insertError) throw insertError;
-      } else if (updateError) {
-        throw updateError;
+      if (profileError) throw profileError;
+
+      if (updatedUser) {
+        let organizationRecord: Organization | null = null;
+        if (updatedUser.org_id) {
+          const { data: orgData } = await supabase
+            .from("organizations")
+            .select("*")
+            .eq("id", updatedUser.org_id)
+            .maybeSingle();
+          organizationRecord = (orgData as Organization) ?? null;
+        }
+
+        setUser(updatedUser as User);
+        setOrganization(organizationRecord);
+        setFormData((prev) => ({
+          ...prev,
+          email: updatedUser.email || prev.email,
+        }));
       }
 
-      // Update local state immediately
-      setUser({ ...user, avatar_url: publicUrl });
-
-      // Refresh user data
-      await fetchUserData();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error: any) {
