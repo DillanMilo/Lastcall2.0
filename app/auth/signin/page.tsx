@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
@@ -24,6 +24,15 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Clear any stale auth tokens on page load to prevent refresh token errors
+  useEffect(() => {
+    // Silently clear any existing session/tokens when landing on sign-in page
+    // This prevents refresh token errors from showing up
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {
+      // Ignore errors - we're just clearing local state
+    });
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
