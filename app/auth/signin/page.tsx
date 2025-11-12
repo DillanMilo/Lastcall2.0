@@ -80,13 +80,18 @@ export default function SignInPage() {
     setError(null);
     setMessage(null);
 
+    console.log('🔐 Starting sign in process...');
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('📧 Sign in response:', { hasData: !!data, hasError: !!error, error: error?.message });
+
       if (error) {
+        console.error('❌ Sign in error:', error);
         // Provide more specific error messages
         if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please try again.');
@@ -100,24 +105,32 @@ export default function SignInPage() {
       }
 
       if (data.session) {
-        // Wait a bit for session to be saved and auth state to update
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('✅ Session created:', { userId: data.session.user.id, email: data.session.user.email });
         
-        // Verify session is still valid
-        const { data: { session: verifySession } } = await supabase.auth.getSession();
-        if (verifySession) {
-          // Use window.location for more reliable redirect
-          window.location.href = "/dashboard";
+        // Give a tiny moment for session to be saved to storage
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify session one more time
+        const { data: { session: finalCheck } } = await supabase.auth.getSession();
+        console.log('🔍 Final session check:', { hasSession: !!finalCheck });
+        
+        if (finalCheck) {
+          console.log('🚀 Redirecting to dashboard...');
+          // Use window.location.replace for immediate redirect (doesn't add to history)
+          window.location.replace("/dashboard");
+          // Don't set loading to false - we're redirecting
         } else {
-          setError("Session expired. Please try signing in again.");
+          console.error('❌ Session lost after creation');
+          setError("Session was created but lost. Please try again.");
           setLoading(false);
         }
       } else {
+        console.error('❌ No session in response');
         setError("Sign in failed. Please try again.");
         setLoading(false);
       }
     } catch (err: any) {
-      console.error('Sign in error:', err);
+      console.error('💥 Unexpected sign in error:', err);
       setError(err.message || "An error occurred during sign in");
       setLoading(false);
     }
@@ -197,7 +210,14 @@ export default function SignInPage() {
 
           <div className="flex flex-col gap-2">
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </Button>
             <Button
               type="button"
