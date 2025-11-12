@@ -25,14 +25,54 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Clear any stale auth tokens on page load to prevent refresh token errors
+  // Check for email confirmation callback and handle session
   useEffect(() => {
-    // Silently clear any existing session/tokens when landing on sign-in page
-    // This prevents refresh token errors from showing up
-    supabase.auth.signOut({ scope: 'local' }).catch(() => {
-      // Ignore errors - we're just clearing local state
-    });
-  }, []);
+    const handleAuthCallback = async () => {
+      // Check if this is an email confirmation callback
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      
+      if (accessToken && refreshToken) {
+        // This is an email confirmation callback
+        try {
+          // Exchange the tokens for a session
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error('Error setting session:', error);
+            setError('Failed to complete sign in. Please try signing in again.');
+            // Clear the hash from URL
+            window.history.replaceState(null, '', window.location.pathname);
+            return;
+          }
+
+          if (data.session) {
+            // Successfully authenticated, redirect to dashboard
+            router.push('/dashboard');
+            return;
+          }
+        } catch (err: any) {
+          console.error('Error handling auth callback:', err);
+          setError('Failed to complete sign in. Please try signing in again.');
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } else {
+        // Not a callback - check for stale tokens only if there's an error
+        // Don't clear valid sessions
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error && error.message?.includes('Refresh Token')) {
+          // Only clear if there's a refresh token error
+          supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        }
+      }
+    };
+
+    handleAuthCallback();
+  }, [router]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,14 +86,31 @@ export default function SignInPage() {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Provide more specific error messages
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please try again.');
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('Please check your email and confirm your account before signing in.');
+        } else {
+          setError(error.message || "An error occurred during sign in");
+        }
+        setLoading(false);
+        return;
+      }
 
       if (data.session) {
-        router.push("/dashboard");
+        // Small delay to ensure session is saved
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Use window.location for more reliable redirect
+        window.location.href = "/dashboard";
+      } else {
+        setError("Sign in failed. Please try again.");
+        setLoading(false);
       }
     } catch (err: any) {
+      console.error('Sign in error:', err);
       setError(err.message || "An error occurred during sign in");
-    } finally {
       setLoading(false);
     }
   };

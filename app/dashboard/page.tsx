@@ -35,6 +35,45 @@ export default function DashboardPage() {
     !String(process.env.NEXT_PUBLIC_SUPABASE_URL).includes("placeholder") &&
     String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) !== "placeholder-key";
 
+  // Handle email confirmation callback
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      // Check if this is an email confirmation callback (has hash fragments)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      
+      if (accessToken && refreshToken) {
+        try {
+          // Exchange the tokens for a session
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error('Error setting session from callback:', error);
+            // Redirect to signin if session setup fails
+            router.push('/auth/signin?error=session_failed');
+            return;
+          }
+
+          if (data.session) {
+            // Clear the hash from URL
+            window.history.replaceState(null, '', window.location.pathname);
+            // Force a page reload to refresh auth state
+            window.location.reload();
+          }
+        } catch (err: any) {
+          console.error('Error handling auth callback:', err);
+          router.push('/auth/signin?error=callback_failed');
+        }
+      }
+    };
+
+    handleAuthCallback();
+  }, [router]);
+
   useEffect(() => {
     if (!authLoading) {
       if (!user) {

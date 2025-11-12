@@ -41,12 +41,23 @@ export default function SignUpPage() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific error cases
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+          setError("This email is already registered. Please sign in instead.");
+        } else {
+          throw error;
+        }
+        setLoading(false);
+        return;
+      }
 
       if (data.user && !data.session) {
         setMessage("Check your email to confirm your account.");
       } else if (data.session) {
-        router.push("/dashboard");
+        // User is immediately signed in (email confirmations disabled)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        window.location.href = "/dashboard";
       }
     } catch (err: any) {
       setError(err.message || "An error occurred during sign up");
