@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem } from "@/types";
+import { useAuth } from "@/lib/auth/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +41,8 @@ import { AIAssistant } from "@/components/inventory/AIAssistant";
 import { demoInventoryItems } from "@/lib/demoInventory";
 
 export default function InventoryPage() {
+  const router = useRouter();
+  const { user, orgId, loading: authLoading } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,10 +51,17 @@ export default function InventoryPage() {
   const [bulkEditInvoice, setBulkEditInvoice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const orgId = "00000000-0000-0000-0000-000000000001";
 
   useEffect(() => {
-    fetchInventory();
+    if (!authLoading) {
+      if (!user) {
+        router.push('/auth/signin');
+        return;
+      }
+      if (orgId) {
+        fetchInventory();
+      }
+    }
     // Auto-set to card view on mobile
     const handleResize = () => {
       if (window.innerWidth < 768 && viewMode === "table") {
@@ -60,13 +71,16 @@ export default function InventoryPage() {
     handleResize(); // Check on mount
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [authLoading, user, orgId, router]);
 
   const fetchInventory = async () => {
+    if (!orgId) return;
+
     try {
       const { data, error } = await supabase
         .from("inventory_items")
         .select("*")
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -75,30 +89,17 @@ export default function InventoryPage() {
           error.message?.includes("FetchError") ||
           error.message?.includes("fetch failed")
         ) {
-          setItems(demoInventoryItems);
+          setItems([]);
           setLoading(false);
           return;
         }
         throw error;
       }
 
-      if (!data || data.length === 0) {
-        setItems(demoInventoryItems);
-        return;
-      }
-
-      setItems(data);
+      setItems(data || []);
     } catch (error: any) {
-      if (
-        error.message?.includes("fetch") ||
-        error.message?.includes("network") ||
-        error.code === "PGRST"
-      ) {
-        setItems(demoInventoryItems);
-      } else {
-        console.error("Error fetching inventory:", error);
-        setItems(demoInventoryItems);
-      }
+      console.error("Error fetching inventory:", error);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -210,9 +211,9 @@ export default function InventoryPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {authLoading || loading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Loading inventory...
+              {authLoading ? "Authenticating..." : "Loading inventory..."}
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="text-center py-8">
@@ -338,7 +339,7 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      {showAddModal && (
+      {showAddModal && orgId && (
         <AddItemModal
           orgId={orgId}
           onClose={() => setShowAddModal(false)}
@@ -363,7 +364,7 @@ export default function InventoryPage() {
         />
       )}
 
-      {showAIAssistant && (
+      {showAIAssistant && orgId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
           <div className="w-full max-w-2xl my-auto">
             <AIAssistant

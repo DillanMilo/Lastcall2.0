@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem } from "@/types";
+import { useAuth } from "@/lib/auth/useAuth";
 import {
   Card,
   CardContent,
@@ -22,10 +24,11 @@ import { daysUntilExpiration } from "@/lib/utils";
 import { AIAssistant } from "@/components/inventory/AIAssistant";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, orgId, loading: authLoading } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const orgId = "00000000-0000-0000-0000-000000000001";
   const isSupabaseConfigured =
     !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
@@ -33,14 +36,24 @@ export default function DashboardPage() {
     String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) !== "placeholder-key";
 
   useEffect(() => {
-    // Clear AI chat history when dashboard loads (fresh start)
-    const aiChatKey = `ai-chat-${orgId}`;
-    localStorage.removeItem(aiChatKey);
-    
-    fetchInventory();
-  }, [orgId]);
+    if (!authLoading) {
+      if (!user) {
+        router.push('/auth/signin');
+        return;
+      }
+      if (orgId) {
+        // Clear AI chat history when dashboard loads (fresh start)
+        const aiChatKey = `ai-chat-${orgId}`;
+        localStorage.removeItem(aiChatKey);
+
+        fetchInventory();
+      }
+    }
+  }, [authLoading, user, orgId, router]);
 
   const fetchInventory = async () => {
+    if (!orgId) return;
+
     try {
       if (!isSupabaseConfigured) {
         console.warn(
@@ -51,7 +64,8 @@ export default function DashboardPage() {
       }
       const { data, error } = await supabase
         .from("inventory_items")
-        .select("*");
+        .select("*")
+        .eq("org_id", orgId);
 
       if (error) {
         console.error("Error fetching inventory:", {
@@ -89,28 +103,28 @@ export default function DashboardPage() {
   const stats = [
     {
       title: "Total Items",
-      value: loading ? "..." : totalItems.toString(),
+      value: authLoading || loading ? "..." : totalItems.toString(),
       description: "Items in inventory",
       icon: Package,
       trend: `${totalItems} total`,
     },
     {
       title: "Low Stock Alerts",
-      value: loading ? "..." : lowStockItems.length.toString(),
+      value: authLoading || loading ? "..." : lowStockItems.length.toString(),
       description: "Items below reorder point",
       icon: AlertCircle,
       trend: `${lowStockItems.length} items`,
     },
     {
       title: "Expiring Soon",
-      value: loading ? "..." : expiringSoonItems.length.toString(),
+      value: authLoading || loading ? "..." : expiringSoonItems.length.toString(),
       description: "Items expiring in 7 days",
       icon: Clock,
       trend: `${expiringSoonItems.length} items`,
     },
     {
       title: "Restock Needed",
-      value: loading ? "..." : restockNeeded.toString(),
+      value: authLoading || loading ? "..." : restockNeeded.toString(),
       description: "Recommended reorders",
       icon: TrendingUp,
       trend: `${restockNeeded} items`,
@@ -173,9 +187,9 @@ export default function DashboardPage() {
             <CardDescription>Latest inventory additions</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
-                Loading...
+                {authLoading ? "Authenticating..." : "Loading..."}
               </div>
             ) : items.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-8">
@@ -213,9 +227,9 @@ export default function DashboardPage() {
             <CardDescription>Items needing attention</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
-                Loading...
+                {authLoading ? "Authenticating..." : "Loading..."}
               </div>
             ) : lowStockItems.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-8">
@@ -255,9 +269,9 @@ export default function DashboardPage() {
             <CardDescription>Products expiring within 7 days</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
-                Loading...
+                {authLoading ? "Authenticating..." : "Loading..."}
               </div>
             ) : expiringSoonItems.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-8">
@@ -293,9 +307,9 @@ export default function DashboardPage() {
             <CardDescription>Below reorder threshold</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
-                Loading...
+                {authLoading ? "Authenticating..." : "Loading..."}
               </div>
             ) : restockItems.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-8">
@@ -325,7 +339,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {showAIAssistant && (
+      {showAIAssistant && orgId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
           <div className="w-full max-w-2xl my-auto">
             <AIAssistant
