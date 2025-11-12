@@ -131,7 +131,9 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
       // Add AI response
       const aiMessage: Message = {
         role: "assistant",
-        content: data.response,
+        content:
+          data.response ??
+          "I couldn't generate a response, but your request was received.",
         timestamp: new Date(),
       };
 
