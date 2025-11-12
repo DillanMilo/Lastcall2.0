@@ -171,7 +171,7 @@ export default function SettingsPage() {
         phone: fallbackUser.phone || "",
       });
       setOrgForm({ name: "" });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching user data:", error);
       const {
         data: { user: authUser },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CSVImporter } from "@/components/forms/CSVImporter";
 import { APIImporter } from "@/components/forms/APIImporter";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,12 +11,7 @@ export default function ImportPage() {
   );
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchUserOrg();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const fetchUserOrg = async () => {
+  const fetchUserOrg = useCallback(async () => {
     try {
       const {
         data: { user },
@@ -39,7 +34,11 @@ export default function ImportPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchUserOrg();
+  }, [fetchUserOrg]);
 
   if (loading) {
     return (

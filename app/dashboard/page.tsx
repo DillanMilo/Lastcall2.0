@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem } from "@/types";
@@ -64,7 +64,7 @@ export default function DashboardPage() {
             // Force a page reload to refresh auth state
             window.location.reload();
           }
-        } catch (err: any) {
+        } catch (err) {
           console.error('Error handling auth callback:', err);
           router.push('/auth/signin?error=callback_failed');
         }
@@ -75,33 +75,30 @@ export default function DashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/auth/signin');
-        return;
-      }
-      // Wait for orgId to be set (it might be created automatically)
-      // Only redirect if we've finished loading and still no orgId after a delay
-      if (orgId) {
-        // Clear AI chat history when dashboard loads (fresh start)
-        const aiChatKey = `ai-chat-${orgId}`;
-        localStorage.removeItem(aiChatKey);
+    if (authLoading) return;
 
-        fetchInventory();
-      } else {
-        // Give it a moment for orgId to be set (user record might be created)
-        const timeout = setTimeout(() => {
-          if (!orgId && user) {
-            console.warn('User authenticated but no orgId found. User record may need to be created.');
-            // Don't redirect - let the useAuth hook create the user record
-          }
-        }, 2000);
-        return () => clearTimeout(timeout);
-      }
+    if (!user) {
+      router.push('/auth/signin');
+      return;
     }
-  }, [authLoading, user, orgId, router]);
 
-  const fetchInventory = async () => {
+    if (orgId) {
+      const aiChatKey = `ai-chat-${orgId}`;
+      localStorage.removeItem(aiChatKey);
+
+      fetchInventory();
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!orgId && user) {
+        console.warn('User authenticated but no orgId found. User record may need to be created.');
+      }
+    }, 2000);
+    return () => clearTimeout(timeout);
+  }, [authLoading, user, orgId, router, fetchInventory]);
+
+  const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
     try {
@@ -119,23 +116,26 @@ export default function DashboardPage() {
 
       if (error) {
         console.error("Error fetching inventory:", {
-          message: (error as any)?.message,
-          status: (error as any)?.status,
-          details: (error as any)?.details,
-          hint: (error as any)?.hint,
-          original: error,
+          message: error.message,
+          status: error.status,
+          details: error.details,
+          hint: error.hint,
         });
         setItems([]);
       } else {
         setItems(data || []);
       }
     } catch (error) {
-      console.error("Unexpected error fetching inventory:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unexpected error fetching inventory";
+      console.error("Unexpected error fetching inventory:", message);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [orgId, isSupabaseConfigured]);
 
   // Calculate stats from real data
   const totalItems = items.length;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem } from "@/types";
@@ -38,7 +38,6 @@ import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
 import { AIAssistant } from "@/components/inventory/AIAssistant";
-import { demoInventoryItems } from "@/lib/demoInventory";
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -53,14 +52,13 @@ export default function InventoryPage() {
   const [showAIAssistant, setShowAIAssistant] = useState(false);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/auth/signin');
-        return;
-      }
-      if (orgId) {
-        fetchInventory();
-      }
+    if (authLoading) return;
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+    if (orgId) {
+      fetchInventory();
     }
     // Auto-set to card view on mobile
     const handleResize = () => {
@@ -71,9 +69,9 @@ export default function InventoryPage() {
     handleResize(); // Check on mount
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [authLoading, user, orgId, router]);
+  }, [authLoading, user, orgId, router, viewMode, fetchInventory]);
 
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
     try {
@@ -97,13 +95,15 @@ export default function InventoryPage() {
       }
 
       setItems(data || []);
-    } catch (error: any) {
-      console.error("Error fetching inventory:", error);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch inventory";
+      console.error("Error fetching inventory:", message);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [orgId]);
 
   const filteredItems = items.filter(
     (item) =>
