@@ -58,15 +58,38 @@ export function APIImporter({ orgId }: { orgId: string }) {
     };
   };
 
-  const buildSyncResult = (payload: any): SyncResult => ({
-    summary: payload?.summary ?? "Sync completed.",
-    created: payload?.results?.created ?? 0,
-    updated: payload?.results?.updated ?? 0,
-    failed: payload?.results?.failed ?? 0,
-    errors: Array.isArray(payload?.results?.errors)
-      ? payload.results.errors
-      : [],
-  });
+  const buildSyncResult = (payload: unknown): SyncResult => {
+    const fallback: SyncResult = {
+      summary: "Sync completed.",
+      created: 0,
+      updated: 0,
+      failed: 0,
+      errors: [],
+    };
+
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      Array.isArray(payload)
+    ) {
+      return fallback;
+    }
+
+    const safePayload = payload as Partial<{
+      summary: string;
+      results: Partial<SyncResult>;
+    }>;
+
+    return {
+      summary: safePayload.summary ?? fallback.summary,
+      created: safePayload.results?.created ?? fallback.created,
+      updated: safePayload.results?.updated ?? fallback.updated,
+      failed: safePayload.results?.failed ?? fallback.failed,
+      errors: Array.isArray(safePayload.results?.errors)
+        ? safePayload.results.errors
+        : fallback.errors,
+    };
+  };
 
   const syncWithBackend = async (body: Record<string, unknown>) => {
     const response = await fetch("/api/inventory/sync", {
@@ -161,8 +184,10 @@ export function APIImporter({ orgId }: { orgId: string }) {
         items: mappedItems,
         enable_ai_labeling: enableAiLabeling,
       });
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to sync inventory via API.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to sync inventory via API.";
+      setError(message);
     } finally {
       setSyncing(false);
     }

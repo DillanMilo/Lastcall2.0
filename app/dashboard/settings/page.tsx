@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { User, Organization } from "@/types";
@@ -265,9 +266,11 @@ export default function SettingsPage() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update profile";
       console.error("Error updating profile:", error);
-      setError(error.message || "Failed to update profile");
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -320,9 +323,11 @@ export default function SettingsPage() {
       setPasswordData({ current: "", new: "", confirm: "" });
 
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to change password";
       console.error("Error changing password:", error);
-      setError(error.message || "Failed to change password");
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -411,9 +416,11 @@ export default function SettingsPage() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to upload avatar";
       console.error("Error uploading avatar:", error);
-      setError(error.message || "Failed to upload avatar");
+      setError(message);
     } finally {
       setUploading(false);
     }
@@ -483,9 +490,11 @@ export default function SettingsPage() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to save organization";
       console.error("Error saving organization:", error);
-      setError(error.message || "Failed to save organization");
+      setError(message);
     } finally {
       setOrgSaving(false);
     }
@@ -558,9 +567,11 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
             <div className="relative">
               {user.avatar_url ? (
-                <img
+                <Image
                   src={user.avatar_url}
                   alt="Profile"
+                  width={128}
+                  height={128}
                   className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-muted"
                 />
               ) : (

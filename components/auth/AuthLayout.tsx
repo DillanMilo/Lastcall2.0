@@ -1,6 +1,4 @@
 "use client";
-
-import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
@@ -70,5 +68,4 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
     </div>
   );
 }
-
 

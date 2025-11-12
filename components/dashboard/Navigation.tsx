@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
@@ -97,9 +98,11 @@ export function Navigation() {
           <Link href="/dashboard/settings">
             <div className="flex items-center gap-3 px-3 py-2 mb-2 rounded-xl hover:bg-accent transition-colors">
               {user.avatar_url ? (
-                <img
+                <Image
                   src={user.avatar_url}
                   alt="Profile"
+                  width={32}
+                  height={32}
                   className="w-8 h-8 rounded-full object-cover"
                 />
               ) : (

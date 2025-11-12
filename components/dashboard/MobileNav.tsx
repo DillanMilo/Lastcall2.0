@@ -25,7 +25,8 @@ export function MobileNav() {
       });
       await supabase.auth.signOut();
       window.location.href = "/auth/signin";
-    } catch (e) {
+    } catch (error) {
+      console.error("Error during sign out:", error);
       window.location.href = "/auth/signin";
     }
   };
