@@ -54,7 +54,35 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // Try to get session, but handle errors gracefully
+  let session = null
+  try {
+    const { data, error } = await supabase.auth.getSession()
+    
+    // If there's a refresh token error, clear the session and continue
+    if (error) {
+      // Check if it's a refresh token error
+      if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Invalid Refresh Token')) {
+        // Clear invalid tokens by signing out (this properly clears all auth cookies)
+        await supabase.auth.signOut()
+        // Continue without session (user will need to sign in again)
+        session = null
+      } else {
+        // For other errors, log but don't block
+        console.error('Auth error in middleware:', error.message)
+        session = null
+      }
+    } else {
+      session = data?.session ?? null
+    }
+  } catch (error: any) {
+    // Catch any unexpected errors and continue
+    // If it's a refresh token error, clear it
+    if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token')) {
+      await supabase.auth.signOut().catch(() => {})
+    }
+    session = null
+  }
 
   // Protect dashboard routes
   if (request.nextUrl.pathname.startsWith('/dashboard') && !session) {
