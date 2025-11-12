@@ -83,6 +83,7 @@ vercel
 ```
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SITE_URL=https://your-production-domain.vercel.app
 OPENAI_API_KEY=your_openai_api_key (optional)
 ```
 
@@ -126,6 +127,9 @@ You don't need to change any of these! Vercel handles it all automatically.
 # Supabase (Required)
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
+
+# Site URL (Required for email redirects in production)
+NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 
 # OpenAI (Optional - for AI labeling)
 OPENAI_API_KEY=sk-proj-...

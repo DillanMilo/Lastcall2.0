@@ -121,6 +121,19 @@ SELECT * FROM users;
    - **Enable Email Confirmations**: Turn OFF for development (turn ON in production)
    - **Enable Email Signup**: ON
 
+### ⚠️ IMPORTANT: Email Confirmations Must Be Disabled
+
+For development/testing, **email confirmations MUST be turned OFF**, otherwise:
+- Users won't receive signup emails
+- Signup will fail with "Check your email" message
+- You'll need to manually confirm users in Supabase Dashboard
+
+**To disable email confirmations:**
+1. Go to **Authentication** → **Settings** (not Providers)
+2. Scroll to **Email Auth**
+3. Turn OFF **Enable email confirmations**
+4. Click **Save**
+
 ### (Optional) Enable Google OAuth
 
 1. Go to **Authentication** → **Providers**
