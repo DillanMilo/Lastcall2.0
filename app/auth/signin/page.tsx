@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
@@ -20,7 +20,7 @@ import AuthLayout from "@/components/auth/AuthLayout";
 const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL || "";
 const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefilledEmail = searchParams.get("email") ?? "";
@@ -365,5 +365,13 @@ export default function SignInPage() {
         </div>
       </CardContent>
     </AuthLayout>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="py-24 text-center text-muted-foreground">Loading…</div>}>
+      <SignInContent />
+    </Suspense>
   );
 }
