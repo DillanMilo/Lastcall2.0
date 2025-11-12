@@ -190,6 +190,11 @@ Required environment variables:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 - `OPENAI_API_KEY` - Your OpenAI API key
 
+Optional but recommended:
+
+- `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD` - credentials for the “View live demo” button on the sign-in screen. Make sure the user exists (confirmed) inside Supabase Auth.
+- `SUPABASE_SERVICE_ROLE_KEY` - enables the `/api/auth/bootstrap` fallback route that provisions organizations/users when RLS blocks client-side inserts. Store this secret only in server envs (Vercel project settings, `.env.local`)—never expose it via `NEXT_PUBLIC_*`.
+
 ## 🚧 Roadmap
 
 ### Phase 1 (Current) - MVP

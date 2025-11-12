@@ -18,13 +18,11 @@ export default function SignUpPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setMessage(null);
 
     if (password !== confirm) {
       setError("Passwords do not match");
@@ -37,13 +35,15 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${getSiteUrl()}/dashboard`,
+          emailRedirectTo: `${getSiteUrl()}/auth/signin`,
         },
       });
 
       if (error) {
-        // Handle specific error cases
-        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+        if (
+          error.message.includes("already registered") ||
+          error.message.includes("User already registered")
+        ) {
           setError("This email is already registered. Please sign in instead.");
         } else {
           throw error;
@@ -53,37 +53,19 @@ export default function SignUpPage() {
       }
 
       if (data.user && !data.session) {
-        setMessage("Check your email to confirm your account.");
-      } else if (data.session) {
-        // User is immediately signed in (email confirmations disabled)
-        await new Promise(resolve => setTimeout(resolve, 100));
+        router.push(
+          `/auth/signin?verify=1&email=${encodeURIComponent(email.trim())}`
+        );
+        return;
+      }
+
+      if (data.session) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
         window.location.href = "/dashboard";
+        return;
       }
     } catch (err: any) {
       setError(err.message || "An error occurred during sign up");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${getSiteUrl()}/dashboard`,
-        },
-      });
-
-      if (error) throw error;
-      setMessage("Check your email for a magic link!");
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -140,26 +122,9 @@ export default function SignUpPage() {
             </div>
           )}
 
-          {message && (
-            <div className="text-sm text-primary bg-primary/10 p-3 rounded-xl">
-              {message}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Creating account..." : "Create account"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleMagicLink}
-              disabled={loading || !email}
-              className="w-full"
-            >
-              Email me a magic link
-            </Button>
-          </div>
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Creating account..." : "Create account"}
+          </Button>
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
@@ -170,5 +135,3 @@ export default function SignUpPage() {
     </AuthLayout>
   );
 }
-
-

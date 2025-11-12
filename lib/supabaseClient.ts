@@ -1,18 +1,25 @@
+import { createBrowserClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-// Note: Using placeholder values to allow UI development without backend setup
-// Add real credentials to .env.local for full functionality
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    // Handle refresh token errors gracefully
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    flowType: 'pkce',
-  },
-});
+const isBrowser = typeof window !== 'undefined';
 
+/**
+ * Browser clients use @supabase/ssr so auth state is mirrored into HTTP cookies.
+ * Server-side imports fall back to a plain client (anon role) with session
+ * persistence disabled.
+ */
+export const supabase = isBrowser
+  ? createBrowserClient(supabaseUrl, supabaseAnonKey, {
+      isSingleton: true,
+    })
+  : createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        flowType: 'pkce',
+      },
+    });

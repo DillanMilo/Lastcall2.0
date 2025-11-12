@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { getSiteUrl } from "@/lib/utils/site-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,154 +16,193 @@ import {
 import Link from "next/link";
 import AuthLayout from "@/components/auth/AuthLayout";
 
+const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL || "";
+const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
+
 export default function SignInPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const prefilledEmail = searchParams.get("email") ?? "";
+  const verifyReminder = searchParams.get("verify");
+  const [email, setEmail] = useState(prefilledEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [processingVerification, setProcessingVerification] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    verifyReminder
+      ? "Check your inbox for the confirmation email to finish creating your account."
+      : null
+  );
 
-  // Check for email confirmation callback and handle session
   useEffect(() => {
+    setEmail(prefilledEmail);
+  }, [prefilledEmail]);
+
+  useEffect(() => {
+    if (verifyReminder) {
+      setMessage(
+        "Check your inbox for the confirmation email to finish creating your account."
+      );
+    }
+  }, [verifyReminder]);
+
+  // Process email confirmation redirects and skip form if already signed in
+  useEffect(() => {
+    let active = true;
+
     const handleAuthCallback = async () => {
-      // Check if this is an email confirmation callback
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
       if (accessToken && refreshToken) {
-        // This is an email confirmation callback
+        setProcessingVerification(true);
+        setMessage("Email verified! Signing you in...");
         try {
-          // Exchange the tokens for a session
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
+          window.history.replaceState(
+            null,
+            "",
+            window.location.pathname + window.location.search
+          );
+
           if (error) {
-            console.error('Error setting session:', error);
-            setError('Failed to complete sign in. Please try signing in again.');
-            // Clear the hash from URL
-            window.history.replaceState(null, '', window.location.pathname);
+            if (active) {
+              setProcessingVerification(false);
+              setError(
+                "We couldn't finish signing you in. Please try again from the sign-in form."
+              );
+            }
             return;
           }
 
-          if (data.session) {
-            // Successfully authenticated, redirect to dashboard
-            router.push('/dashboard');
+          if (data.session && active) {
+            router.replace("/dashboard");
             return;
           }
         } catch (err: any) {
-          console.error('Error handling auth callback:', err);
-          setError('Failed to complete sign in. Please try signing in again.');
-          window.history.replaceState(null, '', window.location.pathname);
+          if (active) {
+            setProcessingVerification(false);
+            setError(err.message || "Something went wrong. Please try again.");
+          }
+          return;
         }
-      } else {
-        // Not a callback - check for stale tokens only if there's an error
-        // Don't clear valid sessions
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error && error.message?.includes('Refresh Token')) {
-          // Only clear if there's a refresh token error
-          supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-        }
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session && active) {
+        router.replace("/dashboard");
       }
     };
 
     handleAuthCallback();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        router.replace("/dashboard");
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
+
+  const disableForm = useMemo(
+    () => loading || demoLoading || processingVerification,
+    [loading, demoLoading, processingVerification]
+  );
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (disableForm) return;
+
     setLoading(true);
     setError(null);
     setMessage(null);
 
-    console.log('🔐 Starting sign in process...');
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      console.log('📧 Sign in response:', { hasData: !!data, hasError: !!error, error: error?.message });
-
       if (error) {
-        console.error('❌ Sign in error:', error);
-        // Provide more specific error messages
-        if (error.message.includes('Invalid login credentials')) {
-          setError('Invalid email or password. Please try again.');
-        } else if (error.message.includes('Email not confirmed')) {
-          setError('Please check your email and confirm your account before signing in.');
+        if (error.message.includes("Email not confirmed")) {
+          setError("Please confirm your email before signing in.");
+        } else if (error.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please try again.");
         } else {
-          setError(error.message || "An error occurred during sign in");
+          setError(error.message || "Unable to sign in right now.");
         }
         setLoading(false);
         return;
       }
 
-      if (data.session) {
-        console.log('✅ Session created:', { userId: data.session.user.id, email: data.session.user.email });
-        
-        // Give a tiny moment for session to be saved to storage
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Verify session one more time
-        const { data: { session: finalCheck } } = await supabase.auth.getSession();
-        console.log('🔍 Final session check:', { hasSession: !!finalCheck });
-        
-        if (finalCheck) {
-          console.log('🚀 Redirecting to dashboard...');
-          // Use window.location.replace for immediate redirect (doesn't add to history)
-          window.location.replace("/dashboard");
-          // Don't set loading to false - we're redirecting
-        } else {
-          console.error('❌ Session lost after creation');
-          setError("Session was created but lost. Please try again.");
-          setLoading(false);
-        }
-      } else {
-        console.error('❌ No session in response');
-        setError("Sign in failed. Please try again.");
-        setLoading(false);
-      }
+      setMessage("Signing you in...");
+      router.replace("/dashboard");
     } catch (err: any) {
-      console.error('💥 Unexpected sign in error:', err);
-      setError(err.message || "An error occurred during sign in");
+      setError(err.message || "Unable to sign in right now.");
       setLoading(false);
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleDemoLogin = async () => {
+    if (!demoEmail || !demoPassword) {
+      setError(
+        "Demo account credentials are not configured. Add NEXT_PUBLIC_DEMO_EMAIL and NEXT_PUBLIC_DEMO_PASSWORD to your .env.local file."
+      );
+      return;
+    }
+
+    setDemoLoading(true);
     setError(null);
-    setMessage(null);
+    setMessage("Loading the demo dashboard...");
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${getSiteUrl()}/dashboard`,
-        },
+      const { error } = await supabase.auth.signInWithPassword({
+        email: demoEmail,
+        password: demoPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        setDemoLoading(false);
+        setError(
+          error.message ||
+            "Unable to sign in to the demo account. Please confirm the credentials exist in Supabase."
+        );
+        return;
+      }
 
-      setMessage("Check your email for a magic link!");
+      router.replace("/dashboard");
     } catch (err: any) {
-      setError(err.message || "An error occurred");
-    } finally {
-      setLoading(false);
+      setDemoLoading(false);
+      setError(err.message || "Unable to sign in to the demo account.");
     }
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to continue to your dashboard.">
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in or instantly jump into the live demo."
+    >
       <CardHeader className="p-0 mb-4">
         <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>Enter your credentials to access LastCall</CardDescription>
+        <CardDescription>
+          Enter your credentials to access LastCall
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <form onSubmit={handleSignIn} className="space-y-4">
@@ -177,13 +215,21 @@ export default function SignInPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              disabled={loading}
+              disabled={disableForm}
+              autoComplete="email"
             />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link href="#" className="text-sm text-primary hover:underline">Forgot password?</Link>
+              <Link
+                href="https://supabase.com/docs/guides/auth/auth-password-reset#reset-password"
+                className="text-sm text-primary hover:underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Forgot password?
+              </Link>
             </div>
             <Input
               id="password"
@@ -192,7 +238,8 @@ export default function SignInPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={loading}
+              disabled={disableForm}
+              autoComplete="current-password"
             />
           </div>
 
@@ -209,7 +256,7 @@ export default function SignInPage() {
           )}
 
           <div className="flex flex-col gap-2">
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={disableForm} className="w-full">
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="animate-spin">⏳</span>
@@ -222,18 +269,20 @@ export default function SignInPage() {
             <Button
               type="button"
               variant="outline"
-              onClick={handleMagicLink}
-              disabled={loading || !email}
+              onClick={handleDemoLogin}
+              disabled={demoLoading || processingVerification}
               className="w-full"
             >
-              Email me a magic link
+              {demoLoading ? "Loading demo..." : "View live demo"}
             </Button>
           </div>
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account? {" "}
-          <Link href="/auth/signup" className="text-primary hover:underline">Sign up</Link>
+          Don&apos;t have an account?{" "}
+          <Link href="/auth/signup" className="text-primary hover:underline">
+            Sign up
+          </Link>
         </div>
       </CardContent>
     </AuthLayout>
