@@ -37,7 +37,7 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${getSiteUrl()}/auth/signin`,
+          emailRedirectTo: `${getSiteUrl()}/dashboard`,
         },
       });
 
@@ -76,7 +76,7 @@ export default function SignUpPage() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${getSiteUrl()}/auth/signin`,
+          emailRedirectTo: `${getSiteUrl()}/dashboard`,
         },
       });
 
@@ -170,4 +170,5 @@ export default function SignUpPage() {
     </AuthLayout>
   );
 }
+
 

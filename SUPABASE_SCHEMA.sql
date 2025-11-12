@@ -66,6 +66,45 @@ ALTER TABLE imports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read own data" ON users
   FOR SELECT USING (auth.uid() = id);
 
+-- Policy: Users can insert their own record (for first-time sign-in)
+CREATE POLICY "Users can insert own data" ON users
+  FOR INSERT 
+  WITH CHECK (auth.uid() = id);
+
+-- Policy: Users can update their own data
+CREATE POLICY "Users can update own data" ON users
+  FOR UPDATE 
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+-- Policy: Authenticated users can create organizations
+CREATE POLICY "Authenticated users can create organizations" ON organizations
+  FOR INSERT 
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Policy: Users can read their own organization
+CREATE POLICY "Users can read own organization" ON organizations
+  FOR SELECT 
+  USING (
+    id IN (
+      SELECT org_id FROM users WHERE id = auth.uid()
+    )
+  );
+
+-- Policy: Users can update their own organization
+CREATE POLICY "Users can update own organization" ON organizations
+  FOR UPDATE 
+  USING (
+    id IN (
+      SELECT org_id FROM users WHERE id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    id IN (
+      SELECT org_id FROM users WHERE id = auth.uid()
+    )
+  );
+
 -- Policy: Users can read their organization's data
 CREATE POLICY "Users can read org inventory" ON inventory_items
   FOR SELECT USING (
@@ -93,6 +132,24 @@ CREATE POLICY "Users can update org inventory" ON inventory_items
 -- Policy: Users can delete inventory items for their org
 CREATE POLICY "Users can delete org inventory" ON inventory_items
   FOR DELETE USING (
+    org_id IN (
+      SELECT org_id FROM users WHERE id = auth.uid()
+    )
+  );
+
+-- Policy: Users can insert imports for their org
+CREATE POLICY "Users can insert org imports" ON imports
+  FOR INSERT 
+  WITH CHECK (
+    org_id IN (
+      SELECT org_id FROM users WHERE id = auth.uid()
+    )
+  );
+
+-- Policy: Users can read imports for their org
+CREATE POLICY "Users can read org imports" ON imports
+  FOR SELECT 
+  USING (
     org_id IN (
       SELECT org_id FROM users WHERE id = auth.uid()
     )
