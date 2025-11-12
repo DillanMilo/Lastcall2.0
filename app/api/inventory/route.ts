@@ -1,6 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { InventoryItem } from '@/types';
+
+/**
+ * Create authenticated Supabase client for API routes
+ */
+function createAuthenticatedClient(request: NextRequest, response: NextResponse) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
+    }
+  )
+}
+
+/**
+ * Get the authenticated user's organization ID
+ */
+async function getUserOrgId(request: NextRequest, response: NextResponse): Promise<string | null> {
+  try {
+    const supabase = createAuthenticatedClient(request, response);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return null;
+    }
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userData) {
+      return null;
+    }
+
+    return userData.org_id;
+  } catch (error) {
+    console.error('Error getting user organization:', error);
+    return null;
+  }
+}
 
 /**
  * GET /api/inventory
@@ -9,20 +69,33 @@ import { InventoryItem } from '@/types';
  */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const orgId = searchParams.get('org_id');
+    const response = NextResponse.next();
 
-    if (!orgId) {
+    // Authenticate user and get their org
+    const userOrgId = await getUserOrgId(request, response);
+    if (!userOrgId) {
       return NextResponse.json(
-        { error: 'org_id is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
 
+    const searchParams = request.nextUrl.searchParams;
+    const requestedOrgId = searchParams.get('org_id');
+
+    // Validate that user can only access their own organization's data
+    if (!requestedOrgId || requestedOrgId !== userOrgId) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+
+    const supabase = createAuthenticatedClient(request, response);
     const { data, error } = await supabase
       .from('inventory_items')
       .select('*')
-      .eq('org_id', orgId)
+      .eq('org_id', requestedOrgId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -54,13 +127,25 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const response = NextResponse.next();
+
+    // Authenticate user and get their org
+    const userOrgId = await getUserOrgId(request, response);
+    if (!userOrgId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { org_id, items } = body;
 
-    if (!org_id) {
+    // Validate that user can only create items for their own organization
+    if (!org_id || org_id !== userOrgId) {
       return NextResponse.json(
-        { error: 'org_id is required' },
-        { status: 400 }
+        { error: 'Access denied' },
+        { status: 403 }
       );
     }
 
@@ -90,6 +175,7 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    const supabase = createAuthenticatedClient(request, response);
     const { data, error } = await supabase
       .from('inventory_items')
       .insert(preparedItems)

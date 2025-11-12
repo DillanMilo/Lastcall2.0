@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.76.0",
     "@types/node": "^24.9.0",
     "@types/react": "^19.2.2",
