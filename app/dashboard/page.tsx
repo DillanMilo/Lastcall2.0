@@ -74,30 +74,6 @@ export default function DashboardPage() {
     handleAuthCallback();
   }, [router]);
 
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (!user) {
-      router.push('/auth/signin');
-      return;
-    }
-
-    if (orgId) {
-      const aiChatKey = `ai-chat-${orgId}`;
-      localStorage.removeItem(aiChatKey);
-
-      fetchInventory();
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      if (!orgId && user) {
-        console.warn('User authenticated but no orgId found. User record may need to be created.');
-      }
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [authLoading, user, orgId, router, fetchInventory]);
-
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
@@ -136,6 +112,30 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, [orgId, isSupabaseConfigured]);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+
+    if (orgId) {
+      const aiChatKey = `ai-chat-${orgId}`;
+      localStorage.removeItem(aiChatKey);
+
+      fetchInventory();
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!orgId && user) {
+        console.warn('User authenticated but no orgId found. User record may need to be created.');
+      }
+    }, 2000);
+    return () => clearTimeout(timeout);
+  }, [authLoading, user, orgId, router, fetchInventory]);
 
   // Calculate stats from real data
   const totalItems = items.length;

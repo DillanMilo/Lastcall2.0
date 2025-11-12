@@ -35,7 +35,6 @@ export default tseslint.config(
     },
     plugins: {
       "@typescript-eslint": tseslint.plugin,
-      "@next/next": nextPlugin,
       "react-hooks": reactHooks,
     },
     rules: {
