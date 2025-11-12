@@ -1,22 +1,40 @@
 import nextPlugin from "@next/eslint-plugin-next";
+import tseslint from "typescript-eslint";
 
-export default [
+const withProjectOptions = (config) => ({
+  ...config,
+  languageOptions: {
+    ...config.languageOptions,
+    parserOptions: {
+      ...config.languageOptions?.parserOptions,
+      project: "./tsconfig.json",
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+});
+
+export default tseslint.config(
   {
     ignores: ["node_modules", ".next", "out"],
   },
+  ...tseslint.configs.recommended.map(withProjectOptions),
   {
     files: ["**/*.{js,jsx,ts,tsx}"],
     languageOptions: {
+      parser: tseslint.parser,
       parserOptions: {
+        project: "./tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
         ecmaVersion: 2021,
         sourceType: "module",
       },
     },
     plugins: {
+      "@typescript-eslint": tseslint.plugin,
       "@next/next": nextPlugin,
     },
     rules: {
       ...nextPlugin.configs["core-web-vitals"].rules,
     },
-  },
-];
+  }
+);
