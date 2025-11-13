@@ -116,14 +116,47 @@ function mapProductVariantToItem(
   };
 }
 
-export async function fetchBigCommerceCatalogItems(): Promise<InventorySyncItem[]> {
+async function bigCommerceRequestWithCredentials<T>(
+  endpoint: string,
+  credentials: { storeHash: string; clientId: string; accessToken: string },
+  init: RequestInit = {}
+): Promise<T> {
+  const url = `https://api.bigcommerce.com/stores/${credentials.storeHash}/v3${endpoint}`;
+
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'X-Auth-Token': credentials.accessToken,
+    'X-Auth-Client': credentials.clientId,
+    ...(init.headers || {}),
+  };
+
+  const response = await fetch(url, {
+    ...init,
+    headers,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(
+      `BigCommerce request failed (${response.status}): ${message || response.statusText}`
+    );
+  }
+
+  return (await response.json()) as T;
+}
+
+export async function fetchBigCommerceCatalogItemsWithCredentials(
+  credentials: { storeHash: string; clientId: string; accessToken: string }
+): Promise<InventorySyncItem[]> {
   const items: InventorySyncItem[] = [];
   let page = 1;
   const limit = 250;
 
   while (true) {
-    const response = await bigCommerceRequest<PaginatedResponse<BigCommerceProduct>>(
-      `/catalog/products?include=variants&limit=${limit}&page=${page}`
+    const response = await bigCommerceRequestWithCredentials<PaginatedResponse<BigCommerceProduct>>(
+      `/catalog/products?include=variants&limit=${limit}&page=${page}`,
+      credentials
     );
 
     for (const product of response.data) {
@@ -147,6 +180,11 @@ export async function fetchBigCommerceCatalogItems(): Promise<InventorySyncItem[
   }
 
   return items;
+}
+
+export async function fetchBigCommerceCatalogItems(): Promise<InventorySyncItem[]> {
+  const credentials = getCredentials();
+  return fetchBigCommerceCatalogItemsWithCredentials(credentials);
 }
 
 export async function fetchBigCommerceVariantInventory(
