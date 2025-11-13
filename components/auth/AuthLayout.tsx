@@ -55,12 +55,12 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
         </div>
       </div>
 
-      <div className="flex items-center justify-center p-6 md:p-12">
+      <div className="flex items-center justify-center p-4 sm:p-6 md:p-12 min-h-screen">
         <div className="w-full max-w-md">
-          <Card className="p-6 md:p-8 shadow-lg border-0 ring-1 ring-black/5">
+          <Card className="p-4 sm:p-6 md:p-8 shadow-lg border-0 ring-1 ring-black/5">
             {children}
           </Card>
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-muted-foreground">
             <Link href="/" className="hover:underline">Back to home</Link>
           </div>
         </div>

@@ -124,33 +124,35 @@ export default function InventoryPage() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
             Inventory
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
             Manage stock and track batches
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
             onClick={() => setShowAIAssistant(true)}
             size="sm"
             variant="outline"
-            className="md:h-10"
+            className="flex-1 sm:flex-none sm:h-10"
           >
-            <Sparkles className="h-4 w-4 md:mr-2" />
+            <Sparkles className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">AI Assistant</span>
+            <span className="sm:hidden">AI</span>
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
             size="sm"
-            className="md:h-10"
+            className="flex-1 sm:flex-none sm:h-10"
           >
-            <Plus className="h-4 w-4 md:mr-2" />
+            <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Add Item</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
       </div>
@@ -251,8 +253,9 @@ export default function InventoryPage() {
             </div>
           ) : (
             // Table View (Desktop)
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -333,6 +336,7 @@ export default function InventoryPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </div>
           )}
         </CardContent>
@@ -364,8 +368,8 @@ export default function InventoryPage() {
       )}
 
       {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
-          <div className="w-full max-w-2xl my-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-0 sm:p-2 md:p-4 z-50 overflow-y-auto overscroll-contain">
+          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:my-auto sm:rounded-lg overflow-hidden">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}

@@ -49,12 +49,12 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
           Import Data
         </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
+        <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
           Upload a CSV file or connect your own API to keep inventory in sync.
         </p>
       </div>
@@ -62,14 +62,14 @@ export default function ImportPage() {
       <CSVImporter orgId={orgId} />
       <APIImporter orgId={orgId} />
 
-      <div className="mt-6 md:mt-8 p-3 md:p-4 bg-muted rounded-2xl">
-        <h3 className="text-sm md:text-base font-semibold mb-2">
+      <div className="mt-4 sm:mt-6 md:mt-8 p-3 sm:p-4 bg-muted rounded-xl sm:rounded-2xl">
+        <h3 className="text-xs sm:text-sm md:text-base font-semibold mb-2">
           CSV Format Guide
         </h3>
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="text-xs sm:text-sm text-muted-foreground mb-3">
           Your CSV file should include the following columns:
         </p>
-        <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+        <ul className="text-xs sm:text-sm text-muted-foreground space-y-1 list-disc list-inside">
           <li>
             <strong>name</strong> (required) - Product name
           </li>
@@ -91,13 +91,13 @@ export default function ImportPage() {
             <strong>expiration_date</strong> (optional) - Format: YYYY-MM-DD
           </li>
         </ul>
-        <p className="text-sm text-muted-foreground mt-3">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-3">
           Example:{" "}
-          <code className="bg-background px-2 py-1 rounded">
+          <code className="bg-background px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] xs:text-xs break-all">
             name,sku,invoice,quantity,reorder_threshold,expiration_date
           </code>
         </p>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-[10px] xs:text-xs text-muted-foreground mt-2">
           💡 Tip: Use the same invoice number for products from the same batch
           to easily track and edit them together!
         </p>

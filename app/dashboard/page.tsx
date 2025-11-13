@@ -182,13 +182,13 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-4 md:space-y-8">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
             Dashboard
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
             Overview of your inventory and key metrics
           </p>
         </div>
@@ -196,32 +196,33 @@ export default function DashboardPage() {
           onClick={() => setShowAIAssistant(true)}
           size="sm"
           variant="outline"
-          className="md:h-10"
+          className="w-full sm:w-auto sm:h-10 shrink-0"
         >
-          <Sparkles className="h-4 w-4 md:mr-2" />
+          <Sparkles className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Ask AI</span>
+          <span className="sm:hidden">AI</span>
         </Button>
       </div>
 
-      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
-                <CardTitle className="text-xs md:text-sm font-medium">
+            <Card key={stat.title} className="overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-[10px] xs:text-xs sm:text-sm font-medium truncate pr-1">
                   {stat.title}
                 </CardTitle>
-                <Icon className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                <Icon className="h-3 w-3 sm:h-4 sm:w-4 md:h-4 md:w-4 text-muted-foreground shrink-0" />
               </CardHeader>
-              <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
-                <div className="text-xl md:text-2xl font-bold">
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 md:p-6 md:pt-0">
+                <div className="text-lg sm:text-xl md:text-2xl font-bold truncate">
                   {stat.value}
                 </div>
-                <p className="text-xs text-muted-foreground hidden sm:block">
+                <p className="text-[10px] xs:text-xs text-muted-foreground hidden sm:block mt-1">
                   {stat.description}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] xs:text-xs text-muted-foreground mt-1 truncate">
                   {stat.trend}
                 </p>
               </CardContent>
@@ -230,13 +231,13 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Items</CardTitle>
-            <CardDescription>Latest inventory additions</CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Recent Items</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Latest inventory additions</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
                 {authLoading ? "Authenticating..." : "Loading..."}
@@ -272,11 +273,11 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Low Stock Items</CardTitle>
-            <CardDescription>Items needing attention</CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Low Stock Items</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Items needing attention</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
                 {authLoading ? "Authenticating..." : "Loading..."}
@@ -312,13 +313,13 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Expiring Soon</CardTitle>
-            <CardDescription>Products expiring within 7 days</CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Expiring Soon</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Products expiring within 7 days</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
                 {authLoading ? "Authenticating..." : "Loading..."}
@@ -352,11 +353,11 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Restock Needed</CardTitle>
-            <CardDescription>Below reorder threshold</CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Restock Needed</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Below reorder threshold</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {authLoading || loading ? (
               <div className="text-sm text-muted-foreground text-center py-8">
                 {authLoading ? "Authenticating..." : "Loading..."}
@@ -390,8 +391,8 @@ export default function DashboardPage() {
       </div>
 
       {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 md:p-4 z-50 overflow-y-auto">
-          <div className="w-full max-w-2xl my-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-0 sm:p-2 md:p-4 z-50 overflow-y-auto overscroll-contain">
+          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:my-auto sm:rounded-lg overflow-hidden">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}

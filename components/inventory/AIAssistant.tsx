@@ -168,18 +168,18 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   };
 
   return (
-    <Card className="flex flex-col h-[500px] md:h-[600px] max-h-[85vh] w-full">
-      <CardHeader className="border-b p-4 md:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <div className="p-1.5 md:p-2 rounded-full bg-primary/10 flex-shrink-0">
-              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+    <Card className="flex flex-col h-full sm:h-[500px] md:h-[600px] sm:max-h-[85vh] w-full">
+      <CardHeader className="border-b p-3 sm:p-4 md:p-6 sticky top-0 bg-card z-10">
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="p-1.5 sm:p-2 rounded-full bg-primary/10 flex-shrink-0">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <CardTitle className="text-base md:text-lg truncate">
+              <CardTitle className="text-sm sm:text-base md:text-lg truncate">
                 AI Inventory Assistant
               </CardTitle>
-              <CardDescription className="text-xs md:text-sm truncate">
+              <CardDescription className="text-[10px] xs:text-xs sm:text-sm truncate">
                 Ask me about your stock
               </CardDescription>
             </div>
@@ -190,12 +190,12 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               size="icon"
               onClick={handleClearHistory}
               title="Clear conversation"
-              className="hidden sm:flex"
+              className="hidden sm:flex h-8 w-8"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
             {onClose && (
-              <Button variant="ghost" size="icon" onClick={onClose}>
+              <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 sm:h-10 sm:w-10">
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -205,7 +205,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
       <CardContent className="flex-1 flex flex-col p-0 min-h-0">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -214,21 +214,21 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               }`}
             >
               {message.role === "assistant" && (
-                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Bot className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
+                <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Bot className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-primary" />
                 </div>
               )}
               <div
-                className={`max-w-[85%] md:max-w-[80%] rounded-2xl px-3 py-2 md:px-4 ${
+                className={`max-w-[80%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl px-2.5 py-2 sm:px-3 sm:py-2 md:px-4 ${
                   message.role === "user"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted"
                 }`}
               >
-                <p className="text-xs md:text-sm whitespace-pre-wrap break-words">
+                <p className="text-xs sm:text-sm whitespace-pre-wrap break-words leading-relaxed">
                   {message.content}
                 </p>
-                <p className="text-xs opacity-70 mt-1">
+                <p className="text-[10px] xs:text-xs opacity-70 mt-1">
                   {message.timestamp.toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -236,8 +236,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
                 </p>
               </div>
               {message.role === "user" && (
-                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
+                <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <User className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-primary-foreground" />
                 </div>
               )}
             </div>
@@ -279,7 +279,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         )}
 
         {/* Input */}
-        <div className="p-3 md:p-4 border-t">
+        <div className="p-2 sm:p-3 md:p-4 border-t bg-card">
           <div className="flex gap-2">
             <Input
               value={input}
@@ -287,13 +287,13 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask about your inventory..."
               disabled={loading}
-              className="flex-1 text-sm"
+              className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
             />
             <Button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
               size="icon"
-              className="flex-shrink-0"
+              className="flex-shrink-0 h-9 w-9 sm:h-10 sm:w-10"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -302,7 +302,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 hidden sm:block">
+          <p className="text-[10px] xs:text-xs text-muted-foreground mt-1.5 sm:mt-2 hidden sm:block">
             Press Enter to send, Shift+Enter for new line
           </p>
         </div>

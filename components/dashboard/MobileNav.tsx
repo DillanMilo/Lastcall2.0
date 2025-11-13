@@ -32,8 +32,8 @@ export function MobileNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden">
-      <div className="grid grid-cols-5 gap-1 p-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden safe-bottom">
+      <div className="grid grid-cols-5 gap-1 p-2 safe-left safe-right">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;

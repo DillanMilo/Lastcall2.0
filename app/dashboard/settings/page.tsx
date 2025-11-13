@@ -529,12 +529,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-8">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6 pb-8">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
           Settings
         </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
+        <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
           Manage your account and preferences
         </p>
       </div>
@@ -715,7 +715,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex justify-end pt-2">
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving} className="w-full sm:w-auto">
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -803,6 +803,7 @@ export default function SettingsPage() {
               <Button
                 type="submit"
                 disabled={saving || !passwordData.new || !passwordData.confirm}
+                className="w-full sm:w-auto"
               >
                 {saving ? (
                   <>
