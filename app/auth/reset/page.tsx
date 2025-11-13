@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
@@ -66,8 +65,9 @@ export default function ResetPasswordPage() {
         }
 
         setStage("form");
-      } catch (err: any) {
-        setError(err.message || "Unable to verify reset link.");
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Unable to verify reset link.";
+        setError(errorMessage);
         setStage("error");
       }
     };
@@ -103,8 +103,9 @@ export default function ResetPasswordPage() {
       setStage("success");
       setPassword("");
       setConfirm("");
-    } catch (err: any) {
-      setError(err.message || "Unable to update password.");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unable to update password.";
+      setError(errorMessage);
     } finally {
       setUpdating(false);
     }

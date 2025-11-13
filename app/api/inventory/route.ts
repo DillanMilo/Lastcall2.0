@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { InventoryItem } from '@/types';
 
 /**
  * Create authenticated Supabase client for API routes
@@ -194,10 +193,11 @@ export async function POST(request: NextRequest) {
       count: data.length,
       items: data,
     }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in POST /api/inventory:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

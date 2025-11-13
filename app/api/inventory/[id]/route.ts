@@ -64,7 +64,7 @@ async function getUserOrgId(request: NextRequest, response: NextResponse): Promi
 /**
  * Check if an item belongs to the user's organization
  */
-async function validateItemOwnership(itemId: string, userOrgId: string, supabase: any): Promise<boolean> {
+async function validateItemOwnership(itemId: string, userOrgId: string, supabase: ReturnType<typeof createAuthenticatedClient>): Promise<boolean> {
   try {
     const { data, error } = await supabase
       .from('inventory_items')
@@ -199,10 +199,11 @@ export async function PUT(
       success: true,
       item: data,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in PUT /api/inventory/[id]:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
@@ -266,10 +267,11 @@ export async function PATCH(
       success: true,
       item: data,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in PATCH /api/inventory/[id]:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
@@ -324,10 +326,11 @@ export async function DELETE(
       success: true,
       message: 'Item deleted successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in DELETE /api/inventory/[id]:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

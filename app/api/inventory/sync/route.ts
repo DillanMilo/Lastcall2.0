@@ -44,10 +44,11 @@ export async function POST(request: NextRequest) {
       results,
       summary,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in POST /api/inventory/sync:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

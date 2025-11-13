@@ -99,10 +99,11 @@ export async function POST(request: NextRequest) {
       summary: syncBody?.summary ?? "Sync completed.",
       results: syncBody?.results ?? null,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in POST /api/inventory/import-proxy:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

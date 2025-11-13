@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     const result = await generateAiLabel(itemName);
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in AI label API:', error);
     return NextResponse.json(
       { 

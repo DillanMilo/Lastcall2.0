@@ -43,10 +43,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
-  let payload: any;
+  let payload: { scope?: string; org_id?: string; [key: string]: unknown };
   try {
-    payload = JSON.parse(rawBody);
-  } catch (error) {
+    payload = JSON.parse(rawBody) as { scope?: string; org_id?: string; [key: string]: unknown };
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const data = payload.data || {};
+  const data = (payload.data as { product_id?: string | number; id?: string | number } | undefined) || {};
   const productIdRaw = data.product_id ?? data.id;
   const productId = typeof productIdRaw === 'string' ? Number(productIdRaw) : productIdRaw;
   const isVariantScope = scope.includes('variant');
@@ -107,10 +107,11 @@ export async function POST(request: NextRequest) {
         removed: count ?? 0,
         message: 'Inventory item removed after BigCommerce delete event',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error removing inventory for BigCommerce delete event:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove inventory item';
       return NextResponse.json(
-        { error: error.message || 'Failed to remove inventory item' },
+        { error: errorMessage },
         { status: 500 }
       );
     }
@@ -134,10 +135,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success, results, summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error handling BigCommerce webhook:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process BigCommerce webhook';
     return NextResponse.json(
-      { error: error.message || 'Failed to process BigCommerce webhook' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

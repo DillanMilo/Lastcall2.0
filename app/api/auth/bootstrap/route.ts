@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const buildResponse = async (userRecord: any) => {
+  const buildResponse = async (userRecord: { id: string; email?: string; org_id?: string | null; [key: string]: unknown }) => {
     let organization = null;
     if (userRecord?.org_id) {
       const { data: orgData } = await adminClient
@@ -77,10 +77,12 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
   };
 
-  let {
-    data: existingUser,
+  const {
+    data: initialUser,
     error: existingError,
   } = await getUserById();
+  
+  let existingUser = initialUser;
 
   if (existingError) {
     console.error('Error checking existing user:', existingError);
@@ -202,7 +204,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: user.id,
         email: user.email || '',
-        full_name: (user.user_metadata as any)?.full_name || null,
+        full_name: (user.user_metadata as { full_name?: string } | null)?.full_name || null,
         org_id: targetOrg.id,
       })
       .select('*')

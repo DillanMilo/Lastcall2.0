@@ -46,10 +46,11 @@ export async function POST(request: NextRequest) {
       summary,
       imported: items.length,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error syncing BigCommerce catalog:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to sync BigCommerce catalog';
     return NextResponse.json(
-      { error: error.message || 'Failed to sync BigCommerce catalog' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

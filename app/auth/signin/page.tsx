@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
@@ -92,10 +91,11 @@ function SignInContent() {
             router.replace("/dashboard");
             return;
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           if (active) {
             setProcessingVerification(false);
-            setError(err.message || "Something went wrong. Please try again.");
+            const errorMessage = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+            setError(errorMessage);
           }
           return;
         }
@@ -159,8 +159,9 @@ function SignInContent() {
 
       setMessage("Signing you in...");
       router.replace("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Unable to sign in right now.");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unable to sign in right now.";
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -193,9 +194,10 @@ function SignInContent() {
       }
 
       router.replace("/dashboard");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDemoLoading(false);
-      setError(err.message || "Unable to sign in to the demo account.");
+      const errorMessage = err instanceof Error ? err.message : "Unable to sign in to the demo account.";
+      setError(errorMessage);
     }
   };
 
@@ -224,8 +226,9 @@ function SignInContent() {
       setResetFeedback(
         "Password reset email sent! Check your inbox for the link."
       );
-    } catch (err: any) {
-      setResetFeedback(err.message || "Unable to send password reset email.");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unable to send password reset email.";
+      setResetFeedback(errorMessage);
     } finally {
       setResetLoading(false);
     }
