@@ -8,17 +8,20 @@ This guide will help you quickly onboard new BigCommerce clients to LastCall 2.0
 
 Before onboarding, collect these **4 pieces of information** from your client's BigCommerce account:
 
-### 1. **Store Hash** 
+### 1. **Store Hash**
+
 - Found in: BigCommerce Admin → **Advanced Settings** → **API Accounts**
 - Format: Usually 6-8 characters (e.g., `abc123`)
 - This is the unique identifier for their store
 
 ### 2. **Client ID**
+
 - Found in: BigCommerce Admin → **Advanced Settings** → **API Accounts** → Your API Account
 - Format: Long alphanumeric string
 - This identifies your API application
 
 ### 3. Access Token
+
 - Found in: BigCommerce Admin → **Advanced Settings** → **API Accounts** → Your API Account → **OAuth Scopes**
 - Format: Long alphanumeric string
 - **Important**: Make sure the token has these scopes:
@@ -29,10 +32,12 @@ Before onboarding, collect these **4 pieces of information** from your client's 
 - **Note**: You do NOT need the Client Secret - only the Access Token is required
 
 ### 4. Organization Name
+
 - The name of the client's company/organization
 - This will be displayed in their dashboard
 
 ### Optional (Recommended):
+
 - **User Email**: Admin email for the client account
 - **User Full Name**: Admin's full name
 
@@ -43,11 +48,13 @@ Before onboarding, collect these **4 pieces of information** from your client's 
 ### Step 1: Make the API Request
 
 Send a `POST` request to:
+
 ```
 https://your-domain.com/api/onboarding/bigcommerce
 ```
 
 **Request Body:**
+
 ```json
 {
   "organization_name": "Client Company Name",
@@ -64,6 +71,7 @@ https://your-domain.com/api/onboarding/bigcommerce
 ### Step 2: Check the Response
 
 **Success Response:**
+
 ```json
 {
   "success": true,
@@ -101,6 +109,7 @@ https://your-domain.com/api/onboarding/bigcommerce
 ```
 
 **Error Response:**
+
 ```json
 {
   "success": false,
@@ -134,25 +143,28 @@ curl -X POST https://your-domain.com/api/onboarding/bigcommerce \
 ## 📝 Example: Using JavaScript/Node.js
 
 ```javascript
-const response = await fetch('https://your-domain.com/api/onboarding/bigcommerce', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    organization_name: 'Client Company Name',
-    user_email: 'admin@client.com',
-    user_full_name: 'Admin Name',
-    bigcommerce_store_hash: 'abc123',
-    bigcommerce_client_id: 'your_client_id',
-    bigcommerce_access_token: 'your_access_token',
-    enable_ai_labeling: false,
-    perform_initial_sync: true,
-  }),
-});
+const response = await fetch(
+  "https://your-domain.com/api/onboarding/bigcommerce",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      organization_name: "Client Company Name",
+      user_email: "admin@client.com",
+      user_full_name: "Admin Name",
+      bigcommerce_store_hash: "abc123",
+      bigcommerce_client_id: "your_client_id",
+      bigcommerce_access_token: "your_access_token",
+      enable_ai_labeling: false,
+      perform_initial_sync: true,
+    }),
+  }
+);
 
 const result = await response.json();
-console.log('Onboarding result:', result);
+console.log("Onboarding result:", result);
 ```
 
 ---
@@ -173,6 +185,7 @@ After successful onboarding, set up webhooks in BigCommerce to keep inventory in
 
 1. Go to BigCommerce Admin → **Advanced Settings** → **Webhooks**
 2. Create a new webhook with these settings:
+
    - **Event**: Product Created, Product Updated, Product Deleted, Product Inventory Updated, Variant Created, Variant Updated, Variant Deleted
    - **Destination URL**: `https://your-domain.com/api/webhooks/bigcommerce`
    - **Format**: JSON
@@ -180,14 +193,16 @@ After successful onboarding, set up webhooks in BigCommerce to keep inventory in
    - **Secret**: Generate a secure random string (you'll use this in step 4)
 
 3. Add `org_id` to webhook payload (custom field):
+
    - Use the `organization.id` from the onboarding response
    - This ensures webhooks are routed to the correct organization
 
 4. Set webhook secret in your environment variables:
+
    ```
    BIGCOMMERCE_WEBHOOK_SECRET=the_secret_you_created_in_step_2
    ```
-   
+
    **Note**: The webhook secret is something YOU create and configure, not something from the client. It's used to verify webhook signatures for security.
 
 ---
@@ -195,16 +210,19 @@ After successful onboarding, set up webhooks in BigCommerce to keep inventory in
 ## 🐛 Troubleshooting
 
 ### Connection Test Fails
+
 - **Check**: Store hash, client ID, and access token are correct
 - **Check**: Access token has required scopes
 - **Check**: Store is active and accessible
 
 ### Initial Sync Returns 0 Items
+
 - **Check**: Store has products in BigCommerce
 - **Check**: Products have inventory tracking enabled
 - **Check**: API credentials have read permissions
 
 ### User Account Not Created
+
 - **Check**: Email is valid and not already in use
 - **Check**: SUPABASE_SERVICE_ROLE_KEY is configured
 - **Note**: User can still sign up manually using the email
@@ -214,6 +232,7 @@ After successful onboarding, set up webhooks in BigCommerce to keep inventory in
 ## 📞 Support
 
 If you encounter issues during onboarding:
+
 1. Check the error response for the `step` field to identify where it failed
 2. Verify all credentials are correct
 3. Check server logs for detailed error messages
@@ -223,8 +242,8 @@ If you encounter issues during onboarding:
 ## 🎉 After Onboarding
 
 Once onboarding is complete:
+
 - Client can sign in at `/auth/signin` using the email you provided
 - All their BigCommerce products are synced and visible in the dashboard
 - Webhooks will keep inventory in sync automatically
 - Client can use all LastCall features (AI assistant, bulk edits, etc.)
-

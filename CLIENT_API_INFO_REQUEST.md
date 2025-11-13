@@ -5,6 +5,7 @@ When setting up API import for a client, ask them for the following information:
 ## ✅ Required Information
 
 ### 1. **API Endpoint URL**
+
 - The full URL to their inventory API endpoint
 - Example: `https://api.clientstore.com/inventory`
 - Example: `https://api.clientstore.com/v1/products`
@@ -16,6 +17,7 @@ When setting up API import for a client, ask them for the following information:
 ## 🔑 Optional (But Usually Needed)
 
 ### 2. **API Key / Access Token**
+
 - If their API requires authentication
 - This will be sent as a Bearer token in the Authorization header
 - Example: `sk_live_abc123xyz`
@@ -27,9 +29,11 @@ When setting up API import for a client, ask them for the following information:
 ## 📊 Helpful Information (For Field Mapping)
 
 ### 3. **API Response Structure**
+
 Ask them to share a sample API response or documentation. You need to know:
 
-- **Where are the items?** 
+- **Where are the items?**
+
   - Is it an array at the root? `[{...}, {...}]`
   - Or nested? `{ data: { items: [...] } }`
   - Or `{ products: [...] }`
@@ -66,6 +70,7 @@ Optional but helpful:
 ## 💡 Example Client Response
 
 **Good response:**
+
 ```
 API Endpoint: https://api.mystore.com/v2/products
 API Key: sk_live_abc123xyz789
@@ -85,6 +90,7 @@ Sample Response:
 ```
 
 **What you'd configure:**
+
 - API Endpoint URL: `https://api.mystore.com/v2/products`
 - API Key: `sk_live_abc123xyz789`
 - Items Path: `data.products`
@@ -123,6 +129,7 @@ If your client doesn't know their API structure:
 ## 🔍 Testing the Connection
 
 After setup, the system will:
+
 1. Test the connection to their API
 2. Fetch the data
 3. Map the fields
@@ -130,8 +137,8 @@ After setup, the system will:
 5. Show you a summary (created/updated/failed)
 
 If it fails, check:
+
 - ✅ API endpoint is correct and accessible
 - ✅ API key is valid (if required)
 - ✅ Items path matches their response structure
 - ✅ Field mappings match their field names
-
