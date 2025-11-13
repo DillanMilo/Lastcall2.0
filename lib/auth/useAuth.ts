@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -19,40 +19,6 @@ export function useAuth() {
   const [userWithOrg, setUserWithOrg] = useState<UserWithOrg | null>(null);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserWithOrg(session.user.id);
-        // fetchUserWithOrg will set loading to false when done
-      } else {
-        setLoading(false);
-      }
-    };
-
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          await fetchUserWithOrg(session.user.id);
-          // fetchUserWithOrg will set loading to false when done
-        } else {
-          setUser(null);
-          setUserWithOrg(null);
-          setOrgId(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const bootstrapViaServer = async () => {
     try {
@@ -150,7 +116,7 @@ export function useAuth() {
     }
   };
 
-  const fetchUserWithOrg = async (userId: string) => {
+  const fetchUserWithOrg = useCallback(async (userId: string) => {
     try {
       const { data: userRecord, error } = await supabase
         .from('users')
@@ -190,7 +156,37 @@ export function useAuth() {
       console.error('Error in fetchUserWithOrg:', error);
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        await fetchUserWithOrg(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          await fetchUserWithOrg(session.user.id);
+        } else {
+          setUser(null);
+          setUserWithOrg(null);
+          setOrgId(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserWithOrg]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
