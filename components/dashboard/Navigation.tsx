@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,28 +28,35 @@ export function Navigation() {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
 
-  const fetchUser = useCallback(async () => {
-    try {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", authUser.id)
-        .single();
-
-      if (userData) setUser(userData);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-    }
-  }, []);
-
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        if (!authUser || !isMounted) return;
+
+        const { data: userData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", authUser.id)
+          .single();
+
+        if (userData && isMounted) {
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    };
+
     fetchUser();
-  }, [fetchUser]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSignOut = async () => {
     // Clear AI chat history from localStorage

@@ -20,7 +20,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
 
-  const bootstrapViaServer = async () => {
+  const bootstrapViaServer = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/bootstrap', {
         method: 'POST',
@@ -55,9 +55,9 @@ export function useAuth() {
       console.error('Bootstrap API error:', error);
       return null;
     }
-  };
+  }, []);
 
-  const createUserAndOrg = async (userId: string) => {
+  const createUserAndOrg = useCallback(async (userId: string) => {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
@@ -114,7 +114,7 @@ export function useAuth() {
       console.error('Error creating user and org:', error);
       return null;
     }
-  };
+  }, [bootstrapViaServer]);
 
   const fetchUserWithOrg = useCallback(async (userId: string) => {
     try {
@@ -156,7 +156,7 @@ export function useAuth() {
       console.error('Error in fetchUserWithOrg:', error);
       setLoading(false);
     }
-  }, []);
+  }, [createUserAndOrg]);
 
   useEffect(() => {
     const getInitialSession = async () => {
