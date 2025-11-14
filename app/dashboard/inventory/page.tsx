@@ -368,8 +368,8 @@ export default function InventoryPage() {
       )}
 
       {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-0 sm:p-2 md:p-4 z-50 overflow-y-auto overscroll-contain">
-          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:my-auto sm:rounded-lg overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-0 sm:p-2 md:p-4 z-[60] overflow-hidden">
+          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:my-auto sm:rounded-lg overflow-hidden flex flex-col">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}

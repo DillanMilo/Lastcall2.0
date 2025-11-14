@@ -168,8 +168,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   };
 
   return (
-    <Card className="flex flex-col h-full sm:h-[500px] md:h-[600px] sm:max-h-[85vh] w-full">
-      <CardHeader className="border-b p-3 sm:p-4 md:p-6 sticky top-0 bg-card z-10">
+    <Card className="flex flex-col h-full sm:h-[500px] md:h-[600px] sm:max-h-[85vh] w-full overflow-hidden">
+      <CardHeader className="border-b p-3 sm:p-4 md:p-6 shrink-0 bg-card">
         <div className="flex items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <div className="p-1.5 sm:p-2 rounded-full bg-primary/10 flex-shrink-0">
@@ -203,9 +203,9 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+      <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4 min-h-0">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -259,7 +259,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
         {/* Suggested Questions */}
         {messages.length === 1 && (
-          <div className="px-3 md:px-4 py-2 border-t bg-muted/30">
+          <div className="px-3 md:px-4 py-2 border-t bg-muted/30 shrink-0">
             <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
             <div className="flex flex-wrap gap-1.5 md:gap-2">
               {SUGGESTED_QUESTIONS.map((question, index) => (
@@ -278,8 +278,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
           </div>
         )}
 
-        {/* Input */}
-        <div className="p-2 sm:p-3 md:p-4 border-t bg-card">
+        {/* Input - Fixed at bottom */}
+        <div className="p-3 sm:p-3 md:p-4 border-t bg-card shrink-0 safe-bottom">
           <div className="flex gap-2">
             <Input
               value={input}
@@ -287,13 +287,13 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask about your inventory..."
               disabled={loading}
-              className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+              className="flex-1 text-xs sm:text-sm h-10 sm:h-10"
             />
             <Button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
               size="icon"
-              className="flex-shrink-0 h-9 w-9 sm:h-10 sm:w-10"
+              className="flex-shrink-0 h-10 w-10"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
