@@ -81,13 +81,35 @@
       padding-top: max(env(safe-area-inset-top), 0px);
     }
     .safe-bottom {
-      padding-bottom: max(env(safe-area-inset-bottom), 0px);
+      padding-bottom: max(env(safe-area-inset-bottom), 20px);
     }
     .safe-left {
       padding-left: max(env(safe-area-inset-left), 0px);
     }
     .safe-right {
       padding-right: max(env(safe-area-inset-right), 0px);
+    }
+  }
+  
+  /* iOS viewport height fix */
+  @supports (height: 100dvh) {
+    .h-screen-ios {
+      height: 100dvh;
+    }
+    .h-full-ios {
+      height: 100dvh;
+    }
+  }
+  
+  /* Fallback for browsers that don't support dvh */
+  @supports not (height: 100dvh) {
+    .h-screen-ios {
+      height: 100vh;
+      height: -webkit-fill-available;
+    }
+    .h-full-ios {
+      height: 100vh;
+      height: -webkit-fill-available;
     }
   }
 }
