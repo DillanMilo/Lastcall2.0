@@ -205,7 +205,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
       <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden relative">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4 min-h-0 pb-20 sm:pb-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4 min-h-0">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -279,7 +279,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         )}
 
         {/* Input - Fixed at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-3 md:p-4 pb-6 sm:pb-3 md:pb-4 border-t bg-card z-20 safe-bottom" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 24px)' }}>
+        <div className="p-3 sm:p-3 md:p-4 pb-6 sm:pb-3 md:pb-4 border-t bg-card z-20 safe-bottom" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 24px)' }}>
           <div className="flex gap-2">
             <Input
               value={input}
