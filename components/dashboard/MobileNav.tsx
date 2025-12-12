@@ -32,7 +32,7 @@ export function MobileNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden safe-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t md:hidden safe-bottom mobile-nav transition-transform duration-300">
       <div className="grid grid-cols-5 gap-1 p-2 safe-left safe-right">
         {navItems.map((item) => {
           const Icon = item.icon;

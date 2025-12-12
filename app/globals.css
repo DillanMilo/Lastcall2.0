@@ -112,5 +112,9 @@
       height: -webkit-fill-available;
     }
   }
-}
 
+  /* Hide mobile nav when AI assistant is open */
+  body.ai-assistant-open .mobile-nav {
+    transform: translateY(100%);
+  }
+}
