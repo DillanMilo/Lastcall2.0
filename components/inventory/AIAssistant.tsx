@@ -85,6 +85,14 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Toggle body class when assistant is open to hide mobile nav
+  useEffect(() => {
+    document.body.classList.add("ai-assistant-open");
+    return () => {
+      document.body.classList.remove("ai-assistant-open");
+    };
+  }, []);
+
   const handleSend = async (messageText?: string) => {
     const userMessage = messageText || input.trim();
     if (!userMessage || loading) return;
