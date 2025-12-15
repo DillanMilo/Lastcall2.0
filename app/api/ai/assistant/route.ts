@@ -145,6 +145,51 @@ export async function POST(request: NextRequest) {
     // Fetch stock movements for smart ordering recommendations
     const stockMovements = await getStockMovements(orgId);
 
+    // Check if this is an action request (setting expiry, updating quantities, etc.)
+    const actionKeywords = ['set expiry', 'set expiration', 'update expiry', 'change expiry', 'set all', 'update all'];
+    const isLikelyAction = actionKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+
+    if (isLikelyAction) {
+      // Try to execute as an action
+      try {
+        const actionResponse = await fetch(new URL('/api/ai/action', request.url).toString(), {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Cookie': request.headers.get('cookie') || '',
+          },
+          body: JSON.stringify({ message, orgId }),
+        });
+
+        const actionData = await actionResponse.json();
+
+        if (actionData.isAction && actionData.success) {
+          // Action was executed successfully
+          const actionMessage = `✅ **Action Completed!**\n\n${actionData.message}\n\n**Items updated:**\n${actionData.details?.map((d: string) => `• ${d}`).join('\n') || 'See inventory for details'}`;
+          
+          return NextResponse.json({
+            success: true,
+            response: actionMessage,
+            timestamp: new Date().toISOString(),
+            actionExecuted: true,
+          });
+        } else if (actionData.isAction && !actionData.success) {
+          // Action was recognized but failed
+          return NextResponse.json({
+            success: true,
+            response: `⚠️ I understood you want to update inventory, but: ${actionData.message}\n\nPlease try being more specific, for example:\n• "Set expiry for all Biltong products to March 30, 2026"\n• "Update invoice INV-123 expiry to June 2026"`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        // If not an action, fall through to regular AI response
+      } catch (actionError) {
+        console.error('Action processing error:', actionError);
+        // Fall through to regular AI response
+      }
+    }
+
     // Get AI response with inventory and movement context
     const aiResponse = await getInventoryAssistantResponse(
       message,

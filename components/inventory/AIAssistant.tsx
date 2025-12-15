@@ -24,11 +24,11 @@ interface AIAssistantProps {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "What's running low?",
-  "Expiring soon?",
-  "What to reorder?",
-  "Critical items?",
-  "Invoice status?",
+  "What should I order?",
+  "What's expiring soon?",
+  "Set expiry dates",
+  "Daily summary",
+  "Low stock alerts",
 ];
 
 // Helper to create welcome message
@@ -36,7 +36,7 @@ function getWelcomeMessage(): Message {
   return {
     role: "assistant",
     content:
-      "👋 Hi! I'm your Inventory assistant. I'm here to help you with stock levels, reorder recommendations, expiring items, and more. What would you like to know?",
+      "👋 Hi! I'm your Inventory assistant. I can help you with:\n\n📦 **Smart Ordering** - Tell you exactly what to order based on sales\n📅 **Set Expiry Dates** - Just say \"Set expiry for [items] to [date]\"\n⚠️ **Alerts** - Low stock and expiring items\n📊 **Reports** - Daily/weekly summaries\n\nWhat would you like to do?",
     timestamp: new Date(),
   };
 }
@@ -189,7 +189,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               size="icon"
               onClick={handleClearHistory}
               title="Clear conversation"
-              className="hidden sm:flex h-8 w-8"
+              className="flex h-8 w-8"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>

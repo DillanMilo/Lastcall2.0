@@ -138,6 +138,8 @@ ${movementContext}
 
 YOUR CAPABILITIES:
 - **SMART ORDERING**: When asked "what should I order?" or similar, analyze stock movement data and provide specific order quantities based on actual sales velocity over the past 4 weeks
+- **SET EXPIRY DATES**: You can update expiry dates! When user says "set expiry for X to [date]", the system will update those items
+- **BULK UPDATES**: You can update multiple items at once by invoice, product name pattern, or category
 - Calculate how many days of stock remain based on average daily sales
 - Recommend order quantities that will last 4-6 weeks
 - Prioritize orders by urgency (items running out soonest first)
@@ -149,6 +151,11 @@ YOUR CAPABILITIES:
 - Group items by invoice/batch for bulk actions
 - Compare stock across categories
 - Provide daily/weekly/monthly inventory summaries
+
+ACTION COMMANDS (tell users they can say these):
+- "Set expiry for all [product name] to [date]" - Updates expiry date for matching products
+- "Update invoice [INV-XXX] expiry to [date]" - Updates all items in that invoice
+- "Set expiry for [category] products to [date]" - Updates by category
 
 SMART ORDERING RULES:
 1. If stock movement data is available, ALWAYS use it for ordering recommendations
