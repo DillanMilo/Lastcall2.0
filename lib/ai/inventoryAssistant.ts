@@ -5,6 +5,17 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
 });
 
+export interface StockMovement {
+  item_id: string;
+  item_name: string;
+  sku: string | null;
+  total_sold: number;
+  total_restocked: number;
+  avg_daily_sales: number;
+  days_of_stock_left: number;
+  suggested_order_qty: number;
+}
+
 /**
  * Format inventory data into a context string for the AI
  */
@@ -65,12 +76,51 @@ ${expiringSoon.map(item => {
 }
 
 /**
+ * Format stock movement data into context for AI ordering recommendations
+ */
+export function formatStockMovementContext(movements: StockMovement[]): string {
+  if (!movements || movements.length === 0) {
+    return '\nSTOCK MOVEMENT DATA: No movement history available yet. Smart ordering predictions will improve as more data is collected.';
+  }
+
+  // Sort by urgency (days of stock left, ascending)
+  const sorted = [...movements].sort((a, b) => a.days_of_stock_left - b.days_of_stock_left);
+  
+  const urgentItems = sorted.filter(m => m.days_of_stock_left <= 14);
+  const moderateItems = sorted.filter(m => m.days_of_stock_left > 14 && m.days_of_stock_left <= 30);
+
+  return `
+STOCK MOVEMENT ANALYSIS (Last 4 Weeks):
+=======================================
+
+${sorted.map(m => `
+📦 ${m.item_name} ${m.sku ? `(${m.sku})` : ''}
+   - Units Sold (4 weeks): ${m.total_sold}
+   - Avg Daily Sales: ${m.avg_daily_sales.toFixed(1)} units/day
+   - Days of Stock Left: ${m.days_of_stock_left} days ${m.days_of_stock_left <= 7 ? '🚨 CRITICAL' : m.days_of_stock_left <= 14 ? '⚠️ ORDER SOON' : ''}
+   - Suggested Order Qty: ${m.suggested_order_qty} units (4-week supply)
+`).join('')}
+
+${urgentItems.length > 0 ? `
+🚨 URGENT ORDERS NEEDED (< 2 weeks stock):
+${urgentItems.map(m => `- ${m.item_name}: Order ${m.suggested_order_qty} units NOW (only ${m.days_of_stock_left} days left)`).join('\n')}
+` : ''}
+
+${moderateItems.length > 0 ? `
+⚠️ ORDER SOON (2-4 weeks stock):
+${moderateItems.map(m => `- ${m.item_name}: Order ${m.suggested_order_qty} units within 1-2 weeks`).join('\n')}
+` : ''}
+`;
+}
+
+/**
  * Get AI-powered inventory insights and recommendations
  */
 export async function getInventoryAssistantResponse(
   userMessage: string,
   inventory: InventoryItem[],
-  conversationHistory: { role: 'user' | 'assistant'; content: string }[] = []
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
+  stockMovements?: StockMovement[]
 ): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
     return "AI assistant is not configured. Please add OPENAI_API_KEY to your environment variables.";
@@ -78,47 +128,63 @@ export async function getInventoryAssistantResponse(
 
   try {
     const inventoryContext = formatInventoryContext(inventory);
+    const movementContext = stockMovements ? formatStockMovementContext(stockMovements) : '';
 
-    const systemPrompt = `You are an expert inventory management assistant for LastCall, a smart inventory system. Your role is to help users understand their stock levels, identify issues, and provide actionable recommendations.
+    const systemPrompt = `You are an expert inventory management assistant for LastCall, a smart inventory system. Your role is to help users understand their stock levels, identify issues, and provide actionable SMART ORDERING recommendations based on actual sales data.
 
 CURRENT INVENTORY DATA:
 ${inventoryContext}
+${movementContext}
 
 YOUR CAPABILITIES:
-- Analyze stock levels and identify low stock items
-- Predict when items will run out based on current levels and expiration dates
-- Recommend reorder quantities and timing
+- **SMART ORDERING**: When asked "what should I order?" or similar, analyze stock movement data and provide specific order quantities based on actual sales velocity over the past 4 weeks
+- Calculate how many days of stock remain based on average daily sales
+- Recommend order quantities that will last 4-6 weeks
+- Prioritize orders by urgency (items running out soonest first)
+- Identify fast-moving vs slow-moving items
+- Suggest items to discontinue or put on sale if they're not selling
+- Predict when items will run out based on sales trends
 - Identify items expiring soon and suggest actions
-- Provide insights on inventory turnover
-- Alert about potential stockouts
-- Suggest optimal reorder points
-- Suggest items to remove from inventory if they are not selling
-- Suggest items to run a sale on if they are not selling
+- Alert about potential stockouts before they happen
 - Group items by invoice/batch for bulk actions
-- Compare stock across categories and invoices
-- Offer a daily summary of the inventory and any issues or recommendations
-- Offer a weekly summary of the inventory and any issues or recommendations
-- Offer a monthly summary of the inventory and any issues or recommendations
-- Offer a yearly summary of the inventory and any issues or recommendations
+- Compare stock across categories
+- Provide daily/weekly/monthly inventory summaries
+
+SMART ORDERING RULES:
+1. If stock movement data is available, ALWAYS use it for ordering recommendations
+2. Calculate suggested order = (avg daily sales × 28 days) + safety buffer
+3. Prioritize items with < 14 days of stock as URGENT
+4. Items with < 7 days of stock are CRITICAL - recommend immediate ordering
+5. For slow-moving items (< 1 unit/day), suggest smaller order quantities
+6. For fast-moving items (> 5 units/day), suggest larger quantities with buffer
 
 GUIDELINES:
 1. Be concise and actionable - prioritize urgent issues
 2. Use specific numbers and item names from the inventory
 3. Always mention invoice numbers when relevant for batch operations
 4. Highlight urgent items with 🚨 and good status with ✅
-5. Provide specific recommendations (e.g., "Order 50 more units by Friday")
+5. Provide SPECIFIC recommendations (e.g., "Order 50 units of Biltong Original by Friday")
 6. If asked about items not in inventory, clearly state they don't exist
 7. Use bullet points for multiple recommendations
 8. Calculate days of stock remaining when relevant
-9. Always be helpful and friendly and professional
-10. Use emojis liberally
+9. Always be helpful, friendly, and professional
+10. Use emojis liberally to highlight important information
+11. When giving order recommendations, format as a clear ORDER LIST
 
-EXAMPLE RESPONSES:
-- "🚨 URGENT: 3 items need immediate attention..."
-- "Based on current stock, you should reorder [item] within 7 days"
-- "Items in invoice INV-123 are all expiring within 2 weeks..."
+EXAMPLE SMART ORDER RESPONSE:
+"📋 **RECOMMENDED ORDER** (based on last 4 weeks sales):
 
-Always base your answers ONLY on the provided inventory data. Never make up stock levels or items.`;
+🚨 **ORDER NOW** (Critical - under 7 days stock):
+- Angus Biltong Original 100g: Order **75 units** (selling 2.5/day, only 3 days left)
+- Mixed Nuts 500g: Order **50 units** (selling 1.8/day, only 5 days left)
+
+⚠️ **ORDER THIS WEEK** (Under 14 days stock):
+- Droewors 250g: Order **40 units** (selling 1.2/day, 12 days left)
+
+✅ **Good for 2+ weeks**:
+- Chilli Bites, Peri-Peri varieties have 20+ days stock"
+
+Always base your answers ONLY on the provided inventory and movement data. Never make up stock levels or sales figures.`;
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },

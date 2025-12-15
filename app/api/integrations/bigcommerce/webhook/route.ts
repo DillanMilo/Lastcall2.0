@@ -119,6 +119,16 @@ async function syncProductFromBigCommerce(
     }
 
     if (existing) {
+      // Get current quantity for history tracking
+      const { data: currentItem } = await supabase
+        .from('inventory_items')
+        .select('quantity')
+        .eq('id', existing.id)
+        .single();
+
+      const previousQuantity = currentItem?.quantity ?? 0;
+      const quantityChange = item.quantity - previousQuantity;
+
       await supabase
         .from('inventory_items')
         .update({
@@ -126,9 +136,28 @@ async function syncProductFromBigCommerce(
           reorder_threshold: item.reorder_threshold,
         })
         .eq('id', existing.id);
+
+      // Log quantity change to history
+      if (quantityChange !== 0) {
+        await supabase
+          .from('inventory_history')
+          .insert([{
+            org_id: orgId,
+            item_id: existing.id,
+            item_name: item.name,
+            sku: item.sku,
+            previous_quantity: previousQuantity,
+            new_quantity: item.quantity,
+            quantity_change: quantityChange,
+            change_type: 'webhook',
+            source: 'bigcommerce',
+          }])
+          .catch(() => { /* History table might not exist */ });
+      }
+
       results.updated++;
     } else {
-      await supabase
+      const { data: inserted } = await supabase
         .from('inventory_items')
         .insert([{
           org_id: orgId,
@@ -136,7 +165,28 @@ async function syncProductFromBigCommerce(
           sku: item.sku,
           quantity: item.quantity,
           reorder_threshold: item.reorder_threshold,
-        }]);
+        }])
+        .select('id')
+        .single();
+
+      // Log initial stock in history
+      if (inserted && item.quantity > 0) {
+        await supabase
+          .from('inventory_history')
+          .insert([{
+            org_id: orgId,
+            item_id: inserted.id,
+            item_name: item.name,
+            sku: item.sku,
+            previous_quantity: 0,
+            new_quantity: item.quantity,
+            quantity_change: item.quantity,
+            change_type: 'webhook',
+            source: 'bigcommerce',
+          }])
+          .catch(() => { /* History table might not exist */ });
+      }
+
       results.created++;
     }
   }

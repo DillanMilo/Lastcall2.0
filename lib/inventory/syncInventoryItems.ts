@@ -186,22 +186,77 @@ export async function syncInventoryItems({
         };
 
         const existing = await findExistingInventoryItem(supabase, orgId, item);
+        const newQuantity = parseInteger(item.quantity);
 
         if (existing) {
+          // Get current quantity for history tracking
+          const { data: currentItem } = await supabase
+            .from('inventory_items')
+            .select('quantity')
+            .eq('id', existing.id)
+            .single();
+
+          const previousQuantity = currentItem?.quantity ?? 0;
+          const quantityChange = newQuantity - previousQuantity;
+
           const { error: updateError } = await supabase
             .from('inventory_items')
             .update(itemData)
             .eq('id', existing.id);
 
           if (updateError) throw updateError;
+
+          // Log quantity change to history (only if quantity changed)
+          if (quantityChange !== 0) {
+            await supabase
+              .from('inventory_history')
+              .insert([{
+                org_id: orgId,
+                item_id: existing.id,
+                item_name: item.name,
+                sku: item.sku ?? null,
+                previous_quantity: previousQuantity,
+                new_quantity: newQuantity,
+                quantity_change: quantityChange,
+                change_type: 'sync',
+                source: sourceLabel,
+              }])
+              .catch(() => {
+                // History table might not exist yet - ignore error
+              });
+          }
+
           return { status: 'updated' };
         }
 
-        const { error: insertError } = await supabase
+        const { data: insertedItem, error: insertError } = await supabase
           .from('inventory_items')
-          .insert([itemData]);
+          .insert([itemData])
+          .select('id')
+          .single();
 
         if (insertError) throw insertError;
+
+        // Log initial stock as a restock in history
+        if (insertedItem && newQuantity > 0) {
+          await supabase
+            .from('inventory_history')
+            .insert([{
+              org_id: orgId,
+              item_id: insertedItem.id,
+              item_name: item.name,
+              sku: item.sku ?? null,
+              previous_quantity: 0,
+              new_quantity: newQuantity,
+              quantity_change: newQuantity,
+              change_type: 'sync',
+              source: sourceLabel,
+            }])
+            .catch(() => {
+              // History table might not exist yet - ignore error
+            });
+        }
+
         return { status: 'created' };
       } catch (error) {
         const message =

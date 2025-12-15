@@ -104,6 +104,26 @@ export default function InventoryPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, [authLoading, user, orgId, router, viewMode, fetchInventory]);
 
+  // Prevent background scrolling when AI modal is open (mobile only)
+  useEffect(() => {
+    if (showAIAssistant && window.innerWidth < 768) {
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.top = `-${window.scrollY}px`;
+    }
+    return () => {
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
+    };
+  }, [showAIAssistant]);
+
   const filteredItems = items.filter(
     (item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -372,8 +392,8 @@ export default function InventoryPage() {
       )}
 
       {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 pb-20 sm:p-2 md:p-4 sm:pb-2 z-[60] overflow-hidden">
-          <div className="w-full max-h-[calc(100vh-100px)] sm:max-h-[90vh] sm:max-w-2xl sm:my-auto rounded-lg overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 pb-20 sm:p-2 md:p-4 sm:pb-2 z-[60] overflow-hidden overscroll-contain touch-none sm:touch-auto">
+          <div className="w-full max-h-[calc(100vh-100px)] sm:max-h-[90vh] sm:max-w-2xl sm:my-auto rounded-lg overflow-hidden flex flex-col touch-auto">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}
