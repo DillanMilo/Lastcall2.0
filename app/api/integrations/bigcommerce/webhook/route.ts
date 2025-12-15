@@ -137,22 +137,25 @@ async function syncProductFromBigCommerce(
         })
         .eq('id', existing.id);
 
-      // Log quantity change to history
+      // Log quantity change to history (ignore errors if table doesn't exist)
       if (quantityChange !== 0) {
-        await supabase
-          .from('inventory_history')
-          .insert([{
-            org_id: orgId,
-            item_id: existing.id,
-            item_name: item.name,
-            sku: item.sku,
-            previous_quantity: previousQuantity,
-            new_quantity: item.quantity,
-            quantity_change: quantityChange,
-            change_type: 'webhook',
-            source: 'bigcommerce',
-          }])
-          .catch(() => { /* History table might not exist */ });
+        try {
+          await supabase
+            .from('inventory_history')
+            .insert([{
+              org_id: orgId,
+              item_id: existing.id,
+              item_name: item.name,
+              sku: item.sku,
+              previous_quantity: previousQuantity,
+              new_quantity: item.quantity,
+              quantity_change: quantityChange,
+              change_type: 'webhook',
+              source: 'bigcommerce',
+            }]);
+        } catch {
+          // History table might not exist yet - ignore
+        }
       }
 
       results.updated++;
@@ -169,22 +172,25 @@ async function syncProductFromBigCommerce(
         .select('id')
         .single();
 
-      // Log initial stock in history
+      // Log initial stock in history (ignore errors if table doesn't exist)
       if (inserted && item.quantity > 0) {
-        await supabase
-          .from('inventory_history')
-          .insert([{
-            org_id: orgId,
-            item_id: inserted.id,
-            item_name: item.name,
-            sku: item.sku,
-            previous_quantity: 0,
-            new_quantity: item.quantity,
-            quantity_change: item.quantity,
-            change_type: 'webhook',
-            source: 'bigcommerce',
-          }])
-          .catch(() => { /* History table might not exist */ });
+        try {
+          await supabase
+            .from('inventory_history')
+            .insert([{
+              org_id: orgId,
+              item_id: inserted.id,
+              item_name: item.name,
+              sku: item.sku,
+              previous_quantity: 0,
+              new_quantity: item.quantity,
+              quantity_change: item.quantity,
+              change_type: 'webhook',
+              source: 'bigcommerce',
+            }]);
+        } catch {
+          // History table might not exist yet - ignore
+        }
       }
 
       results.created++;
