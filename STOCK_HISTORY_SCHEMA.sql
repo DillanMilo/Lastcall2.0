@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS inventory_history (
   previous_quantity int NOT NULL DEFAULT 0,
   new_quantity int NOT NULL DEFAULT 0,
   quantity_change int NOT NULL DEFAULT 0,
-  change_type text NOT NULL DEFAULT 'sync',  -- 'sync', 'manual', 'sale', 'restock', 'adjustment', 'webhook'
-  source text,  -- 'bigcommerce', 'csv', 'manual', etc.
+  change_type text NOT NULL DEFAULT 'sync',
+  source text,
   created_at timestamptz DEFAULT now()
 );
 
@@ -35,47 +35,15 @@ CREATE POLICY "Users can read org inventory history" ON inventory_history
     )
   );
 
--- Policy: Service role can insert history (for syncs and webhooks)
+-- Policy: Service role can insert history
 CREATE POLICY "Service role can insert history" ON inventory_history
   FOR INSERT 
   WITH CHECK (true);
 
--- Comment for documentation
+-- Comments
 COMMENT ON TABLE inventory_history IS 'Tracks all inventory quantity changes for analytics and smart ordering predictions';
 COMMENT ON COLUMN inventory_history.quantity_change IS 'Positive = restock/increase, Negative = sale/decrease';
 COMMENT ON COLUMN inventory_history.change_type IS 'Type of change: sync, manual, sale, restock, adjustment, webhook';
-
--- Create a function to calculate stock velocity (units moved per day)
-CREATE OR REPLACE FUNCTION get_stock_velocity(
-  p_org_id uuid,
-  p_item_id uuid,
-  p_days int DEFAULT 28
-)
-RETURNS TABLE (
-  total_decrease int,
-  total_increase int,
-  net_change int,
-  avg_daily_decrease numeric,
-  days_of_data int
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    COALESCE(SUM(CASE WHEN h.quantity_change < 0 THEN ABS(h.quantity_change) ELSE 0 END), 0)::int AS total_decrease,
-    COALESCE(SUM(CASE WHEN h.quantity_change > 0 THEN h.quantity_change ELSE 0 END), 0)::int AS total_increase,
-    COALESCE(SUM(h.quantity_change), 0)::int AS net_change,
-    ROUND(
-      COALESCE(SUM(CASE WHEN h.quantity_change < 0 THEN ABS(h.quantity_change) ELSE 0 END), 0)::numeric / 
-      GREATEST(EXTRACT(DAY FROM (now() - MIN(h.created_at)))::numeric, 1),
-      2
-    ) AS avg_daily_decrease,
-    GREATEST(EXTRACT(DAY FROM (now() - MIN(h.created_at)))::int, 0) AS days_of_data
-  FROM inventory_history h
-  WHERE h.org_id = p_org_id
-    AND h.item_id = p_item_id
-    AND h.created_at >= now() - (p_days || ' days')::interval;
-END;
-$$ LANGUAGE plpgsql;
 
 -- Create a view for easy stock movement analysis
 CREATE OR REPLACE VIEW stock_movement_summary AS
@@ -92,4 +60,3 @@ SELECT
 FROM inventory_history h
 WHERE h.created_at >= now() - interval '30 days'
 GROUP BY h.org_id, h.item_id, h.item_name, h.sku;
-
