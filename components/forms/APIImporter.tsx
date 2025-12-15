@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Plug, CheckCircle, XCircle, Store, Link2, RefreshCw } from "lucide-react";
+import { Loader2, Plug, CheckCircle, XCircle, Store, Link2, RefreshCw, Zap } from "lucide-react";
 import {
   DEFAULT_FIELD_MAPPING,
   mapExternalItems,
@@ -74,6 +74,8 @@ export function APIImporter({ orgId }: { orgId: string }) {
   const [bcResult, setBcResult] = useState<BigCommerceSyncResult | null>(null);
   const [bcError, setBcError] = useState<string | null>(null);
   const [bcSuccess, setBcSuccess] = useState<string | null>(null);
+  const [webhooksEnabled, setWebhooksEnabled] = useState(false);
+  const [enablingWebhooks, setEnablingWebhooks] = useState(false);
 
   // Check if BigCommerce is already connected on mount
   useEffect(() => {
@@ -177,6 +179,32 @@ export function APIImporter({ orgId }: { orgId: string }) {
       setBcError(err instanceof Error ? err.message : "Failed to sync");
     } finally {
       setBcSyncing(false);
+    }
+  };
+
+  const handleEnableWebhooks = async () => {
+    setEnablingWebhooks(true);
+    setBcError(null);
+
+    try {
+      const response = await fetch("/api/integrations/bigcommerce/register-webhooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to enable auto-sync");
+      }
+
+      setWebhooksEnabled(true);
+      setBcSuccess(`Auto-sync enabled! ${data.message}`);
+    } catch (err) {
+      setBcError(err instanceof Error ? err.message : "Failed to enable auto-sync");
+    } finally {
+      setEnablingWebhooks(false);
     }
   };
 
@@ -394,33 +422,73 @@ export function APIImporter({ orgId }: { orgId: string }) {
 
             {/* Connected State */}
             {bcConnected && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
-                <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Connected to {bcStoreName || "BigCommerce"}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                  <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                      Connected to {bcStoreName || "BigCommerce"}
+                    </p>
+                    {webhooksEnabled && (
+                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-0.5">
+                        <Zap className="h-3 w-3" /> Auto-sync enabled
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBcSync}
+                      disabled={bcSyncing || enablingWebhooks}
+                    >
+                      {bcSyncing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Sync Now
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBcSync}
-                  disabled={bcSyncing}
-                  className="shrink-0"
-                >
-                  {bcSyncing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Sync Now
-                    </>
-                  )}
-                </Button>
+
+                {/* Auto-Sync Button */}
+                {!webhooksEnabled && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                    <Zap className="h-5 w-5 text-amber-600 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        Enable Auto-Sync
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Automatically update inventory when products change in BigCommerce
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={handleEnableWebhooks}
+                      disabled={enablingWebhooks || bcSyncing}
+                      className="shrink-0 bg-amber-600 hover:bg-amber-700"
+                    >
+                      {enablingWebhooks ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Enabling...
+                        </>
+                      ) : (
+                        "Enable"
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
