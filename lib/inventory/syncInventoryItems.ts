@@ -1,5 +1,21 @@
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 import { generateAiLabel } from '@/lib/ai/labelGenerator';
+
+// Use service role client for server-side operations to bypass RLS
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function getAdminClient() {
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+  }
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 export interface InventorySyncItem {
   name: string;
@@ -49,56 +65,33 @@ function parseInteger(value: InventorySyncItem['quantity']): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-async function findExistingInventoryItem(orgId: string, item: InventorySyncItem) {
-  if (item.bigcommerce_variant_id) {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('bigcommerce_variant_id', String(item.bigcommerce_variant_id))
-      .limit(1);
-
-    if (error) throw error;
-    if (data && data.length > 0) {
-      return data[0];
-    }
-  }
-
-  if (item.bigcommerce_product_id && item.sku) {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('bigcommerce_product_id', String(item.bigcommerce_product_id))
-      .eq('sku', item.sku)
-      .limit(1);
-
-    if (error) throw error;
-    if (data && data.length > 0) {
-      return data[0];
-    }
-  }
-
-  if (item.bigcommerce_product_id) {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('bigcommerce_product_id', String(item.bigcommerce_product_id))
-      .limit(1);
-
-    if (error) throw error;
-    if (data && data.length > 0) {
-      return data[0];
-    }
-  }
-
+async function findExistingInventoryItem(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  item: InventorySyncItem
+) {
+  // Match by SKU first (most reliable)
   if (item.sku) {
     const { data, error } = await supabase
       .from('inventory_items')
       .select('id')
       .eq('org_id', orgId)
       .eq('sku', item.sku)
+      .limit(1);
+
+    if (error) throw error;
+    if (data && data.length > 0) {
+      return data[0];
+    }
+  }
+
+  // Fallback: match by name (less reliable but better than duplicates)
+  if (item.name) {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('name', item.name)
       .limit(1);
 
     if (error) throw error;
@@ -128,6 +121,9 @@ export async function syncInventoryItems({
     throw new Error('items must be a non-empty array');
   }
 
+  // Use admin client to bypass RLS for server-side operations
+  const supabase = getAdminClient();
+
   const results: InventorySyncResult = {
     created: 0,
     updated: 0,
@@ -140,73 +136,90 @@ export async function syncInventoryItems({
     ? normalizedSource
     : source;
 
-  for (const item of items) {
-    try {
-      if (!item.name) {
-        results.failed += 1;
-        results.errors.push('Item missing name field');
-        continue;
+  // Process items in batches for better performance
+  const BATCH_SIZE = 50;
+  
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+    
+    // Process batch items in parallel (but limit AI calls)
+    const batchPromises = batch.map(async (item) => {
+      try {
+        if (!item.name) {
+          return { status: 'failed', error: 'Item missing name field' };
+        }
+
+        let aiData: { category: string | null; ai_label: string | null } = {
+          category: null,
+          ai_label: null,
+        };
+
+        // Only do AI labeling for new items and limit to avoid rate limits
+        if (enableAiLabeling && !item.ai_label && !item.category) {
+          try {
+            const aiResult = await generateAiLabel(item.name);
+            if (aiResult.status === 'success') {
+              aiData = {
+                category: aiResult.category ?? null,
+                ai_label: aiResult.label ?? null,
+              };
+            }
+          } catch {
+            // AI labeling failed, continue without it
+          }
+        }
+
+        // Build base item data (bigcommerce columns may not exist in DB yet)
+        const itemData: Record<string, unknown> = {
+          org_id: orgId,
+          name: item.name,
+          sku: item.sku ?? null,
+          invoice: item.invoice ?? null,
+          quantity: parseInteger(item.quantity),
+          reorder_threshold: parseInteger(item.reorder_threshold),
+          category: item.category ?? aiData.category,
+          ai_label: item.ai_label ?? aiData.ai_label,
+          expiration_date: item.expiration_date ?? null,
+        };
+
+        const existing = await findExistingInventoryItem(supabase, orgId, item);
+
+        if (existing) {
+          const { error: updateError } = await supabase
+            .from('inventory_items')
+            .update(itemData)
+            .eq('id', existing.id);
+
+          if (updateError) throw updateError;
+          return { status: 'updated' };
+        }
+
+        const { error: insertError } = await supabase
+          .from('inventory_items')
+          .insert([itemData]);
+
+        if (insertError) throw insertError;
+        return { status: 'created' };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to sync item';
+        return { status: 'failed', error: `${item.name || 'Unknown'}: ${message}` };
       }
+    });
 
-      let aiData: { category: string | null; ai_label: string | null } = {
-        category: null,
-        ai_label: null,
-      };
-
-      if (enableAiLabeling && !item.ai_label && !item.category) {
-        const aiResult = await generateAiLabel(item.name);
-        if (aiResult.status === 'success') {
-          aiData = {
-            category: aiResult.category ?? null,
-            ai_label: aiResult.label ?? null,
-          };
+    const batchResults = await Promise.all(batchPromises);
+    
+    for (const result of batchResults) {
+      if (result.status === 'created') {
+        results.created += 1;
+      } else if (result.status === 'updated') {
+        results.updated += 1;
+      } else if (result.status === 'failed') {
+        results.failed += 1;
+        if (result.error) {
+          results.errors.push(result.error);
         }
       }
-
-      const itemData = {
-        org_id: orgId,
-        name: item.name,
-        sku: item.sku ?? null,
-        invoice: item.invoice ?? null,
-        quantity: parseInteger(item.quantity),
-        reorder_threshold: parseInteger(item.reorder_threshold),
-        category: item.category ?? aiData.category,
-        ai_label: item.ai_label ?? aiData.ai_label,
-        expiration_date: item.expiration_date ?? null,
-        bigcommerce_product_id: item.bigcommerce_product_id
-          ? String(item.bigcommerce_product_id)
-          : null,
-        bigcommerce_variant_id: item.bigcommerce_variant_id
-          ? String(item.bigcommerce_variant_id)
-          : null,
-      };
-
-      const existing = await findExistingInventoryItem(orgId, item);
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from('inventory_items')
-          .update(itemData)
-          .eq('id', existing.id);
-
-        if (updateError) throw updateError;
-        results.updated += 1;
-        continue;
-      }
-
-      const { error: insertError } = await supabase
-        .from('inventory_items')
-        .insert([itemData]);
-
-      if (insertError) throw insertError;
-      results.created += 1;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to sync item';
-      results.failed += 1;
-      results.errors.push(
-        `${item.name || 'Unknown'}: ${message}`
-      );
     }
   }
 

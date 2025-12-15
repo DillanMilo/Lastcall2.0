@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +19,7 @@ import {
   resolveItemsFromPayload,
   type FieldMapping,
 } from "@/lib/inventory/apiImportUtils";
+import { supabase } from "@/lib/supabaseClient";
 
 interface SyncResult {
   summary: string;
@@ -73,6 +74,30 @@ export function APIImporter({ orgId }: { orgId: string }) {
   const [bcResult, setBcResult] = useState<BigCommerceSyncResult | null>(null);
   const [bcError, setBcError] = useState<string | null>(null);
   const [bcSuccess, setBcSuccess] = useState<string | null>(null);
+
+  // Check if BigCommerce is already connected on mount
+  useEffect(() => {
+    const checkBigCommerceConnection = async () => {
+      try {
+        const { data: org, error } = await supabase
+          .from('organizations')
+          .select('bigcommerce_store_hash, bigcommerce_connected_at')
+          .eq('id', orgId)
+          .single();
+
+        if (!error && org?.bigcommerce_connected_at) {
+          setBcConnected(true);
+          setBcStoreName(org.bigcommerce_store_hash || 'BigCommerce Store');
+        }
+      } catch (err) {
+        console.error('Error checking BigCommerce connection:', err);
+      }
+    };
+
+    if (orgId) {
+      checkBigCommerceConnection();
+    }
+  }, [orgId]);
 
   const handleFieldChange = (field: keyof FieldMapping) => {
     return (e: ChangeEvent<HTMLInputElement>) => {

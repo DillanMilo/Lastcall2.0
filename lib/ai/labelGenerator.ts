@@ -42,7 +42,7 @@ Never hallucinate or guess wildly. Only classify if you have reasonable confiden
         },
         {
           role: 'user',
-          content: `Classify this inventory item: "${itemName}"`,
+          content: `Classify this inventory item: "${itemName}". Respond in JSON format.`,
         },
       ],
       temperature: 0.3,

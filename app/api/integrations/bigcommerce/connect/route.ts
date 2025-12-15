@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Test the BigCommerce connection
-    const testUrl = `https://api.bigcommerce.com/stores/${store_hash}/v3/store`;
+    // Test the BigCommerce connection using the catalog endpoint (more reliable)
+    const testUrl = `https://api.bigcommerce.com/stores/${store_hash}/v3/catalog/products?limit=1`;
     const testResponse = await fetch(testUrl, {
       headers: {
         'Accept': 'application/json',
@@ -106,7 +106,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const storeInfo = await testResponse.json();
+    const catalogData = await testResponse.json();
+    const productCount = catalogData?.meta?.pagination?.total || 0;
     
     // Save credentials to organization
     if (!serviceRoleKey) {
@@ -144,10 +145,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       store_info: {
-        name: storeInfo.data?.name,
-        domain: storeInfo.data?.domain,
+        name: `Store ${store_hash}`,
+        product_count: productCount,
       },
-      message: 'BigCommerce connected successfully!',
+      message: `BigCommerce connected successfully! Found ${productCount} products.`,
     });
   } catch (error) {
     console.error('Error in BigCommerce connect:', error);
