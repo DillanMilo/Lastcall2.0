@@ -14,6 +14,10 @@ export interface Organization {
   id: string;
   name: string;
   subscription_tier: 'growth' | 'enterprise' | 'trial';
+  bigcommerce_store_hash?: string;
+  bigcommerce_client_id?: string;
+  bigcommerce_access_token?: string;
+  bigcommerce_connected_at?: string;
   created_at: string;
 }
 
