@@ -36,7 +36,7 @@ function getWelcomeMessage(): Message {
   return {
     role: "assistant",
     content:
-      "👋 Hi! I'm your Inventory assistant. I can help you with:\n\n📦 **Smart Ordering** - Tell you exactly what to order based on sales\n📅 **Set Expiry Dates** - Just say \"Set expiry for [items] to [date]\"\n⚠️ **Alerts** - Low stock and expiring items\n📊 **Reports** - Daily/weekly summaries\n\nWhat would you like to do?",
+      '👋 Hi! I\'m your Inventory assistant. I can help you with:\n\n📦 **Smart Ordering** - Tell you exactly what to order based on sales\n📅 **Set Expiry Dates** - Just say "Set expiry for [items] to [date]"\n⚠️ **Alerts** - Low stock and expiring items\n📊 **Reports** - Daily/weekly summaries\n\nWhat would you like to do?',
     timestamp: new Date(),
   };
 }
