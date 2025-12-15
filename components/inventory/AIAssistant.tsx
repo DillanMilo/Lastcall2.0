@@ -139,8 +139,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       console.error("Error getting AI response:", error);
       const errorMessage: Message = {
         role: "assistant",
@@ -168,8 +167,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   };
 
   return (
-    <Card className="flex flex-col h-screen-ios sm:h-[500px] md:h-[600px] sm:max-h-[85vh] w-full overflow-hidden">
-      <CardHeader className="border-b p-3 sm:p-4 md:p-6 shrink-0 bg-card z-10">
+    <Card className="flex flex-col h-[calc(100vh-120px)] sm:h-[500px] md:h-[600px] max-h-[85vh] w-full overflow-hidden">
+      <CardHeader className="border-b p-2.5 sm:p-4 md:p-6 shrink-0 bg-card z-10">
         <div className="flex items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <div className="p-1.5 sm:p-2 rounded-full bg-primary/10 flex-shrink-0">
@@ -195,7 +194,12 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               <RotateCcw className="h-4 w-4" />
             </Button>
             {onClose && (
-              <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 sm:h-10 sm:w-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8 sm:h-10 sm:w-10"
+              >
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -259,9 +263,11 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
         {/* Suggested Questions */}
         {messages.length === 1 && (
-          <div className="px-3 md:px-4 py-2 border-t bg-muted/30 shrink-0">
-            <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
-            <div className="flex flex-wrap gap-1.5 md:gap-2">
+          <div className="px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 border-t bg-muted/30 shrink-0">
+            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 sm:mb-2">
+              Try asking:
+            </p>
+            <div className="flex flex-wrap gap-1 sm:gap-1.5 md:gap-2">
               {SUGGESTED_QUESTIONS.map((question, index) => (
                 <Button
                   key={index}
@@ -269,7 +275,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
                   size="sm"
                   onClick={() => handleSend(question)}
                   disabled={loading}
-                  className="text-xs h-7 md:h-8 px-2 md:px-3"
+                  className="text-[10px] sm:text-xs h-6 sm:h-7 md:h-8 px-1.5 sm:px-2 md:px-3"
                 >
                   {question}
                 </Button>
@@ -279,7 +285,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         )}
 
         {/* Input - Fixed at bottom */}
-        <div className="p-3 sm:p-3 md:p-4 pb-6 sm:pb-3 md:pb-4 border-t bg-card z-20 safe-bottom" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 24px)' }}>
+        <div className="p-3 sm:p-3 md:p-4 pb-3 sm:pb-3 md:pb-4 border-t bg-card z-20 shrink-0">
           <div className="flex gap-2">
             <Input
               value={input}

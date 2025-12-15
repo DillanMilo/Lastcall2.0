@@ -88,7 +88,7 @@ export default function InventoryPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.push('/auth/signin');
+      router.push("/auth/signin");
       return;
     }
     if (orgId) {
@@ -256,86 +256,90 @@ export default function InventoryPage() {
             <div className="overflow-x-auto -mx-4 sm:mx-0">
               <div className="inline-block min-w-full align-middle px-4 sm:px-0">
                 <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Reorder Point</TableHead>
-                    <TableHead>Expiry</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.sku || "-"}</TableCell>
-                      <TableCell>
-                        {item.invoice ? (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              {item.invoice}
-                            </span>
-                            {invoiceCounts[item.invoice] > 1 && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setBulkEditInvoice(item.invoice!)
-                                }
-                                className="h-6 px-2 text-xs"
-                              >
-                                <Package className="h-3 w-3 mr-1" />
-                                Edit Batch ({invoiceCounts[item.invoice]})
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={
-                            item.quantity <= item.reorder_threshold
-                              ? "text-amber-600 font-semibold"
-                              : ""
-                          }
-                        >
-                          {item.quantity}
-                        </span>
-                      </TableCell>
-                      <TableCell>{item.reorder_threshold}</TableCell>
-                      <TableCell>
-                        {item.expiration_date
-                          ? new Date(item.expiration_date).toLocaleDateString()
-                          : "-"}
-                      </TableCell>
-                      <TableCell>
-                        {item.category ? (
-                          <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
-                            {item.category}
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingItem(item)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Reorder Point</TableHead>
+                      <TableHead>Expiry</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">
+                          {item.name}
+                        </TableCell>
+                        <TableCell>{item.sku || "-"}</TableCell>
+                        <TableCell>
+                          {item.invoice ? (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                {item.invoice}
+                              </span>
+                              {invoiceCounts[item.invoice] > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    setBulkEditInvoice(item.invoice!)
+                                  }
+                                  className="h-6 px-2 text-xs"
+                                >
+                                  <Package className="h-3 w-3 mr-1" />
+                                  Edit Batch ({invoiceCounts[item.invoice]})
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={
+                              item.quantity <= item.reorder_threshold
+                                ? "text-amber-600 font-semibold"
+                                : ""
+                            }
+                          >
+                            {item.quantity}
+                          </span>
+                        </TableCell>
+                        <TableCell>{item.reorder_threshold}</TableCell>
+                        <TableCell>
+                          {item.expiration_date
+                            ? new Date(
+                                item.expiration_date
+                              ).toLocaleDateString()
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {item.category ? (
+                            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
+                              {item.category}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingItem(item)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}
@@ -368,8 +372,8 @@ export default function InventoryPage() {
       )}
 
       {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-2 md:p-4 z-[60] overflow-hidden">
-          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:my-auto sm:rounded-lg overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 pb-20 sm:p-2 md:p-4 sm:pb-2 z-[60] overflow-hidden">
+          <div className="w-full max-h-[calc(100vh-100px)] sm:max-h-[90vh] sm:max-w-2xl sm:my-auto rounded-lg overflow-hidden flex flex-col">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}

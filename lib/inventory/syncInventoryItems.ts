@@ -1,11 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { generateAiLabel } from '@/lib/ai/labelGenerator';
 
 // Use service role client for server-side operations to bypass RLS
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-function getAdminClient() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminClient = SupabaseClient<any, 'public', any>;
+
+function getAdminClient(): AdminClient {
   if (!serviceRoleKey) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
   }
@@ -66,7 +69,7 @@ function parseInteger(value: InventorySyncItem['quantity']): number {
 }
 
 async function findExistingInventoryItem(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AdminClient,
   orgId: string,
   item: InventorySyncItem
 ) {
