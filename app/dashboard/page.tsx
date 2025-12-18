@@ -29,6 +29,18 @@ export default function DashboardPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+
+  // Lock body scroll when AI chat is open
+  useEffect(() => {
+    if (showAIAssistant) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showAIAssistant]);
   const isSupabaseConfigured =
     !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&

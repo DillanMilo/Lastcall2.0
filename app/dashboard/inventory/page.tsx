@@ -51,6 +51,18 @@ export default function InventoryPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [showAIAssistant, setShowAIAssistant] = useState(false);
 
+  // Lock body scroll when AI chat is open
+  useEffect(() => {
+    if (showAIAssistant) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showAIAssistant]);
+
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
@@ -392,8 +404,8 @@ export default function InventoryPage() {
       )}
 
       {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 pb-20 sm:p-2 md:p-4 sm:pb-2 z-[60] overflow-hidden overscroll-contain touch-none sm:touch-auto">
-          <div className="w-full max-h-[calc(100vh-100px)] sm:max-h-[90vh] sm:max-w-2xl sm:my-auto rounded-lg overflow-hidden flex flex-col touch-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-2 md:p-4 z-[100] overflow-hidden">
+          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:my-auto sm:rounded-lg overflow-hidden flex flex-col">
             <AIAssistant
               orgId={orgId}
               onClose={() => setShowAIAssistant(false)}
