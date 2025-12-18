@@ -167,7 +167,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   };
 
   return (
-    <Card className="flex flex-col h-[60vh] sm:h-[500px] md:h-[600px] max-h-[400px] sm:max-h-[85vh] w-full overflow-hidden">
+    <Card className="flex flex-col h-[85vh] sm:h-[500px] md:h-[600px] max-h-[calc(100vh-80px)] sm:max-h-[85vh] w-full overflow-hidden">
       <CardHeader className="border-b p-2.5 sm:p-4 md:p-6 shrink-0 bg-card z-10">
         <div className="flex items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
