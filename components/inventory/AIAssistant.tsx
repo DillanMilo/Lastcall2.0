@@ -293,7 +293,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask about your inventory..."
               disabled={loading}
-              className="flex-1 text-xs sm:text-sm h-10 sm:h-10 min-h-[44px]"
+              className="flex-1 text-base sm:text-sm h-10 sm:h-10 min-h-[44px]"
             />
             <Button
               onClick={() => handleSend()}
