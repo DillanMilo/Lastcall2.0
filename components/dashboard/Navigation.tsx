@@ -75,7 +75,7 @@ export function Navigation() {
   };
 
   const handleSync = async () => {
-    if (syncing) return;
+    if (syncing || !user?.org_id) return;
 
     setSyncing(true);
     setSyncStatus("idle");
@@ -84,6 +84,7 @@ export function Navigation() {
       const response = await fetch("/api/integrations/bigcommerce/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ org_id: user.org_id }),
       });
 
       if (!response.ok) {
@@ -144,7 +145,7 @@ export function Navigation() {
               syncStatus === "error" && "border-destructive text-destructive bg-destructive/10"
             )}
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncing || !user?.org_id}
           >
             {syncing ? (
               <RefreshCw className="h-5 w-5 animate-spin" />
