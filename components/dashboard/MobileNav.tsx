@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { LayoutDashboard, Package, Upload, Settings, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, Package, Upload, Settings, LogOut, Menu, X, RefreshCw, Check, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +18,8 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
 
   const handleSignOut = async () => {
     try {
@@ -32,6 +34,37 @@ export function MobileNav() {
     } catch (error) {
       console.error("Error during sign out:", error);
       window.location.href = "/auth/signin";
+    }
+  };
+
+  const handleSync = async () => {
+    if (syncing) return;
+
+    setSyncing(true);
+    setSyncStatus("idle");
+
+    try {
+      const response = await fetch("/api/integrations/bigcommerce/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Sync failed");
+      }
+
+      setSyncStatus("success");
+      // Reload page to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error("Sync error:", error);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus("idle"), 3000);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -88,6 +121,36 @@ export function MobileNav() {
               </Link>
             );
           })}
+
+          <div className="border-t my-1" />
+
+          {/* Sync Button */}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 w-full transition-colors",
+              syncStatus === "success"
+                ? "bg-green-500/10 text-green-600"
+                : syncStatus === "error"
+                ? "bg-destructive/10 text-destructive"
+                : "hover:bg-accent hover:text-accent-foreground"
+            )}
+            aria-label="Sync Inventory"
+          >
+            {syncing ? (
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            ) : syncStatus === "success" ? (
+              <Check className="h-5 w-5" />
+            ) : syncStatus === "error" ? (
+              <AlertCircle className="h-5 w-5" />
+            ) : (
+              <RefreshCw className="h-5 w-5" />
+            )}
+            <span className="text-sm font-medium">
+              {syncing ? "Syncing..." : syncStatus === "success" ? "Synced!" : syncStatus === "error" ? "Sync Failed" : "Sync Now"}
+            </span>
+          </button>
 
           <div className="border-t my-1" />
 

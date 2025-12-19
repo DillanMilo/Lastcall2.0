@@ -12,6 +12,9 @@ import {
   Settings,
   LogOut,
   UserCircle,
+  RefreshCw,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
@@ -27,6 +30,8 @@ const navItems = [
 export function Navigation() {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
 
   useEffect(() => {
     let isMounted = true;
@@ -69,6 +74,37 @@ export function Navigation() {
     window.location.href = "/auth/signin";
   };
 
+  const handleSync = async () => {
+    if (syncing) return;
+
+    setSyncing(true);
+    setSyncStatus("idle");
+
+    try {
+      const response = await fetch("/api/integrations/bigcommerce/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Sync failed");
+      }
+
+      setSyncStatus("success");
+      // Reload page to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error("Sync error:", error);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus("idle"), 3000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <nav className="flex flex-col h-full">
       <div className="p-6">
@@ -97,6 +133,33 @@ export function Navigation() {
             </Link>
           );
         })}
+
+        {/* Sync Button */}
+        <div className="mt-4 pt-4 border-t">
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full justify-start gap-3",
+              syncStatus === "success" && "border-green-500 text-green-600 bg-green-500/10",
+              syncStatus === "error" && "border-destructive text-destructive bg-destructive/10"
+            )}
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            ) : syncStatus === "success" ? (
+              <Check className="h-5 w-5" />
+            ) : syncStatus === "error" ? (
+              <AlertCircle className="h-5 w-5" />
+            ) : (
+              <RefreshCw className="h-5 w-5" />
+            )}
+            <span className="text-sm font-medium">
+              {syncing ? "Syncing..." : syncStatus === "success" ? "Synced!" : syncStatus === "error" ? "Sync Failed" : "Sync Now"}
+            </span>
+          </Button>
+        </div>
       </div>
 
       <div className="p-3 border-t">
