@@ -51,18 +51,6 @@ export default function InventoryPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [showAIAssistant, setShowAIAssistant] = useState(false);
 
-  // Lock body scroll when AI chat is open
-  useEffect(() => {
-    if (showAIAssistant) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [showAIAssistant]);
-
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
