@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +20,31 @@ export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
+  const [orgId, setOrgId] = useState<string | null>(null);
+
+  // Fetch user's org_id on mount
+  useEffect(() => {
+    const fetchOrgId = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: userData } = await supabase
+          .from("users")
+          .select("org_id")
+          .eq("id", user.id)
+          .single();
+
+        if (userData?.org_id) {
+          setOrgId(userData.org_id);
+        }
+      } catch (error) {
+        console.error("Error fetching org_id:", error);
+      }
+    };
+
+    fetchOrgId();
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -38,7 +63,7 @@ export function MobileNav() {
   };
 
   const handleSync = async () => {
-    if (syncing) return;
+    if (syncing || !orgId) return;
 
     setSyncing(true);
     setSyncStatus("idle");
@@ -47,6 +72,7 @@ export function MobileNav() {
       const response = await fetch("/api/integrations/bigcommerce/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ org_id: orgId }),
       });
 
       if (!response.ok) {
@@ -127,14 +153,15 @@ export function MobileNav() {
           {/* Sync Button */}
           <button
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncing || !orgId}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 w-full transition-colors",
               syncStatus === "success"
                 ? "bg-green-500/10 text-green-600"
                 : syncStatus === "error"
                 ? "bg-destructive/10 text-destructive"
-                : "hover:bg-accent hover:text-accent-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+              !orgId && "opacity-50 cursor-not-allowed"
             )}
             aria-label="Sync Inventory"
           >
