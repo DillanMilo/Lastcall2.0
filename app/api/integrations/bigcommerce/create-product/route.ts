@@ -13,6 +13,7 @@ interface CreateProductRequest {
   quantity: number;
   invoice?: string;
   expiration_date?: string;
+  bigcommerce_product_id?: number; // If provided, update this product instead of creating new
 }
 
 /**
@@ -73,7 +74,7 @@ async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ val
 export async function POST(request: NextRequest) {
   try {
     const body: CreateProductRequest = await request.json();
-    const { org_id, name, sku, quantity, invoice, expiration_date } = body;
+    const { org_id, name, sku, quantity, invoice, expiration_date, bigcommerce_product_id } = body;
 
     // Validate required fields
     if (!org_id || !name) {
@@ -128,6 +129,63 @@ export async function POST(request: NextRequest) {
     }
 
     const { bigcommerce_store_hash, bigcommerce_client_id, bigcommerce_access_token } = org;
+
+    // If a BigCommerce product ID is provided, update that product directly
+    if (bigcommerce_product_id) {
+      // First, get current inventory level
+      const getProductUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}`;
+      const getResponse = await fetch(getProductUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Auth-Token': bigcommerce_access_token,
+          'X-Auth-Client': bigcommerce_client_id,
+        },
+      });
+
+      if (!getResponse.ok) {
+        return NextResponse.json(
+          { error: 'Product not found in BigCommerce', details: `Product ID ${bigcommerce_product_id} not found` },
+          { status: 404 }
+        );
+      }
+
+      const productData = await getResponse.json();
+      const currentInventory = productData.data?.inventory_level || 0;
+      const newInventory = currentInventory + quantity;
+
+      // Update inventory level (add to existing)
+      const updateUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}`;
+      const updateResponse = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Auth-Token': bigcommerce_access_token,
+          'X-Auth-Client': bigcommerce_client_id,
+        },
+        body: JSON.stringify({
+          inventory_level: newInventory,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        return NextResponse.json(
+          { error: 'Failed to update product inventory', details: errorText },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        action: 'updated',
+        message: `Added ${quantity} units to "${name}" (${currentInventory} → ${newInventory})`,
+        bigcommerce_product_id: bigcommerce_product_id,
+        previous_inventory: currentInventory,
+        new_inventory: newInventory,
+      });
+    }
 
     // Check if product with this SKU already exists
     if (sku) {

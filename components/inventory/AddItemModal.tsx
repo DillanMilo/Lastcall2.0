@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { X, Upload, Check, AlertCircle } from "lucide-react";
+import { X, Upload, Check, AlertCircle, Search, Package } from "lucide-react";
+
+interface BigCommerceProduct {
+  id: number;
+  name: string;
+  sku: string;
+  inventory_level: number;
+}
 
 interface AddItemModalProps {
   orgId: string;
@@ -35,6 +42,14 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
     expiration_date: "",
   });
 
+  // Autocomplete state
+  const [searchResults, setSearchResults] = useState<BigCommerceProduct[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<BigCommerceProduct | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   // Check if BigCommerce is connected
   useEffect(() => {
     const checkBigCommerceConnection = async () => {
@@ -55,6 +70,64 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
 
     checkBigCommerceConnection();
   }, [orgId]);
+
+  // Debounced search for BigCommerce products
+  const searchProducts = useCallback(async (query: string) => {
+    if (!bigCommerceConnected || query.length < 2) {
+      setSearchResults([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const response = await fetch(
+        `/api/integrations/bigcommerce/search-products?org_id=${orgId}&q=${encodeURIComponent(query)}`
+      );
+      const data = await response.json();
+      setSearchResults(data.products || []);
+      setShowSuggestions(data.products?.length > 0);
+    } catch (error) {
+      console.error("Error searching products:", error);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [orgId, bigCommerceConnected]);
+
+  // Handle name input change with debounced search
+  const handleNameChange = (value: string) => {
+    setFormData({ ...formData, name: value });
+
+    // Clear selected product if user changes name
+    if (selectedProduct && value !== selectedProduct.name) {
+      setSelectedProduct(null);
+    }
+
+    // Debounce the search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (bigCommerceConnected && value.length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchProducts(value);
+      }, 300);
+    } else {
+      setSearchResults([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Handle product selection from autocomplete
+  const handleSelectProduct = (product: BigCommerceProduct) => {
+    setSelectedProduct(product);
+    setFormData({ ...formData, name: product.name });
+    setShowSuggestions(false);
+    setSearchResults([]);
+    // Auto-enable sync when a BigCommerce product is selected
+    setSyncToBigCommerce(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,6 +165,8 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
               quantity: parseInt(formData.quantity) || 0,
               invoice: formData.invoice || undefined,
               expiration_date: formData.expiration_date || undefined,
+              // If a product was selected from autocomplete, use its BigCommerce ID
+              bigcommerce_product_id: selectedProduct?.id,
             }),
           });
 
@@ -157,15 +232,71 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
                 <Label htmlFor="name">
                   Product Name <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="name"
-                  required
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="Angus Biltong Original 100g"
-                />
+                <div className="relative">
+                  <div className="relative">
+                    <Input
+                      ref={inputRef}
+                      id="name"
+                      required
+                      value={formData.name}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      onFocus={() => {
+                        if (searchResults.length > 0) setShowSuggestions(true);
+                      }}
+                      onBlur={() => {
+                        // Delay hiding to allow click on suggestion
+                        setTimeout(() => setShowSuggestions(false), 200);
+                      }}
+                      placeholder={bigCommerceConnected ? "Start typing to search BigCommerce..." : "Angus Biltong Original 100g"}
+                      className={selectedProduct ? "pr-10 border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
+                    />
+                    {searching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    )}
+                    {selectedProduct && !searching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Check className="h-4 w-4 text-green-600" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Autocomplete dropdown */}
+                  {showSuggestions && searchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-card border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div className="p-2 text-xs text-muted-foreground border-b">
+                        <Search className="h-3 w-3 inline mr-1" />
+                        Select a product from BigCommerce
+                      </div>
+                      {searchResults.map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => handleSelectProduct(product)}
+                          className="w-full text-left px-3 py-2 hover:bg-muted transition-colors flex items-center gap-3"
+                        >
+                          <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.sku && `SKU: ${product.sku} • `}
+                              Stock: {product.inventory_level}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Selected product indicator */}
+                  {selectedProduct && (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <Check className="h-3 w-3" />
+                      Linked to BigCommerce product (ID: {selectedProduct.id})
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -251,7 +382,9 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
                           Sync to BigCommerce
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          Create this product in your BigCommerce store
+                          {selectedProduct
+                            ? `Add ${formData.quantity || 0} units to existing product`
+                            : "Create new product in BigCommerce"}
                         </p>
                       </div>
                     </div>
