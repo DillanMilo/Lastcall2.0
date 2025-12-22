@@ -12,35 +12,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Package,
   AlertCircle,
   TrendingUp,
   Clock,
-  Sparkles,
 } from "lucide-react";
 import { daysUntilExpiration } from "@/lib/utils";
-import { AIAssistant } from "@/components/inventory/AIAssistant";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, orgId, loading: authLoading } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
 
-  // Lock body scroll when AI chat is open
-  useEffect(() => {
-    if (showAIAssistant) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [showAIAssistant]);
   const isSupabaseConfigured =
     !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
@@ -195,25 +180,13 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-            Dashboard
-          </h1>
-          <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
-            Overview of your inventory and key metrics
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowAIAssistant(true)}
-          size="sm"
-          variant="outline"
-          className="w-full sm:w-auto sm:h-10 shrink-0"
-        >
-          <Sparkles className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Ask AI</span>
-          <span className="sm:hidden">AI</span>
-        </Button>
+      <div>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
+          Dashboard
+        </h1>
+        <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
+          Overview of your inventory and key metrics
+        </p>
       </div>
 
       <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
@@ -401,17 +374,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-16 sm:p-4 z-[100] overflow-hidden">
-          <div className="w-full h-full max-h-[calc(100vh-64px)] sm:h-auto sm:max-h-[85vh] sm:max-w-xl rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl">
-            <AIAssistant
-              orgId={orgId}
-              onClose={() => setShowAIAssistant(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

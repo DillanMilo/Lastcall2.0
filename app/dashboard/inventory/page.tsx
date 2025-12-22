@@ -31,13 +31,11 @@ import {
   Package,
   Grid3x3,
   List,
-  Sparkles,
 } from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
-import { AIAssistant } from "@/components/inventory/AIAssistant";
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -49,7 +47,6 @@ export default function InventoryPage() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [bulkEditInvoice, setBulkEditInvoice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
 
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
@@ -104,26 +101,6 @@ export default function InventoryPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, [authLoading, user, orgId, router, viewMode, fetchInventory]);
 
-  // Prevent background scrolling when AI modal is open (mobile only)
-  useEffect(() => {
-    if (showAIAssistant && window.innerWidth < 768) {
-      document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
-      document.body.style.top = `-${window.scrollY}px`;
-    }
-    return () => {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
-      document.body.style.top = "";
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || "0") * -1);
-      }
-    };
-  }, [showAIAssistant]);
-
   const filteredItems = items.filter(
     (item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -154,27 +131,15 @@ export default function InventoryPage() {
             Manage stock and track batches
           </p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button
-            onClick={() => setShowAIAssistant(true)}
-            size="sm"
-            variant="outline"
-            className="flex-1 sm:flex-none sm:h-10"
-          >
-            <Sparkles className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">AI Assistant</span>
-            <span className="sm:hidden">AI</span>
-          </Button>
-          <Button
-            onClick={() => setShowAddModal(true)}
-            size="sm"
-            className="flex-1 sm:flex-none sm:h-10"
-          >
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Item</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
-        </div>
+        <Button
+          onClick={() => setShowAddModal(true)}
+          size="sm"
+          className="w-full sm:w-auto sm:h-10"
+        >
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Add Item</span>
+          <span className="sm:hidden">Add</span>
+        </Button>
       </div>
 
       {lowStockItems.length > 0 && (
@@ -389,17 +354,6 @@ export default function InventoryPage() {
           onClose={() => setBulkEditInvoice(null)}
           onSuccess={fetchInventory}
         />
-      )}
-
-      {showAIAssistant && orgId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-16 sm:p-4 z-[100] overflow-hidden">
-          <div className="w-full h-full max-h-[calc(100vh-64px)] sm:h-auto sm:max-h-[85vh] sm:max-w-xl rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl">
-            <AIAssistant
-              orgId={orgId}
-              onClose={() => setShowAIAssistant(false)}
-            />
-          </div>
-        </div>
       )}
     </div>
   );
