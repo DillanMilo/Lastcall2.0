@@ -207,11 +207,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const refetchUser = useCallback(() => {
+  const refetchUser = () => {
     if (user?.id) {
       fetchUserWithOrg(user.id);
     }
-  }, [user?.id, fetchUserWithOrg]);
+  };
 
   return (
     <AuthContext.Provider value={{
