@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { User } from "@/types";
+import { useAuth } from "@/lib/auth/useAuth";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,39 +29,9 @@ const navItems = [
 
 export function Navigation() {
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
+  const { userWithOrg, orgId, signOut: authSignOut } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchUser = async () => {
-      try {
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-        if (!authUser || !isMounted) return;
-
-        const { data: userData } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", authUser.id)
-          .single();
-
-        if (userData && isMounted) {
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      }
-    };
-
-    fetchUser();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const handleSignOut = async () => {
     // Clear AI chat history from localStorage
@@ -70,12 +40,12 @@ export function Navigation() {
         localStorage.removeItem(key);
       }
     });
-    await supabase.auth.signOut();
+    await authSignOut();
     window.location.href = "/auth/signin";
   };
 
   const handleSync = async () => {
-    if (syncing || !user?.org_id) return;
+    if (syncing || !orgId) return;
 
     setSyncing(true);
     setSyncStatus("idle");
@@ -84,7 +54,7 @@ export function Navigation() {
       const response = await fetch("/api/integrations/bigcommerce/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ org_id: user.org_id }),
+        body: JSON.stringify({ org_id: orgId }),
       });
 
       if (!response.ok) {
@@ -145,7 +115,7 @@ export function Navigation() {
               syncStatus === "error" && "border-destructive text-destructive bg-destructive/10"
             )}
             onClick={handleSync}
-            disabled={syncing || !user?.org_id}
+            disabled={syncing || !orgId}
           >
             {syncing ? (
               <RefreshCw className="h-5 w-5 animate-spin" />
@@ -165,17 +135,15 @@ export function Navigation() {
 
       <div className="p-3 border-t">
         {/* User Profile Preview */}
-        {user && (
+        {userWithOrg && (
           <Link href="/dashboard/settings">
             <div className="flex items-center gap-3 px-3 py-2 mb-2 rounded-xl hover:bg-accent transition-colors">
-              {user.avatar_url ? (
-                <Image
-                  src={user.avatar_url}
-                  alt="Profile"
-                  width={32}
-                  height={32}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
+              {userWithOrg.organization ? (
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-medium text-primary">
+                    {userWithOrg.organization.name?.charAt(0).toUpperCase() || "O"}
+                  </span>
+                </div>
               ) : (
                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                   <UserCircle className="h-5 w-5 text-muted-foreground" />
@@ -183,7 +151,7 @@ export function Navigation() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
-                  {user.full_name || "User"}
+                  {userWithOrg.full_name || userWithOrg.email?.split("@")[0] || "User"}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   View Profile

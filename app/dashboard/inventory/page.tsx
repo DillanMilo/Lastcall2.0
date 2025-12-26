@@ -31,11 +31,15 @@ import {
   Package,
   Grid3x3,
   List,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
+
+const PAGE_SIZE = 50;
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -43,20 +47,37 @@ export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [bulkEditInvoice, setBulkEditInvoice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
 
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      const from = currentPage * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
         .from("inventory_items")
-        .select("*")
-        .eq("org_id", orgId)
-        .order("created_at", { ascending: false });
+        .select("*", { count: "exact" })
+        .eq("org_id", orgId);
+
+      // Server-side search
+      if (debouncedSearch) {
+        query = query.or(
+          `name.ilike.%${debouncedSearch}%,sku.ilike.%${debouncedSearch}%,invoice.ilike.%${debouncedSearch}%`
+        );
+      }
+
+      const { data, error, count } = await query
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (error) {
         if (
@@ -65,6 +86,7 @@ export default function InventoryPage() {
           error.message?.includes("fetch failed")
         ) {
           setItems([]);
+          setTotalCount(0);
           setLoading(false);
           return;
         }
@@ -72,24 +94,33 @@ export default function InventoryPage() {
       }
 
       setItems(data || []);
+      setTotalCount(count || 0);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to fetch inventory";
       console.error("Error fetching inventory:", message);
       setItems([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [orgId]);
+  }, [orgId, currentPage, debouncedSearch]);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(0); // Reset to first page on search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Auth check and resize handling
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       router.push("/auth/signin");
       return;
-    }
-    if (orgId) {
-      fetchInventory();
     }
     const handleResize = () => {
       if (window.innerWidth < 768 && viewMode === "table") {
@@ -99,26 +130,34 @@ export default function InventoryPage() {
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [authLoading, user, orgId, router, viewMode, fetchInventory]);
+  }, [authLoading, user, router, viewMode]);
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.invoice?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Fetch inventory when dependencies change
+  useEffect(() => {
+    if (orgId && !authLoading && user) {
+      fetchInventory();
+    }
+  }, [orgId, authLoading, user, fetchInventory]);
 
-  const lowStockItems = filteredItems.filter(
+  // Items are already filtered server-side, use directly
+  const lowStockItems = items.filter(
     (item) => item.quantity <= item.reorder_threshold
   );
 
   // Group items by invoice for bulk edit
-  const invoiceCounts = filteredItems.reduce((acc, item) => {
+  const invoiceCounts = items.reduce((acc, item) => {
     if (item.invoice) {
       acc[item.invoice] = (acc[item.invoice] || 0) + 1;
     }
     return acc;
   }, {} as Record<string, number>);
+
+  // Pagination helpers
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const hasNextPage = currentPage < totalPages - 1;
+  const hasPrevPage = currentPage > 0;
+  const startItem = currentPage * PAGE_SIZE + 1;
+  const endItem = Math.min((currentPage + 1) * PAGE_SIZE, totalCount);
 
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6">
@@ -201,26 +240,30 @@ export default function InventoryPage() {
             <div className="text-center py-8 text-muted-foreground">
               {authLoading ? "Authenticating..." : "Loading inventory..."}
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">
-                No items found. Start by importing your inventory!
+                {debouncedSearch
+                  ? `No items match "${debouncedSearch}"`
+                  : "No items found. Start by importing your inventory!"}
               </p>
-              <div className="flex gap-2 justify-center">
-                <Button
-                  onClick={() => (window.location.href = "/dashboard/import")}
-                >
-                  Import CSV
-                </Button>
-                <Button variant="outline" onClick={() => setShowAddModal(true)}>
-                  Add Manually
-                </Button>
-              </div>
+              {!debouncedSearch && (
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    onClick={() => (window.location.href = "/dashboard/import")}
+                  >
+                    Import CSV
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowAddModal(true)}>
+                    Add Manually
+                  </Button>
+                </div>
+              )}
             </div>
           ) : viewMode === "grid" ? (
             // Card View (Mobile-friendly)
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredItems.map((item) => (
+              {items.map((item) => (
                 <InventoryCard
                   key={item.id}
                   item={item}
@@ -254,7 +297,7 @@ export default function InventoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredItems.map((item) => (
+                    {items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">
                           {item.name}
@@ -325,6 +368,40 @@ export default function InventoryPage() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t mt-4">
+              <p className="text-sm text-muted-foreground order-2 sm:order-1">
+                Showing {startItem}-{endItem} of {totalCount.toLocaleString()} items
+              </p>
+              <div className="flex items-center gap-2 order-1 sm:order-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  disabled={!hasPrevPage || loading}
+                  className="h-9"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Previous</span>
+                </Button>
+                <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+                  Page {currentPage + 1} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={!hasNextPage || loading}
+                  className="h-9"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </div>
             </div>
           )}

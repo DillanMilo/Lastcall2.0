@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { LayoutDashboard, Package, Upload, Settings, LogOut, Menu, X, RefreshCw, Check, AlertCircle } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth/useAuth";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -17,34 +17,10 @@ const navItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { orgId, signOut: authSignOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
-  const [orgId, setOrgId] = useState<string | null>(null);
-
-  // Fetch user's org_id on mount
-  useEffect(() => {
-    const fetchOrgId = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: userData } = await supabase
-          .from("users")
-          .select("org_id")
-          .eq("id", user.id)
-          .single();
-
-        if (userData?.org_id) {
-          setOrgId(userData.org_id);
-        }
-      } catch (error) {
-        console.error("Error fetching org_id:", error);
-      }
-    };
-
-    fetchOrgId();
-  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -54,7 +30,7 @@ export function MobileNav() {
           localStorage.removeItem(key);
         }
       });
-      await supabase.auth.signOut();
+      await authSignOut();
       window.location.href = "/auth/signin";
     } catch (error) {
       console.error("Error during sign out:", error);

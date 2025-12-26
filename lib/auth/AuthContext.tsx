@@ -170,11 +170,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
+      // Failsafe timeout - if auth takes longer than 10 seconds, something is wrong
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          console.warn('Auth initialization timed out - clearing stale state');
+          setLoading((currentLoading) => {
+            if (currentLoading) {
+              // Only clear if still loading
+              setUser(null);
+              setUserWithOrg(null);
+              setOrgId(null);
+              // Clear potentially corrupted auth state
+              supabase.auth.signOut().catch(() => {});
+              return false;
+            }
+            return currentLoading;
+          });
+        }
+      }, 10000);
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (!isMounted) return;
+
+        // If there's a session error, clear state and continue
+        if (sessionError) {
+          console.error('Session error:', sessionError.message);
+          setLoading(false);
+          return;
+        }
 
         if (session?.user) {
           setUser(session.user);
@@ -211,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, [fetchUserWithOrg]);
