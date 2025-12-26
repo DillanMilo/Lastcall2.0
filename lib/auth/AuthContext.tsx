@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -32,7 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userWithOrg, setUserWithOrg] = useState<UserWithOrg | null>(null);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
-  const initializedRef = useRef(false);
 
   const bootstrapViaServer = useCallback(async () => {
     try {
@@ -170,13 +169,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [createUserAndOrg]);
 
   useEffect(() => {
-    // Get initial session only once
-    const initializeAuth = async () => {
-      if (initializedRef.current) return;
-      initializedRef.current = true;
+    let isMounted = true;
 
+    const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
         if (session?.user) {
           setUser(session.user);
           await fetchUserWithOrg(session.user.id);
@@ -185,15 +184,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
-    // Set up auth state listener - this should persist for the lifetime of the provider
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!isMounted) return;
+
         if (session?.user) {
           setUser(session.user);
           await fetchUserWithOrg(session.user.id);
@@ -206,7 +209,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchUserWithOrg]);
 
   const signOut = async () => {
