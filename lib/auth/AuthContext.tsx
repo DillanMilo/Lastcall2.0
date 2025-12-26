@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userWithOrg, setUserWithOrg] = useState<UserWithOrg | null>(null);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
   const bootstrapViaServer = useCallback(async () => {
     try {
@@ -170,22 +170,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [createUserAndOrg]);
 
   useEffect(() => {
-    // Only initialize once
-    if (initialized) return;
+    // Get initial session only once
+    const initializeAuth = async () => {
+      if (initializedRef.current) return;
+      initializedRef.current = true;
 
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserWithOrg(session.user.id);
-      } else {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          await fetchUserWithOrg(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error getting initial session:', error);
         setLoading(false);
       }
-      setInitialized(true);
     };
 
-    getInitialSession();
+    initializeAuth();
 
+    // Set up auth state listener - this should persist for the lifetime of the provider
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (session?.user) {
@@ -201,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, [initialized, fetchUserWithOrg]);
+  }, [fetchUserWithOrg]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
