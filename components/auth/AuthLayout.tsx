@@ -13,7 +13,7 @@ type AuthLayoutProps = {
 
 export default function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-background">
+    <div className="grid grid-cols-1 lg:grid-cols-2 bg-background min-h-screen-ios">
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex relative overflow-hidden bg-card">
         {/* Background Pattern */}
@@ -97,7 +97,7 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex items-center justify-center p-6 sm:p-8 lg:p-12 min-h-screen">
+      <div className="flex items-center justify-center p-6 sm:p-8 lg:p-12 min-h-screen-ios">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8 animate-fade-up">
