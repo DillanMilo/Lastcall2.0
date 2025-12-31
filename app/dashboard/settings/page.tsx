@@ -774,35 +774,53 @@ export default function SettingsPage() {
         <CardContent>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="new_password">New Password</Label>
+              <Label htmlFor="current_password">Current Password</Label>
               <Input
-                id="new_password"
+                id="current_password"
                 type="password"
-                value={passwordData.new}
+                autoComplete="current-password"
+                value={passwordData.current}
                 onChange={(e) =>
-                  setPasswordData({ ...passwordData, new: e.target.value })
+                  setPasswordData({ ...passwordData, current: e.target.value })
                 }
                 placeholder="••••••••"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirm_password">Confirm New Password</Label>
-              <Input
-                id="confirm_password"
-                type="password"
-                value={passwordData.confirm}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, confirm: e.target.value })
-                }
-                placeholder="••••••••"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new_password">New Password</Label>
+                <Input
+                  id="new_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordData.new}
+                  onChange={(e) =>
+                    setPasswordData({ ...passwordData, new: e.target.value })
+                  }
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm_password">Confirm New Password</Label>
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordData.confirm}
+                  onChange={(e) =>
+                    setPasswordData({ ...passwordData, confirm: e.target.value })
+                  }
+                  placeholder="••••••••"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end pt-2">
               <Button
                 type="submit"
-                disabled={saving || !passwordData.new || !passwordData.confirm}
+                disabled={saving || !passwordData.current || !passwordData.new || !passwordData.confirm}
                 className="w-full sm:w-auto"
               >
                 {saving ? (

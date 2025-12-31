@@ -3,7 +3,13 @@ import { Sparkles, Package, TrendingUp, Clock, ArrowRight } from "lucide-react";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background relative overflow-hidden">
+    <main 
+      className="bg-background relative overflow-hidden"
+      style={{
+        minHeight: "100vh",
+        minHeight: "100dvh",
+      }}
+    >
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-[0.015]" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -13,7 +19,13 @@ export default function Home() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-20" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[hsl(var(--warning))]/20 rounded-full blur-3xl opacity-20" />
 
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6 md:p-12">
+      <div 
+        className="relative z-10 flex flex-col items-center justify-center p-6 md:p-12"
+        style={{
+          minHeight: "100vh",
+          minHeight: "100dvh",
+        }}
+      >
         <div className="max-w-4xl w-full text-center space-y-8">
           {/* Logo */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm animate-fade-up">

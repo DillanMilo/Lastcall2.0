@@ -391,19 +391,20 @@ export function APIImporter({ orgId }: { orgId: string }) {
         {/* Source Selector - Always visible */}
         <div className="space-y-2">
           <Label htmlFor="api-source">Source</Label>
-          <select
-            id="api-source"
-            value={source}
-            onChange={(e) => {
-              setSource(e.target.value);
-              setError(null);
-              setResult(null);
-              setBcError(null);
-              setBcResult(null);
-              setBcSuccess(null);
-            }}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
+            <select
+              id="api-source"
+              value={source}
+              onChange={(e) => {
+                setSource(e.target.value);
+                setError(null);
+                setResult(null);
+                setBcError(null);
+                setBcResult(null);
+                setBcSuccess(null);
+              }}
+              className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation appearance-none cursor-pointer"
+              style={{ fontSize: "max(16px, 0.875rem)" }}
+            >
             {SOURCE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -656,7 +657,7 @@ export function APIImporter({ orgId }: { orgId: string }) {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="field-name">Name Field</Label>
                 <Input
