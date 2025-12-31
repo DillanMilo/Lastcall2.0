@@ -454,6 +454,46 @@
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
   }
 
+  /* Floating button positioning - cross-browser compatible */
+  .floating-button-position {
+    /* Fallback for browsers without env() support */
+    bottom: 1rem;
+    right: 1rem;
+    /* Enhanced positioning with safe area - env() returns fallback if not supported */
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    right: calc(1rem + env(safe-area-inset-right, 0px));
+  }
+
+  /* Modal safe area padding - cross-browser compatible */
+  .modal-safe-padding {
+    /* Fallback */
+    padding: 1rem;
+    /* Enhanced with safe areas */
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Dashboard content padding - cross-browser compatible */
+  .dashboard-content-padding {
+    /* Fallback */
+    padding-bottom: 5rem;
+    /* Enhanced with safe area */
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Prevent iOS zoom on input focus - must be at least 16px */
+  .text-ios-safe {
+    font-size: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .text-ios-safe {
+      font-size: 0.875rem;
+    }
+  }
+
   /* Word break for long text on mobile */
   .break-word-mobile {
     word-break: break-word;

@@ -42,11 +42,7 @@ export function FloatingAIButton() {
       {/* Floating AI Button - positioned to respect safe areas */}
       <button
         onClick={() => setShowAIAssistant(true)}
-        className="fixed z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center group touch-manipulation"
-        style={{
-          bottom: "max(1rem, env(safe-area-inset-bottom, 0px) + 0.75rem)",
-          right: "max(1rem, env(safe-area-inset-right, 0px) + 0.75rem)",
-        }}
+        className="fixed z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center group touch-manipulation floating-button-position"
         aria-label="Open AI Assistant"
       >
         <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 group-hover:animate-pulse" />
@@ -59,15 +55,7 @@ export function FloatingAIButton() {
 
       {/* AI Assistant Modal */}
       {showAIAssistant && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] overflow-hidden"
-          style={{
-            paddingTop: "max(1rem, env(safe-area-inset-top, 0px))",
-            paddingBottom: "env(safe-area-inset-bottom, 0px)",
-            paddingLeft: "env(safe-area-inset-left, 0px)",
-            paddingRight: "env(safe-area-inset-right, 0px)",
-          }}
-        >
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] overflow-hidden modal-safe-padding">
           <div className="w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-xl rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl">
             <AIAssistant
               orgId={orgId}

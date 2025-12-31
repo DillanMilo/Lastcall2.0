@@ -402,8 +402,7 @@ export function APIImporter({ orgId }: { orgId: string }) {
                 setBcResult(null);
                 setBcSuccess(null);
               }}
-              className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation appearance-none cursor-pointer"
-              style={{ fontSize: "max(16px, 0.875rem)" }}
+              className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation appearance-none cursor-pointer text-ios-safe"
             >
             {SOURCE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
