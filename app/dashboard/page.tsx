@@ -12,13 +12,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Package,
   AlertCircle,
   TrendingUp,
   Clock,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { daysUntilExpiration } from "@/lib/utils";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -32,17 +36,14 @@ export default function DashboardPage() {
     !String(process.env.NEXT_PUBLIC_SUPABASE_URL).includes("placeholder") &&
     String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) !== "placeholder-key";
 
-  // Handle email confirmation callback
   useEffect(() => {
     const handleAuthCallback = async () => {
-      // Check if this is an email confirmation callback (has hash fragments)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token');
-      
+
       if (accessToken && refreshToken) {
         try {
-          // Exchange the tokens for a session
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -50,15 +51,12 @@ export default function DashboardPage() {
 
           if (error) {
             console.error('Error setting session from callback:', error);
-            // Redirect to signin if session setup fails
             router.push('/auth/signin?error=session_failed');
             return;
           }
 
           if (data.session) {
-            // Clear the hash from URL
             window.history.replaceState(null, '', window.location.pathname);
-            // Force a page reload to refresh auth state
             window.location.reload();
           }
         } catch (err) {
@@ -134,7 +132,6 @@ export default function DashboardPage() {
     return () => clearTimeout(timeout);
   }, [authLoading, user, orgId, router, fetchInventory]);
 
-  // Calculate stats from real data
   const totalItems = items.length;
   const lowStockItems = items.filter(
     (item) => item.quantity <= item.reorder_threshold
@@ -145,7 +142,6 @@ export default function DashboardPage() {
     return days > 0 && days <= 7;
   });
   const restockNeeded = lowStockItems.length;
-  const restockItems = lowStockItems;
 
   const stats = [
     {
@@ -153,101 +149,147 @@ export default function DashboardPage() {
       value: authLoading || loading ? "..." : totalItems.toString(),
       description: "Items in inventory",
       icon: Package,
-      trend: `${totalItems} total`,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
-      title: "Low Stock Alerts",
+      title: "Low Stock",
       value: authLoading || loading ? "..." : lowStockItems.length.toString(),
-      description: "Items below reorder point",
+      description: "Below reorder point",
       icon: AlertCircle,
-      trend: `${lowStockItems.length} items`,
+      color: "text-[hsl(var(--warning))]",
+      bgColor: "bg-[hsl(var(--warning))]/10",
     },
     {
       title: "Expiring Soon",
       value: authLoading || loading ? "..." : expiringSoonItems.length.toString(),
-      description: "Items expiring in 7 days",
+      description: "Within 7 days",
       icon: Clock,
-      trend: `${expiringSoonItems.length} items`,
+      color: "text-destructive",
+      bgColor: "bg-destructive/10",
     },
     {
       title: "Restock Needed",
       value: authLoading || loading ? "..." : restockNeeded.toString(),
-      description: "Recommended reorders",
+      description: "Action required",
       icon: TrendingUp,
-      trend: `${restockNeeded} items`,
+      color: "text-[hsl(var(--success))]",
+      bgColor: "bg-[hsl(var(--success))]/10",
     },
   ];
 
+  const isLoading = authLoading || loading;
+
   return (
-    <div className="space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8">
-      <div>
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
-          Overview of your inventory and key metrics
-        </p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="animate-fade-up" style={{ animationDelay: '0ms' }}>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Dashboard
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Your inventory at a glance
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
+      {/* Stats Grid */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
-                <CardTitle className="text-[10px] xs:text-xs sm:text-sm font-medium truncate pr-1">
-                  {stat.title}
-                </CardTitle>
-                <Icon className="h-3 w-3 sm:h-4 sm:w-4 md:h-4 md:w-4 text-muted-foreground shrink-0" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 md:p-6 md:pt-0">
-                <div className="text-lg sm:text-xl md:text-2xl font-bold truncate">
-                  {stat.value}
+            <Card
+              key={stat.title}
+              variant="elevated"
+              className="animate-fade-up opacity-0 overflow-hidden group"
+              style={{ animationDelay: `${(index + 1) * 100}ms`, animationFillMode: 'forwards' }}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center transition-transform group-hover:scale-110`}>
+                    <Icon className={`h-5 w-5 ${stat.color}`} />
+                  </div>
                 </div>
-                <p className="text-[10px] xs:text-xs text-muted-foreground hidden sm:block mt-1">
-                  {stat.description}
-                </p>
-                <p className="text-[10px] xs:text-xs text-muted-foreground mt-1 truncate">
-                  {stat.trend}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-3xl font-bold data-value tracking-tight">
+                    {stat.value}
+                  </p>
+                  <p className="text-sm font-medium text-foreground">
+                    {stat.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {stat.description}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg">Recent Items</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Latest inventory additions</CardDescription>
+      {/* Main Content Grid */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recent Items */}
+        <Card
+          variant="default"
+          className="animate-fade-up opacity-0"
+          style={{ animationDelay: '500ms', animationFillMode: 'forwards' }}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Recent Items</CardTitle>
+                <CardDescription>Latest inventory additions</CardDescription>
+              </div>
+              <Link
+                href="/dashboard/inventory"
+                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+              >
+                View all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            {authLoading || loading ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                {authLoading ? "Authenticating..." : "Loading..."}
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center justify-between py-3 animate-shimmer rounded-lg h-16" />
+                ))}
               </div>
             ) : items.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                No items yet. Start by importing your inventory!
+              <div className="text-center py-12 px-4">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                  <Package className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-1">No items yet</p>
+                <Link href="/dashboard/import" className="text-sm text-primary hover:underline">
+                  Import your inventory
+                </Link>
               </div>
             ) : (
-              <div className="space-y-3">
-                {items.slice(0, 5).map((item) => (
+              <div className="space-y-1">
+                {items.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    style={{ animationDelay: `${600 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
                         {item.invoice
                           ? `Invoice: ${item.invoice}`
                           : item.sku || "No SKU"}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{item.quantity}</p>
+                    <div className="text-right ml-4">
+                      <p className="font-semibold data-value">{item.quantity}</p>
                       <p className="text-xs text-muted-foreground">units</p>
                     </div>
                   </div>
@@ -257,38 +299,59 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg">Low Stock Items</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Items needing attention</CardDescription>
+        {/* Low Stock Alert */}
+        <Card
+          variant="default"
+          className="animate-fade-up opacity-0"
+          style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Low Stock Alerts</CardTitle>
+                <CardDescription>Items needing attention</CardDescription>
+              </div>
+              {lowStockItems.length > 0 && (
+                <Badge variant="warning" dot>
+                  {lowStockItems.length} items
+                </Badge>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            {authLoading || loading ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                {authLoading ? "Authenticating..." : "Loading..."}
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center justify-between py-3 animate-shimmer rounded-lg h-16" />
+                ))}
               </div>
             ) : lowStockItems.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                ✅ All items are well stocked!
+              <div className="text-center py-12 px-4">
+                <div className="w-12 h-12 rounded-xl bg-[hsl(var(--success))]/10 flex items-center justify-center mx-auto mb-3">
+                  <TrendingUp className="w-6 h-6 text-[hsl(var(--success))]" />
+                </div>
+                <p className="text-sm font-medium text-[hsl(var(--success))]">All stocked up!</p>
+                <p className="text-xs text-muted-foreground mt-1">No items below reorder point</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {lowStockItems.slice(0, 5).map((item) => (
+              <div className="space-y-1">
+                {lowStockItems.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    style={{ animationDelay: `${700 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
-                    <div>
-                      <p className="font-medium">{item.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
                         Reorder at: {item.reorder_threshold}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-amber-600">
+                    <div className="text-right ml-4">
+                      <p className="font-semibold text-[hsl(var(--warning))] data-value">
                         {item.quantity}
                       </p>
-                      <p className="text-xs text-amber-600">Low Stock!</p>
+                      <Badge variant="warning" size="sm">Low</Badge>
                     </div>
                   </div>
                 ))}
@@ -296,38 +359,57 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg">Expiring Soon</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Products expiring within 7 days</CardDescription>
+        {/* Expiring Soon */}
+        <Card
+          variant="default"
+          className="animate-fade-up opacity-0"
+          style={{ animationDelay: '700ms', animationFillMode: 'forwards' }}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Expiring Soon</CardTitle>
+                <CardDescription>Products expiring within 7 days</CardDescription>
+              </div>
+              {expiringSoonItems.length > 0 && (
+                <Badge variant="destructive" dot>
+                  {expiringSoonItems.length} items
+                </Badge>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            {authLoading || loading ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                {authLoading ? "Authenticating..." : "Loading..."}
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center justify-between py-3 animate-shimmer rounded-lg h-16" />
+                ))}
               </div>
             ) : expiringSoonItems.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                🎉 No items expiring in the next week
+              <div className="text-center py-12 px-4">
+                <div className="w-12 h-12 rounded-xl bg-[hsl(var(--success))]/10 flex items-center justify-center mx-auto mb-3">
+                  <Clock className="w-6 h-6 text-[hsl(var(--success))]" />
+                </div>
+                <p className="text-sm font-medium text-[hsl(var(--success))]">All fresh!</p>
+                <p className="text-xs text-muted-foreground mt-1">No items expiring soon</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {expiringSoonItems.slice(0, 5).map((item) => (
+              <div className="space-y-1">
+                {expiringSoonItems.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    style={{ animationDelay: `${800 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-destructive">
                         Expires in {daysUntilExpiration(item.expiration_date!)} days
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{item.quantity}</p>
+                    <div className="text-right ml-4">
+                      <p className="font-semibold data-value">{item.quantity}</p>
                       <p className="text-xs text-muted-foreground">units</p>
                     </div>
                   </div>
@@ -337,36 +419,50 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg">Restock Needed</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Below reorder threshold</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            {authLoading || loading ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                {authLoading ? "Authenticating..." : "Loading..."}
+        {/* Restock Recommendations */}
+        <Card
+          variant="default"
+          className="animate-fade-up opacity-0"
+          style={{ animationDelay: '800ms', animationFillMode: 'forwards' }}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Restock Needed</CardTitle>
+                <CardDescription>Below reorder threshold</CardDescription>
               </div>
-            ) : restockItems.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                ✅ Nothing needs restocking right now
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center justify-between py-3 animate-shimmer rounded-lg h-16" />
+                ))}
+              </div>
+            ) : lowStockItems.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <div className="w-12 h-12 rounded-xl bg-[hsl(var(--success))]/10 flex items-center justify-center mx-auto mb-3">
+                  <TrendingUp className="w-6 h-6 text-[hsl(var(--success))]" />
+                </div>
+                <p className="text-sm font-medium text-[hsl(var(--success))]">Nothing to restock</p>
+                <p className="text-xs text-muted-foreground mt-1">All inventory levels healthy</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {restockItems.slice(0, 5).map((item) => (
+              <div className="space-y-1">
+                {lowStockItems.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    style={{ animationDelay: `${900 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
-                    <div>
-                      <p className="font-medium">{item.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        Qty {item.quantity} / Reorder at {item.reorder_threshold}
+                        {item.quantity} / {item.reorder_threshold} threshold
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-amber-600">Order soon</p>
-                    </div>
+                    <Badge variant="warning">Order soon</Badge>
                   </div>
                 ))}
               </div>

@@ -74,9 +74,9 @@ export default function SignUpPage() {
 
   return (
     <AuthLayout title="Create your account" subtitle="Start managing your inventory with AI-powered tools.">
-      <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-2xl">Sign up</CardTitle>
-        <CardDescription>Create your account to get started</CardDescription>
+      <CardHeader className="p-0 mb-6">
+        <CardTitle className="text-2xl font-bold">Create account</CardTitle>
+        <CardDescription className="text-sm">Start managing your inventory today</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <form onSubmit={handleSignUp} className="space-y-4">
@@ -118,7 +118,7 @@ export default function SignUpPage() {
           </div>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-xl">
+            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
               {error}
             </div>
           )}

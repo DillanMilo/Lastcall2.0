@@ -8,13 +8,8 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -26,7 +21,7 @@ import {
 import {
   Plus,
   Search,
-  AlertCircle,
+  AlertTriangle,
   Edit2,
   Package,
   Grid3x3,
@@ -68,7 +63,6 @@ export default function InventoryPage() {
         .select("*", { count: "exact" })
         .eq("org_id", orgId);
 
-      // Server-side search
       if (debouncedSearch) {
         query = query.or(
           `name.ilike.%${debouncedSearch}%,sku.ilike.%${debouncedSearch}%,invoice.ilike.%${debouncedSearch}%`
@@ -106,16 +100,14 @@ export default function InventoryPage() {
     }
   }, [orgId, currentPage, debouncedSearch]);
 
-  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setCurrentPage(0); // Reset to first page on search
+      setCurrentPage(0);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Auth check and resize handling
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -132,19 +124,16 @@ export default function InventoryPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, [authLoading, user, router, viewMode]);
 
-  // Fetch inventory when dependencies change
   useEffect(() => {
     if (orgId && !authLoading && user) {
       fetchInventory();
     }
   }, [orgId, authLoading, user, fetchInventory]);
 
-  // Items are already filtered server-side, use directly
   const lowStockItems = items.filter(
     (item) => item.quantity <= item.reorder_threshold
   );
 
-  // Group items by invoice for bulk edit
   const invoiceCounts = items.reduce((acc, item) => {
     if (item.invoice) {
       acc[item.invoice] = (acc[item.invoice] || 0) + 1;
@@ -152,82 +141,93 @@ export default function InventoryPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Pagination helpers
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasNextPage = currentPage < totalPages - 1;
   const hasPrevPage = currentPage > 0;
   const startItem = currentPage * PAGE_SIZE + 1;
   const endItem = Math.min((currentPage + 1) * PAGE_SIZE, totalCount);
 
+  const isLoading = authLoading || loading;
+
   return (
-    <div className="space-y-3 sm:space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
+    <div className="space-y-6">
+      {/* Header */}
+      <div
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-up"
+        style={{ animationDelay: '0ms' }}
+      >
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Inventory
           </h1>
-          <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
-            Manage stock and track batches
+          <p className="text-sm text-muted-foreground mt-1">
+            {totalCount > 0 ? `${totalCount.toLocaleString()} items` : "Manage your stock"}
           </p>
         </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          size="sm"
-          className="w-full sm:w-auto sm:h-10"
-        >
-          <Plus className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Add Item</span>
-          <span className="sm:hidden">Add</span>
+        <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
         </Button>
       </div>
 
+      {/* Low Stock Alert */}
       {lowStockItems.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
-              <AlertCircle className="h-5 w-5" />
+        <div
+          className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/20 animate-fade-up"
+          style={{ animationDelay: '100ms' }}
+        >
+          <div className="w-10 h-10 rounded-lg bg-[hsl(var(--warning))]/20 flex items-center justify-center shrink-0">
+            <AlertTriangle className="h-5 w-5 text-[hsl(var(--warning))]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-[hsl(var(--warning))]">
               Low Stock Alert
-            </CardTitle>
-            <CardDescription className="text-amber-800 dark:text-amber-200">
-              {lowStockItems.length} item(s) below reorder threshold
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below reorder threshold
+            </p>
+          </div>
+        </div>
       )}
 
-      <Card>
-        <CardHeader>
+      {/* Main Card */}
+      <Card
+        variant="default"
+        className="animate-fade-up"
+        style={{ animationDelay: '200ms' }}
+      >
+        <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Search */}
             <div className="flex-1">
               <Label htmlFor="search" className="sr-only">
                 Search
               </Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Search name, SKU, invoice..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+              <Input
+                id="search"
+                placeholder="Search name, SKU, invoice..."
+                icon={<Search className="h-4 w-4" />}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <div className="flex gap-2">
+
+            {/* View Toggle */}
+            <div className="flex gap-1 p-1 bg-muted rounded-lg">
               <Button
-                variant={viewMode === "table" ? "default" : "outline"}
+                variant={viewMode === "table" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("table")}
-                className="flex-1 sm:flex-none"
+                className="flex-1 sm:flex-none h-8"
               >
                 <List className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Table</span>
               </Button>
               <Button
-                variant={viewMode === "grid" ? "default" : "outline"}
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("grid")}
-                className="flex-1 sm:flex-none"
+                className="flex-1 sm:flex-none h-8"
               >
                 <Grid3x3 className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Cards</span>
@@ -235,23 +235,34 @@ export default function InventoryPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {authLoading || loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {authLoading ? "Authenticating..." : "Loading inventory..."}
+
+        <CardContent className="pt-0">
+          {isLoading ? (
+            <div className="space-y-3 py-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="h-16 rounded-lg animate-shimmer"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                />
+              ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <Package className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-lg font-medium mb-1">
+                {debouncedSearch ? "No results found" : "No inventory yet"}
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
                 {debouncedSearch
                   ? `No items match "${debouncedSearch}"`
-                  : "No items found. Start by importing your inventory!"}
+                  : "Start by importing your inventory or adding items manually"}
               </p>
               {!debouncedSearch && (
-                <div className="flex gap-2 justify-center">
-                  <Button
-                    onClick={() => (window.location.href = "/dashboard/import")}
-                  >
+                <div className="flex gap-3 justify-center">
+                  <Button onClick={() => router.push("/dashboard/import")}>
                     Import CSV
                   </Button>
                   <Button variant="outline" onClick={() => setShowAddModal(true)}>
@@ -261,12 +272,12 @@ export default function InventoryPage() {
               )}
             </div>
           ) : viewMode === "grid" ? (
-            // Card View (Mobile-friendly)
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map((item) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {items.map((item, index) => (
                 <InventoryCard
                   key={item.id}
                   item={item}
+                  index={index}
                   onEdit={() => setEditingItem(item)}
                   onBulkEdit={
                     item.invoice && invoiceCounts[item.invoice] > 1
@@ -280,85 +291,86 @@ export default function InventoryPage() {
               ))}
             </div>
           ) : (
-            // Table View (Desktop)
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
-              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+            <div className="overflow-x-auto -mx-5 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-5 sm:px-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Invoice</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Reorder Point</TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Reorder</TableHead>
                       <TableHead>Expiry</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">
-                          {item.name}
+                    {items.map((item, index) => (
+                      <TableRow
+                        key={item.id}
+                        className="animate-fade-up opacity-0"
+                        style={{ animationDelay: `${300 + index * 30}ms`, animationFillMode: 'forwards' }}
+                      >
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {item.sku || "-"}
                         </TableCell>
-                        <TableCell>{item.sku || "-"}</TableCell>
                         <TableCell>
                           {item.invoice ? (
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              <Badge variant="default" size="sm">
                                 {item.invoice}
-                              </span>
+                              </Badge>
                               {invoiceCounts[item.invoice] > 1 && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() =>
-                                    setBulkEditInvoice(item.invoice!)
-                                  }
+                                  onClick={() => setBulkEditInvoice(item.invoice!)}
                                   className="h-6 px-2 text-xs"
                                 >
                                   <Package className="h-3 w-3 mr-1" />
-                                  Edit Batch ({invoiceCounts[item.invoice]})
+                                  Batch
                                 </Button>
                               )}
                             </div>
                           ) : (
-                            "-"
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
                           <span
                             className={
                               item.quantity <= item.reorder_threshold
-                                ? "text-amber-600 font-semibold"
-                                : ""
+                                ? "text-[hsl(var(--warning))] font-semibold data-value"
+                                : "data-value"
                             }
                           >
                             {item.quantity}
                           </span>
                         </TableCell>
-                        <TableCell>{item.reorder_threshold}</TableCell>
+                        <TableCell className="data-value text-muted-foreground">
+                          {item.reorder_threshold}
+                        </TableCell>
                         <TableCell>
                           {item.expiration_date
-                            ? new Date(
-                                item.expiration_date
-                              ).toLocaleDateString()
-                            : "-"}
+                            ? new Date(item.expiration_date).toLocaleDateString()
+                            : <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell>
                           {item.category ? (
-                            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
+                            <Badge variant="muted" size="sm">
                               {item.category}
-                            </span>
+                            </Badge>
                           ) : (
-                            "-"
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon-sm"
                             onClick={() => setEditingItem(item)}
                           >
                             <Edit2 className="h-4 w-4" />
@@ -372,11 +384,13 @@ export default function InventoryPage() {
             </div>
           )}
 
-          {/* Pagination Controls */}
+          {/* Pagination */}
           {totalCount > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t mt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 mt-6 border-t">
               <p className="text-sm text-muted-foreground order-2 sm:order-1">
-                Showing {startItem}-{endItem} of {totalCount.toLocaleString()} items
+                Showing <span className="font-medium data-value">{startItem}</span>-
+                <span className="font-medium data-value">{endItem}</span> of{" "}
+                <span className="font-medium data-value">{totalCount.toLocaleString()}</span>
               </p>
               <div className="flex items-center gap-2 order-1 sm:order-2">
                 <Button
@@ -384,22 +398,21 @@ export default function InventoryPage() {
                   size="sm"
                   onClick={() => setCurrentPage((p) => p - 1)}
                   disabled={!hasPrevPage || loading}
-                  className="h-9"
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Previous</span>
+                  Prev
                 </Button>
-                <span className="text-sm text-muted-foreground min-w-[80px] text-center">
-                  Page {currentPage + 1} of {totalPages}
-                </span>
+                <div className="px-3 py-1 rounded-md bg-muted text-sm">
+                  <span className="data-value">{currentPage + 1}</span>
+                  <span className="text-muted-foreground"> / {totalPages}</span>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((p) => p + 1)}
                   disabled={!hasNextPage || loading}
-                  className="h-9"
                 >
-                  <span className="hidden sm:inline">Next</span>
+                  Next
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
@@ -408,6 +421,7 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
+      {/* Modals */}
       {showAddModal && orgId && (
         <AddItemModal
           orgId={orgId}
