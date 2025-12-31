@@ -30,11 +30,15 @@ export function MobileNav() {
           localStorage.removeItem(key);
         }
       });
+
       await authSignOut();
-      window.location.href = "/auth/signin";
+
+      // Force a hard navigation to clear all client state
+      window.location.replace("/auth/signin");
     } catch (error) {
       console.error("Error during sign out:", error);
-      window.location.href = "/auth/signin";
+      // Force redirect even on error
+      window.location.replace("/auth/signin");
     }
   };
 

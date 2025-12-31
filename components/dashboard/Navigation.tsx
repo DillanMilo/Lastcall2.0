@@ -32,14 +32,23 @@ export function Navigation() {
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
 
   const handleSignOut = async () => {
-    // Clear AI chat history from localStorage
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("ai-chat-")) {
-        localStorage.removeItem(key);
-      }
-    });
-    await authSignOut();
-    window.location.href = "/auth/signin";
+    try {
+      // Clear AI chat history from localStorage
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("ai-chat-")) {
+          localStorage.removeItem(key);
+        }
+      });
+
+      await authSignOut();
+
+      // Force a hard navigation to clear all client state
+      window.location.replace("/auth/signin");
+    } catch (error) {
+      console.error("Sign out error:", error);
+      // Force redirect even on error
+      window.location.replace("/auth/signin");
+    }
   };
 
   const handleSync = async () => {

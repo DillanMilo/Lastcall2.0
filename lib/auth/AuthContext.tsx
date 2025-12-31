@@ -244,7 +244,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserWithOrg]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear local state first
+      setUser(null);
+      setUserWithOrg(null);
+      setOrgId(null);
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('Sign out error:', error.message);
+        // Even if there's an error, we've already cleared local state
+        // so the user will be effectively signed out locally
+      }
+    } catch (error) {
+      console.error('Sign out exception:', error);
+      // Force clear on error
+      setUser(null);
+      setUserWithOrg(null);
+      setOrgId(null);
+    }
   };
 
   const refetchUser = () => {
