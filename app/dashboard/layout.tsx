@@ -21,18 +21,8 @@ export default function DashboardLayout({
           <MobileNav />
 
           {/* Page Content */}
-          <div 
-            className="flex-1 overflow-y-auto overflow-x-hidden"
-            style={{
-              WebkitOverflowScrolling: "touch",
-            }}
-          >
-            <div 
-              className="container max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"
-              style={{
-                paddingBottom: "max(2rem, calc(env(safe-area-inset-bottom, 0px) + 5rem))",
-              }}
-            >
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="container max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 dashboard-content-padding">
               {children}
             </div>
           </div>
