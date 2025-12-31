@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Check,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -70,7 +71,6 @@ export function Navigation() {
       }
 
       setSyncStatus("success");
-      // Reload page to show updated data
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -84,14 +84,26 @@ export function Navigation() {
   };
 
   return (
-    <nav className="flex flex-col h-full">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold">LastCall</h1>
-        <p className="text-sm text-muted-foreground">Inventory Management</p>
+    <nav className="flex flex-col h-full bg-card">
+      {/* Brand Header */}
+      <div className="p-6 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">LastCall</h1>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Inventory</p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 px-3">
-        {navItems.map((item) => {
+      {/* Navigation Links */}
+      <div className="flex-1 px-3 space-y-1">
+        <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Menu
+        </p>
+        {navItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 
@@ -99,60 +111,71 @@ export function Navigation() {
             <Link key={item.href} href={item.href}>
               <div
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2 mb-1 transition-colors",
+                  "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
+                  "animate-fade-up opacity-0",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
+                style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className={cn(
+                  "h-[18px] w-[18px] transition-transform duration-200",
+                  !isActive && "group-hover:scale-110"
+                )} />
                 <span className="text-sm font-medium">{item.label}</span>
+                {isActive && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground/70" />
+                )}
               </div>
             </Link>
           );
         })}
 
-        {/* Sync Button */}
-        <div className="mt-4 pt-4 border-t">
+        {/* Sync Section */}
+        <div className="pt-4 mt-4 border-t border-border/50">
+          <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Actions
+          </p>
           <Button
-            variant="outline"
+            variant="ghost"
             className={cn(
-              "w-full justify-start gap-3",
-              syncStatus === "success" && "border-green-500 text-green-600 bg-green-500/10",
-              syncStatus === "error" && "border-destructive text-destructive bg-destructive/10"
+              "w-full justify-start gap-3 font-normal",
+              syncStatus === "success" && "text-[hsl(var(--success))] bg-[hsl(var(--success))]/10",
+              syncStatus === "error" && "text-destructive bg-destructive/10"
             )}
             onClick={handleSync}
             disabled={syncing || !orgId}
           >
             {syncing ? (
-              <RefreshCw className="h-5 w-5 animate-spin" />
+              <RefreshCw className="h-[18px] w-[18px] animate-spin" />
             ) : syncStatus === "success" ? (
-              <Check className="h-5 w-5" />
+              <Check className="h-[18px] w-[18px]" />
             ) : syncStatus === "error" ? (
-              <AlertCircle className="h-5 w-5" />
+              <AlertCircle className="h-[18px] w-[18px]" />
             ) : (
-              <RefreshCw className="h-5 w-5" />
+              <RefreshCw className="h-[18px] w-[18px]" />
             )}
-            <span className="text-sm font-medium">
-              {syncing ? "Syncing..." : syncStatus === "success" ? "Synced!" : syncStatus === "error" ? "Sync Failed" : "Sync Now"}
+            <span className="text-sm">
+              {syncing ? "Syncing..." : syncStatus === "success" ? "Synced!" : syncStatus === "error" ? "Sync Failed" : "Sync Inventory"}
             </span>
           </Button>
         </div>
       </div>
 
-      <div className="p-3 border-t">
-        {/* User Profile Preview */}
+      {/* User Section */}
+      <div className="p-3 border-t border-border/50 bg-muted/30">
         {userWithOrg && (
           <Link href="/dashboard/settings">
-            <div className="flex items-center gap-3 px-3 py-2 mb-2 rounded-xl hover:bg-accent transition-colors">
+            <div className="flex items-center gap-3 px-3 py-2.5 mb-2 rounded-lg hover:bg-background/60 transition-colors group">
               {userWithOrg.organization ? (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-sm font-medium text-primary">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
+                  <span className="text-sm font-semibold text-primary">
                     {userWithOrg.organization.name?.charAt(0).toUpperCase() || "O"}
                   </span>
                 </div>
               ) : (
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                   <UserCircle className="h-5 w-5 text-muted-foreground" />
                 </div>
               )}
@@ -161,7 +184,7 @@ export function Navigation() {
                   {userWithOrg.full_name || userWithOrg.email?.split("@")[0] || "User"}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  View Profile
+                  {userWithOrg.organization?.name || "View Profile"}
                 </p>
               </div>
             </div>
@@ -170,10 +193,10 @@ export function Navigation() {
 
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           onClick={handleSignOut}
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-[18px] w-[18px]" />
           <span className="text-sm font-medium">Sign Out</span>
         </Button>
       </div>

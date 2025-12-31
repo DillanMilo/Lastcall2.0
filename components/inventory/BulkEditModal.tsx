@@ -97,22 +97,22 @@ export function BulkEditModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center py-4">
-        <Card className="w-full max-w-lg my-auto">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Bulk Edit by Invoice</CardTitle>
-              <CardDescription>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto overscroll-contain">
+      <div className="min-h-full sm:min-h-0 w-full sm:w-auto flex items-center justify-center py-4 sm:py-8">
+        <Card className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:my-auto sm:rounded-lg overflow-y-auto">
+          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6 sticky top-0 bg-card border-b z-10">
+            <div className="min-w-0 flex-1 pr-2">
+              <CardTitle className="text-lg sm:text-xl">Bulk Edit by Invoice</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Editing {itemCount} item(s) from invoice:{" "}
-                <strong>{invoice}</strong>
+                <strong className="break-all">{invoice}</strong>
               </CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
               <X className="h-4 w-4" />
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="new_invoice">Update Invoice Number</Label>
@@ -152,6 +152,7 @@ export function BulkEditModal({
                 <Input
                   id="adjust_quantity"
                   type="number"
+                  inputMode="numeric"
                   value={formData.adjust_quantity}
                   onChange={(e) =>
                     setFormData({
@@ -166,16 +167,17 @@ export function BulkEditModal({
                 </p>
               </div>
 
-              <div className="flex gap-2 justify-end pt-4">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onClose}
                   disabled={loading}
+                  className="w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                   {loading ? "Updating..." : `Update ${itemCount} Item(s)`}
                 </Button>
               </div>

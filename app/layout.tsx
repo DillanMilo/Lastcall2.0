@@ -1,20 +1,31 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SuppressDevWarnings } from "@/components/SuppressDevWarnings";
 import { Providers } from "@/components/Providers";
 
-const inter = Inter({ subsets: ["latin"] });
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  minimumScale: 1,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#faf9f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#171412" },
+  ],
+};
 
 export const metadata: Metadata = {
-  title: "LastCall 2.0 - AI-Driven Inventory Management",
-  description: "Smart inventory management for small businesses",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: "cover",
+  title: "LastCall - AI-Driven Inventory Management",
+  description: "Smart inventory management for small businesses. Reduce waste, predict demand, and streamline operations.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "LastCall",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -24,8 +35,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Prevent iOS from auto-zooming on input focus */}
+        <meta name="format-detection" content="telephone=no" />
+        {/* Enable smooth scrolling */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          html { scroll-behavior: smooth; }
+          @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+          }
+        `}} />
+      </head>
+      <body className="antialiased min-h-screen" style={{ minHeight: "100dvh" }}>
         <SuppressDevWarnings />
         <Providers>{children}</Providers>
       </body>

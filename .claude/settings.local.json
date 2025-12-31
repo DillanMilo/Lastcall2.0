@@ -3,6 +3,7 @@
     "allow": [
       "Bash(npx tsc:*)",
       "Bash(npx next lint:*)",
+      "Skill(frontend-design)",
       "Bash(npm run build:*)"
     ]
   }

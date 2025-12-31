@@ -239,10 +239,10 @@ function SignInContent() {
       title="Welcome back"
       subtitle="Sign in or instantly jump into the live demo."
     >
-      <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>
-          Enter your credentials to access LastCall
+      <CardHeader className="p-0 mb-6">
+        <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
+        <CardDescription className="text-sm">
+          Enter your credentials to continue
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -285,13 +285,13 @@ function SignInContent() {
           </div>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-xl">
+            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
               {error}
             </div>
           )}
 
           {message && (
-            <div className="text-sm text-primary bg-primary/10 p-3 rounded-xl">
+            <div className="text-sm text-primary bg-primary/10 p-3 rounded-lg border border-primary/20">
               {message}
             </div>
           )}
