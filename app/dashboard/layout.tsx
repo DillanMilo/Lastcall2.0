@@ -9,13 +9,7 @@ export default function DashboardLayout({
 }) {
   return (
     <DashboardWrapper>
-      <div 
-        className="flex bg-background"
-        style={{
-          minHeight: "100vh",
-          minHeight: "100dvh",
-        }}
-      >
+      <div className="flex bg-background min-h-screen-ios">
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex md:w-64 md:flex-col border-r border-border/50 bg-card md:sticky md:top-0 md:h-screen">
           <Navigation />
