@@ -277,18 +277,18 @@ export default function DashboardPage() {
                 {items.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    className="flex items-start sm:items-center justify-between py-3 px-2 sm:px-3 -mx-2 sm:-mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0 gap-2"
                     style={{ animationDelay: `${600 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{item.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="font-medium text-sm break-words line-clamp-2 sm:truncate sm:line-clamp-none">{item.name}</p>
+                      <p className="text-xs text-muted-foreground break-words line-clamp-1 sm:truncate">
                         {item.invoice
                           ? `Invoice: ${item.invoice}`
                           : item.sku || "No SKU"}
                       </p>
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="text-right flex-shrink-0">
                       <p className="font-semibold data-value">{item.quantity}</p>
                       <p className="text-xs text-muted-foreground">units</p>
                     </div>
@@ -338,16 +338,16 @@ export default function DashboardPage() {
                 {lowStockItems.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    className="flex items-start sm:items-center justify-between py-3 px-2 sm:px-3 -mx-2 sm:-mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0 gap-2"
                     style={{ animationDelay: `${700 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <p className="font-medium text-sm break-words line-clamp-2 sm:truncate sm:line-clamp-none">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
                         Reorder at: {item.reorder_threshold}
                       </p>
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="text-right flex-shrink-0">
                       <p className="font-semibold text-[hsl(var(--warning))] data-value">
                         {item.quantity}
                       </p>
@@ -399,16 +399,16 @@ export default function DashboardPage() {
                 {expiringSoonItems.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    className="flex items-start sm:items-center justify-between py-3 px-2 sm:px-3 -mx-2 sm:-mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0 gap-2"
                     style={{ animationDelay: `${800 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <p className="font-medium text-sm break-words line-clamp-2 sm:truncate sm:line-clamp-none">{item.name}</p>
                       <p className="text-xs text-destructive">
                         Expires in {daysUntilExpiration(item.expiration_date!)} days
                       </p>
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="text-right flex-shrink-0">
                       <p className="font-semibold data-value">{item.quantity}</p>
                       <p className="text-xs text-muted-foreground">units</p>
                     </div>
@@ -453,16 +453,18 @@ export default function DashboardPage() {
                 {lowStockItems.slice(0, 5).map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0"
+                    className="flex items-start sm:items-center justify-between py-3 px-2 sm:px-3 -mx-2 sm:-mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0 gap-2"
                     style={{ animationDelay: `${900 + index * 50}ms`, animationFillMode: 'forwards' }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <p className="font-medium text-sm break-words line-clamp-2 sm:truncate sm:line-clamp-none">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {item.quantity} / {item.reorder_threshold} threshold
                       </p>
                     </div>
-                    <Badge variant="warning">Order soon</Badge>
+                    <div className="flex-shrink-0">
+                      <Badge variant="warning">Order soon</Badge>
+                    </div>
                   </div>
                 ))}
               </div>
