@@ -39,9 +39,9 @@ export function InventoryCard({
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-base truncate">{item.name}</h3>
+              <h3 className="font-semibold text-base line-clamp-2">{item.name}</h3>
               {item.sku && (
-                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                   SKU: {item.sku}
                 </p>
               )}
