@@ -33,7 +33,7 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
                 <Sparkles className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <span className="text-xl font-bold block">LastCall</span>
+                <span className="text-xl font-bold block">LastCallIQ</span>
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Inventory</span>
               </div>
             </div>
@@ -104,7 +104,7 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
-            <span className="text-lg font-bold">LastCall</span>
+            <span className="text-lg font-bold">LastCallIQ</span>
           </div>
 
           <Card

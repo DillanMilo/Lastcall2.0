@@ -13,7 +13,10 @@ export interface User {
 export interface Organization {
   id: string;
   name: string;
-  subscription_tier: 'growth' | 'enterprise' | 'trial';
+  subscription_tier: 'free' | 'starter' | 'growth' | 'business' | 'enterprise' | 'trial';
+  subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
   bigcommerce_store_hash?: string;
   bigcommerce_client_id?: string;
   bigcommerce_access_token?: string;

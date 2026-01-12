@@ -130,7 +130,7 @@ export async function getInventoryAssistantResponse(
     const inventoryContext = formatInventoryContext(inventory);
     const movementContext = stockMovements ? formatStockMovementContext(stockMovements) : '';
 
-    const systemPrompt = `You are an expert inventory management assistant for LastCall, a smart inventory system. Your role is to help users understand their stock levels, identify issues, and provide actionable SMART ORDERING recommendations based on actual sales data.
+    const systemPrompt = `You are an expert inventory management assistant for LastCallIQ, a smart inventory system. Your role is to help users understand their stock levels, identify issues, and provide actionable SMART ORDERING recommendations based on actual sales data.
 
 CURRENT INVENTORY DATA:
 ${inventoryContext}

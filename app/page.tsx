@@ -94,7 +94,7 @@ export default function Home() {
           style={{ animationDelay: '400ms' }}
         >
           <p className="text-xs text-muted-foreground">
-            Built for food retailers, delis, and small manufacturers
+            Smart inventory for growing businesses
           </p>
         </div>
       </div>

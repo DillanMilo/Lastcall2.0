@@ -17,12 +17,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "LastCall - AI-Driven Inventory Management",
+  title: "LastCallIQ - AI-Driven Inventory Management",
   description: "Smart inventory management for small businesses. Reduce waste, predict demand, and streamline operations.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "LastCall",
+    title: "LastCallIQ",
   },
   formatDetection: {
     telephone: false,

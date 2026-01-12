@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserCircle, Upload, Save, Loader2, CheckCircle } from "lucide-react";
+import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -733,37 +734,11 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Organization Info */}
-      {organization && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Organization</CardTitle>
-            <CardDescription>Your organization details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm text-muted-foreground">Name</span>
-                <span className="text-sm font-medium">{organization.name}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm text-muted-foreground">Plan</span>
-                <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-primary/10 text-primary">
-                  {organization.subscription_tier}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-muted-foreground">
-                  Member Since
-                </span>
-                <span className="text-sm font-medium">
-                  {new Date(organization.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Subscription & Billing */}
+      <SubscriptionCard
+        organization={organization}
+        onSubscriptionChange={fetchUserData}
+      />
 
       {/* Password Change */}
       <Card>
