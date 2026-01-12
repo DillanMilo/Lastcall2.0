@@ -92,7 +92,7 @@ export function Navigation() {
             <Sparkles className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">LastCall</h1>
+            <h1 className="text-xl font-bold tracking-tight">LastCallIQ</h1>
             <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Inventory</p>
           </div>
         </div>
