@@ -39,10 +39,16 @@ export default function Home() {
             style={{ animationDelay: '200ms' }}
           >
             <Link
+              href="/auth/signin"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card font-medium h-12 px-8 hover:bg-muted transition-all"
+            >
+              Sign In
+            </Link>
+            <Link
               href="/auth/signup"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-medium h-12 px-8 hover:bg-primary/90 transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
             >
-              Get Started Free
+              Get Started for Free
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
