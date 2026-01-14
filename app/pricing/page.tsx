@@ -197,10 +197,10 @@ export default function PricingPage() {
             <p className="text-muted-foreground mb-6">
               Questions? Email us at{" "}
               <a
-                href="mailto:support@lastcalliq.com"
+                href="mailto:creativecurrentsx@gmail.com"
                 className="text-primary hover:underline"
               >
-                support@lastcalliq.com
+                creativecurrentsx@gmail.com
               </a>
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
