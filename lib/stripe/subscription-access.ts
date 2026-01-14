@@ -19,11 +19,11 @@ export interface SubscriptionAccessStatus {
  */
 export function checkSubscriptionAccess(org: Organization | null): SubscriptionAccessStatus {
   if (!org) {
+    // No message - org is likely still loading
     return {
       hasAccess: false,
-      isReadOnly: true,
+      isReadOnly: false,
       reason: 'expired',
-      message: 'No organization found',
     };
   }
 
