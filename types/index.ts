@@ -13,10 +13,14 @@ export interface User {
 export interface Organization {
   id: string;
   name: string;
-  subscription_tier: 'free' | 'starter' | 'growth' | 'business' | 'enterprise' | 'trial';
+  subscription_tier: 'free' | 'starter' | 'growth' | 'pro' | 'enterprise' | 'trial';
   subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
   stripe_customer_id?: string;
   stripe_subscription_id?: string;
+  subscription_period_end?: string; // When current billing period ends
+  payment_failed_at?: string; // When payment last failed (for grace period)
+  canceled_at?: string; // When subscription was cancelled
+  is_read_only?: boolean; // Read-only mode after grace period expires
   bigcommerce_store_hash?: string;
   bigcommerce_client_id?: string;
   bigcommerce_access_token?: string;

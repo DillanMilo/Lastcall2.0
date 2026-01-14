@@ -12,7 +12,14 @@ export interface UserWithOrg {
   organization?: {
     id: string;
     name: string;
-    subscription_tier: string;
+    subscription_tier: 'free' | 'starter' | 'growth' | 'pro' | 'enterprise' | 'trial';
+    subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
+    stripe_customer_id?: string;
+    stripe_subscription_id?: string;
+    subscription_period_end?: string;
+    payment_failed_at?: string;
+    canceled_at?: string;
+    is_read_only?: boolean;
   };
 }
 
