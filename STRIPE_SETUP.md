@@ -241,4 +241,64 @@ Use any future expiry date and any 3-digit CVC.
 
 ---
 
-Happy billing! 🎉
+## Granting Free Lifetime Access
+
+Need to give a customer free unlimited access (e.g., a special client, beta tester, or friend)?
+
+### Steps:
+
+1. **Go to Supabase Dashboard** → **SQL Editor**
+
+2. **Find the organization ID** by running this query:
+```sql
+SELECT o.id, o.name, u.email
+FROM organizations o
+JOIN users u ON u.org_id = o.id
+WHERE u.email = 'customer@example.com';
+```
+   > Replace `customer@example.com` with their actual email
+
+3. **Go to Table Editor** → **organizations**
+
+4. **Find and edit their organization row** with these values:
+
+   | Field | Value |
+   |-------|-------|
+   | `subscription_tier` | `enterprise` |
+   | `subscription_status` | `active` |
+   | `is_read_only` | `false` |
+
+5. **Leave these fields empty/null** (so Stripe doesn't interfere):
+   - `stripe_customer_id`
+   - `stripe_subscription_id`
+   - `subscription_period_end`
+   - `payment_failed_at`
+   - `canceled_at`
+
+6. **Click Save**
+
+That's it! They now have full Enterprise access with no payment required. Since there's no Stripe subscription linked, the system won't try to charge them or expire their access.
+
+### Quick SQL Alternative
+
+Or run this single query to do it all at once:
+
+```sql
+UPDATE organizations
+SET
+  subscription_tier = 'enterprise',
+  subscription_status = 'active',
+  is_read_only = false,
+  stripe_customer_id = NULL,
+  stripe_subscription_id = NULL,
+  subscription_period_end = NULL,
+  payment_failed_at = NULL,
+  canceled_at = NULL
+WHERE id = 'ORG_ID_HERE';
+```
+
+> Replace `ORG_ID_HERE` with the organization's UUID from step 2.
+
+---
+
+Happy billing!

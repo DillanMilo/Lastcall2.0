@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
+import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -82,7 +84,46 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    
+
+    // Check organization tier for BigCommerce integration access
+    if (!serviceRoleKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY not set' },
+        { status: 500 }
+      );
+    }
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: orgData, error: orgError } = await adminClient
+      .from('organizations')
+      .select('subscription_tier')
+      .eq('id', org_id)
+      .single();
+
+    if (orgError || !orgData) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
+        { status: 404 }
+      );
+    }
+
+    const tier = (orgData.subscription_tier || 'free') as PlanTier;
+    const integrationCheck = checkIntegrationAccess(tier, 'bigcommerce');
+
+    if (!integrationCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Upgrade required',
+          message: integrationCheck.message,
+          upgradeRequired: true,
+        },
+        { status: 403 }
+      );
+    }
+
     // Test the BigCommerce connection using the catalog endpoint (more reliable)
     const testUrl = `https://api.bigcommerce.com/stores/${store_hash}/v3/catalog/products?limit=1`;
     const testResponse = await fetch(testUrl, {
@@ -108,22 +149,8 @@ export async function POST(request: NextRequest) {
     
     const catalogData = await testResponse.json();
     const productCount = catalogData?.meta?.pagination?.total || 0;
-    
-    // Save credentials to organization
-    if (!serviceRoleKey) {
-      return NextResponse.json(
-        { error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY not set' },
-        { status: 500 }
-      );
-    }
-    
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-    
+
+    // Save credentials to organization (reuse adminClient from tier check)
     const { error: updateError } = await adminClient
       .from('organizations')
       .update({

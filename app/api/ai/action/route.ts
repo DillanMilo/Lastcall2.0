@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import OpenAI from 'openai';
+import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
+import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -251,6 +253,37 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Get organization tier for limit checking
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('subscription_tier')
+      .eq('id', orgId)
+      .single();
+
+    if (orgError || !orgData) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
+        { status: 404 }
+      );
+    }
+
+    const tier = (orgData.subscription_tier || 'free') as PlanTier;
+
+    // Check AI request limit
+    const limitCheck = await checkAIRequestLimit(supabase, orgId, tier);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'AI request limit reached',
+          message: limitCheck.message,
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+          upgradeRequired: true,
+        },
+        { status: 403 }
+      );
+    }
+
     const { data: inventory } = await supabase
       .from('inventory_items')
       .select('name, sku, invoice, category, expiration_date')
@@ -283,6 +316,9 @@ export async function POST(request: NextRequest) {
 
     // Execute the action
     const result = await executeAction(orgId, intent.action, intent.filters, intent.value);
+
+    // Log the AI request
+    await logAIRequest(supabase, orgId, 'action');
 
     return NextResponse.json({
       isAction: true,

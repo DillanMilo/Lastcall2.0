@@ -31,3 +31,30 @@ COMMENT ON COLUMN organizations.is_read_only IS 'Read-only mode after grace peri
 
 -- Optional: Update existing organizations without a tier to 'free'
 -- UPDATE organizations SET subscription_tier = 'free' WHERE subscription_tier IS NULL;
+
+-- AI Requests tracking table (for tier limits)
+CREATE TABLE IF NOT EXISTS ai_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  request_type TEXT NOT NULL, -- 'assistant', 'label', 'action'
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for efficient monthly counting
+CREATE INDEX IF NOT EXISTS idx_ai_requests_org_month
+ON ai_requests(org_id, created_at);
+
+-- Enable RLS
+ALTER TABLE ai_requests ENABLE ROW LEVEL SECURITY;
+
+-- RLS policy: users can only see their org's requests
+CREATE POLICY "Users can view own org ai_requests" ON ai_requests
+  FOR SELECT USING (
+    org_id IN (SELECT org_id FROM users WHERE id = auth.uid())
+  );
+
+-- RLS policy: users can insert for their org
+CREATE POLICY "Users can insert own org ai_requests" ON ai_requests
+  FOR INSERT WITH CHECK (
+    org_id IN (SELECT org_id FROM users WHERE id = auth.uid())
+  );
