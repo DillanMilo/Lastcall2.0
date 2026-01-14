@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getInventoryAssistantResponse, StockMovement } from '@/lib/ai/inventoryAssistant';
 import { InventoryItem } from '@/types';
+import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
+import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -128,6 +130,37 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Get organization tier for limit checking
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('subscription_tier')
+      .eq('id', orgId)
+      .single();
+
+    if (orgError || !orgData) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
+        { status: 404 }
+      );
+    }
+
+    const tier = (orgData.subscription_tier || 'free') as PlanTier;
+
+    // Check AI request limit
+    const limitCheck = await checkAIRequestLimit(supabase, orgId, tier);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'AI request limit reached',
+          message: limitCheck.message,
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+          upgradeRequired: true,
+        },
+        { status: 403 }
+      );
+    }
+
     // Fetch current inventory for this organization
     const { data: inventory, error: inventoryError } = await supabase
       .from('inventory_items')
@@ -197,6 +230,9 @@ export async function POST(request: NextRequest) {
       conversationHistory || [],
       stockMovements.length > 0 ? stockMovements : undefined
     );
+
+    // Log the AI request for usage tracking
+    await logAIRequest(supabase, orgId, 'assistant');
 
     return NextResponse.json({
       success: true,

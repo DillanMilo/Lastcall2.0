@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { checkInventoryLimit } from '@/lib/stripe/tier-limits';
+import type { PlanTier } from '@/lib/stripe/config';
 
 /**
  * Create authenticated Supabase client for API routes
@@ -32,10 +34,15 @@ function createAuthenticatedClient(request: NextRequest, response: NextResponse)
   )
 }
 
+interface UserOrgInfo {
+  orgId: string;
+  tier: PlanTier;
+}
+
 /**
- * Get the authenticated user's organization ID
+ * Get the authenticated user's organization ID and subscription tier
  */
-async function getUserOrgId(request: NextRequest, response: NextResponse): Promise<string | null> {
+async function getUserOrgInfo(request: NextRequest, response: NextResponse): Promise<UserOrgInfo | null> {
   try {
     const supabase = createAuthenticatedClient(request, response);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -50,11 +57,25 @@ async function getUserOrgId(request: NextRequest, response: NextResponse): Promi
       .eq('id', user.id)
       .single();
 
-    if (userError || !userData) {
+    if (userError || !userData?.org_id) {
       return null;
     }
 
-    return userData.org_id;
+    // Get organization tier
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('subscription_tier')
+      .eq('id', userData.org_id)
+      .single();
+
+    if (orgError || !orgData) {
+      return null;
+    }
+
+    return {
+      orgId: userData.org_id,
+      tier: (orgData.subscription_tier || 'free') as PlanTier,
+    };
   } catch (error) {
     console.error('Error getting user organization:', error);
     return null;
@@ -71,8 +92,8 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.next();
 
     // Authenticate user and get their org
-    const userOrgId = await getUserOrgId(request, response);
-    if (!userOrgId) {
+    const userOrgInfo = await getUserOrgInfo(request, response);
+    if (!userOrgInfo) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -83,7 +104,7 @@ export async function GET(request: NextRequest) {
     const requestedOrgId = searchParams.get('org_id');
 
     // Validate that user can only access their own organization's data
-    if (!requestedOrgId || requestedOrgId !== userOrgId) {
+    if (!requestedOrgId || requestedOrgId !== userOrgInfo.orgId) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }
@@ -129,8 +150,8 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.next();
 
     // Authenticate user and get their org
-    const userOrgId = await getUserOrgId(request, response);
-    if (!userOrgId) {
+    const userOrgInfo = await getUserOrgInfo(request, response);
+    if (!userOrgInfo) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -141,7 +162,7 @@ export async function POST(request: NextRequest) {
     const { org_id, items } = body;
 
     // Validate that user can only create items for their own organization
-    if (!org_id || org_id !== userOrgId) {
+    if (!org_id || org_id !== userOrgInfo.orgId) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }
@@ -152,6 +173,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'items array is required and must not be empty' },
         { status: 400 }
+      );
+    }
+
+    // Check inventory limit before creating items
+    const supabase = createAuthenticatedClient(request, response);
+    const limitCheck = await checkInventoryLimit(supabase, org_id, userOrgInfo.tier);
+
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Limit exceeded',
+          message: limitCheck.message,
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+          upgradeRequired: true,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check if adding these items would exceed the limit
+    const itemsToAdd = items.length;
+    const wouldExceed = limitCheck.limit && limitCheck.currentCount !== undefined
+      ? (limitCheck.currentCount + itemsToAdd) > limitCheck.limit
+      : false;
+
+    if (wouldExceed && limitCheck.limit !== -1) {
+      const remaining = limitCheck.limit! - (limitCheck.currentCount || 0);
+      return NextResponse.json(
+        {
+          error: 'Limit exceeded',
+          message: `You can only add ${remaining} more item${remaining === 1 ? '' : 's'}. Upgrade your plan to add more products.`,
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+          attemptedToAdd: itemsToAdd,
+          upgradeRequired: true,
+        },
+        { status: 403 }
       );
     }
 
@@ -174,7 +233,6 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const supabase = createAuthenticatedClient(request, response);
     const { data, error } = await supabase
       .from('inventory_items')
       .insert(preparedItems)
