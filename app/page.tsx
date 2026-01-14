@@ -46,10 +46,10 @@ export default function Home() {
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="/auth/signin"
+              href="/pricing"
               className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card font-medium h-12 px-8 hover:bg-muted transition-all"
             >
-              Sign In
+              View Pricing
             </Link>
           </div>
 

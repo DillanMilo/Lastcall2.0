@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Organization } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,8 @@ import {
   ExternalLink,
   Sparkles,
   AlertCircle,
+  Crown,
+  ArrowUpRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -30,13 +33,19 @@ export function SubscriptionCard({
   organization,
   onSubscriptionChange: _onSubscriptionChange,
 }: SubscriptionCardProps) {
-  // Note: _onSubscriptionChange can be used to refresh data after returning from Stripe
   void _onSubscriptionChange;
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const currentTier = organization?.subscription_tier || "free";
   const subscriptionStatus = organization?.subscription_status;
+  const currentPlan = PRICING_PLANS.find((p) => p.id === currentTier);
+  const currentPlanIndex = PRICING_PLANS.findIndex((p) => p.id === currentTier);
+
+  // Only show plans that are upgrades (higher than current)
+  const upgradePlans = PRICING_PLANS.filter(
+    (_, index) => index > currentPlanIndex
+  );
 
   const handleSelectPlan = async (planId: PlanTier) => {
     if (planId === "free" || planId === currentTier) return;
@@ -57,11 +66,9 @@ export function SubscriptionCard({
         throw new Error(data.error || "Failed to create checkout session");
       }
 
-      // Redirect to Stripe Checkout
       if (data.url) {
         window.location.href = data.url;
       } else if (data.sessionId) {
-        // Fallback: construct checkout URL manually
         window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
       }
     } catch (err) {
@@ -123,7 +130,7 @@ export function SubscriptionCard({
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
+          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
           config.className
         )}
       >
@@ -131,6 +138,8 @@ export function SubscriptionCard({
       </span>
     );
   };
+
+  const isTopTier = currentTier === "enterprise";
 
   return (
     <Card>
@@ -156,115 +165,143 @@ export function SubscriptionCard({
           </div>
         )}
 
-        {/* Current Plan Info */}
-        {organization?.stripe_subscription_id && (
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
-            <div>
+        {/* Current Plan Card */}
+        <div className="rounded-xl border bg-gradient-to-br from-primary/5 to-primary/10 p-5">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Current Plan</p>
-              <p className="text-lg font-semibold capitalize">{currentTier}</p>
+              <div className="flex items-center gap-2">
+                {isTopTier && <Crown className="h-5 w-5 text-primary" />}
+                <p className="text-2xl font-bold capitalize">{currentPlan?.name || currentTier}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {currentPlan?.price === 0
+                  ? "Free trial"
+                  : `$${currentPlan?.price}/month`}
+              </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleManageBilling}
-              disabled={loading === "portal"}
-            >
-              {loading === "portal" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  Manage Billing
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
+            {organization?.stripe_subscription_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleManageBilling}
+                disabled={loading === "portal"}
+              >
+                {loading === "portal" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    Manage Billing
+                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Current plan features */}
+          {currentPlan && (
+            <div className="mt-4 pt-4 border-t border-primary/10">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Your plan includes:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {currentPlan.features.slice(0, 4).map((feature, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Check className="h-3 w-3 text-primary" />
+                    {feature}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Upgrade Options */}
+        {upgradePlans.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">Upgrade your plan</h3>
+              <Link
+                href="/pricing"
+                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+              >
+                Compare all plans
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {upgradePlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "relative flex flex-col rounded-xl border p-4 transition-all hover:border-primary/50 hover:shadow-md",
+                    plan.popular && "border-primary/30"
+                  )}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="mb-3">
+                    <h4 className="font-semibold text-sm">{plan.name}</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {plan.description}
+                    </p>
+                  </div>
+
+                  <div className="mb-3">
+                    <span className="text-2xl font-bold">${plan.price}</span>
+                    <span className="text-muted-foreground text-sm">/mo</span>
+                  </div>
+
+                  <ul className="mb-4 space-y-1.5 flex-1">
+                    {plan.features.slice(0, 3).map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5 text-xs">
+                        <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">{feature}</span>
+                      </li>
+                    ))}
+                    {plan.features.length > 3 && (
+                      <li className="text-xs text-muted-foreground pl-5">
+                        +{plan.features.length - 3} more
+                      </li>
+                    )}
+                  </ul>
+
+                  <Button
+                    variant={plan.popular ? "default" : "outline"}
+                    size="sm"
+                    className="w-full"
+                    disabled={loading === plan.id}
+                    onClick={() => handleSelectPlan(plan.id)}
+                  >
+                    {loading === plan.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Upgrade"
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Pricing Plans Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {PRICING_PLANS.map((plan) => {
-            const isCurrentPlan = currentTier === plan.id;
-            const isDowngrade =
-              PRICING_PLANS.findIndex((p) => p.id === currentTier) >
-              PRICING_PLANS.findIndex((p) => p.id === plan.id);
-
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  "relative flex flex-col rounded-xl border p-4 transition-all",
-                  isCurrentPlan
-                    ? "border-primary bg-primary/5 ring-1 ring-primary"
-                    : "hover:border-primary/50",
-                  plan.popular && !isCurrentPlan && "border-primary/30"
-                )}
-              >
-                {plan.popular && !isCurrentPlan && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                      <Sparkles className="h-3 w-3" />
-                      Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <h3 className="font-semibold">{plan.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {plan.description}
-                  </p>
-                </div>
-
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">${plan.price}</span>
-                  {plan.price > 0 && (
-                    <span className="text-muted-foreground">/mo</span>
-                  )}
-                </div>
-
-                <ul className="mb-6 space-y-2 flex-1">
-                  {plan.features.slice(0, 5).map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-xs">
-                      <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{feature}</span>
-                    </li>
-                  ))}
-                  {plan.features.length > 5 && (
-                    <li className="text-xs text-muted-foreground">
-                      +{plan.features.length - 5} more features
-                    </li>
-                  )}
-                </ul>
-
-                <Button
-                  variant={isCurrentPlan ? "outline" : plan.popular ? "default" : "outline"}
-                  size="sm"
-                  className="w-full"
-                  disabled={
-                    isCurrentPlan ||
-                    plan.id === "free" ||
-                    loading === plan.id ||
-                    isDowngrade
-                  }
-                  onClick={() => handleSelectPlan(plan.id)}
-                >
-                  {loading === plan.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : isCurrentPlan ? (
-                    "Current Plan"
-                  ) : isDowngrade ? (
-                    "Manage in Portal"
-                  ) : plan.id === "free" ? (
-                    "Free"
-                  ) : (
-                    "Upgrade"
-                  )}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
+        {/* Already on top tier */}
+        {isTopTier && (
+          <div className="text-center py-4">
+            <Crown className="h-8 w-8 text-primary mx-auto mb-2" />
+            <p className="text-sm font-medium">You&apos;re on the top tier!</p>
+            <p className="text-xs text-muted-foreground">
+              Enjoy unlimited access to all features.
+            </p>
+          </div>
+        )}
 
         <p className="text-xs text-center text-muted-foreground">
           All plans include a 14-day money-back guarantee. Cancel anytime.

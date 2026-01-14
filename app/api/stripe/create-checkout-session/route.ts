@@ -119,6 +119,9 @@ export async function POST(request: NextRequest) {
     // Create checkout session
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+    // Add 14-day free trial for Growth plan
+    const trialDays = plan.id === 'growth' ? 14 : undefined;
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -139,6 +142,7 @@ export async function POST(request: NextRequest) {
           org_id: orgData.id,
           plan_tier: plan.id,
         },
+        ...(trialDays && { trial_period_days: trialDays }),
       },
     });
 

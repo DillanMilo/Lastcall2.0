@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log('Payment succeeded for invoice:', invoice.id);
+        await handlePaymentSucceeded(adminClient, invoice);
         break;
       }
 
@@ -158,22 +158,36 @@ async function updateOrgSubscription(
   subscription: Stripe.Subscription
 ) {
   // Get the price ID from the subscription
-  const priceId = subscription.items.data[0]?.price.id;
+  const subscriptionItem = subscription.items.data[0];
+  const priceId = subscriptionItem?.price.id;
   const plan = priceId ? getPlanByPriceId(priceId) : null;
 
   const status = subscription.status;
   const isActive = status === 'active' || status === 'trialing';
+
+  // Track subscription period end date (from the first subscription item)
+  const periodEndTimestamp = subscriptionItem?.current_period_end;
+  const periodEnd = periodEndTimestamp
+    ? new Date(periodEndTimestamp * 1000).toISOString()
+    : null;
+
+  // Check if subscription was cancelled (cancel_at_period_end = true)
+  const isCanceled = subscription.cancel_at_period_end;
 
   await adminClient
     .from('organizations')
     .update({
       stripe_subscription_id: subscription.id,
       subscription_tier: isActive ? (plan?.id || 'starter') : 'free',
-      subscription_status: status,
+      subscription_status: isCanceled ? 'canceled' : status,
+      subscription_period_end: periodEnd,
+      canceled_at: isCanceled ? new Date().toISOString() : null,
+      // Clear read-only mode if subscription becomes active again
+      is_read_only: isActive && !isCanceled ? false : undefined,
     })
     .eq('id', orgId);
 
-  console.log(`Subscription updated for org ${orgId}: ${status}, tier: ${plan?.id || 'unknown'}`);
+  console.log(`Subscription updated for org ${orgId}: ${status}, tier: ${plan?.id || 'unknown'}, canceled: ${isCanceled}`);
 }
 
 async function handleSubscriptionDeleted(
@@ -187,7 +201,7 @@ async function handleSubscriptionDeleted(
 
   const { data: org } = await adminClient
     .from('organizations')
-    .select('id')
+    .select('id, subscription_period_end')
     .eq('stripe_customer_id', customerId)
     .single();
 
@@ -196,18 +210,62 @@ async function handleSubscriptionDeleted(
     return;
   }
 
+  // Check if we're still within the billing period (allow access until period end)
+  const periodEnd = org.subscription_period_end
+    ? new Date(org.subscription_period_end)
+    : null;
+  const now = new Date();
+  const stillHasAccess = periodEnd && periodEnd > now;
+
   await adminClient
     .from('organizations')
     .update({
-      subscription_tier: 'free',
+      // Keep current tier until period ends, then set to free
+      subscription_tier: stillHasAccess ? undefined : 'free',
       subscription_status: 'canceled',
+      canceled_at: new Date().toISOString(),
+      // Set read-only mode if period has ended
+      is_read_only: !stillHasAccess,
     })
     .eq('id', org.id);
 
-  console.log(`Subscription cancelled for org ${org.id}`);
+  console.log(`Subscription cancelled for org ${org.id}, still has access: ${stillHasAccess}`);
 }
 
 async function handlePaymentFailed(
+  adminClient: AdminClient,
+  invoice: Stripe.Invoice
+) {
+  const customerId =
+    typeof invoice.customer === 'string'
+      ? invoice.customer
+      : invoice.customer?.id;
+
+  if (!customerId) return;
+
+  const { data: org } = await adminClient
+    .from('organizations')
+    .select('id, payment_failed_at')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (!org) return;
+
+  // Only set payment_failed_at if not already set (first failure starts grace period)
+  const paymentFailedAt = org.payment_failed_at || new Date().toISOString();
+
+  await adminClient
+    .from('organizations')
+    .update({
+      subscription_status: 'past_due',
+      payment_failed_at: paymentFailedAt,
+    })
+    .eq('id', org.id);
+
+  console.log(`Payment failed for org ${org.id}, grace period started: ${paymentFailedAt}`);
+}
+
+async function handlePaymentSucceeded(
   adminClient: AdminClient,
   invoice: Stripe.Invoice
 ) {
@@ -226,12 +284,14 @@ async function handlePaymentFailed(
 
   if (!org) return;
 
+  // Clear payment failure tracking and restore access
   await adminClient
     .from('organizations')
     .update({
-      subscription_status: 'past_due',
+      payment_failed_at: null,
+      is_read_only: false,
     })
     .eq('id', org.id);
 
-  console.log(`Payment failed for org ${org.id}`);
+  console.log(`Payment succeeded for org ${org.id}, grace period cleared`);
 }
