@@ -1,4 +1,4 @@
-export type PlanTier = 'free' | 'starter' | 'growth' | 'business';
+export type PlanTier = 'free' | 'starter' | 'growth' | 'pro' | 'enterprise';
 
 export interface PricingPlan {
   id: PlanTier;
@@ -39,11 +39,11 @@ export const PRICING_PLANS: PricingPlan[] = [
     id: 'starter',
     name: 'Starter',
     description: 'Perfect for small shops',
-    price: 29,
+    price: 99,
     priceId: process.env.STRIPE_PRICE_STARTER || '',
     features: [
       'Up to 500 products',
-      '1 user',
+      '2 users',
       'Full inventory tracking',
       'CSV import',
       'Expiry alerts',
@@ -52,7 +52,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     ],
     limits: {
       products: 500,
-      users: 1,
+      users: 2,
       aiRequests: 500,
     },
   },
@@ -60,11 +60,11 @@ export const PRICING_PLANS: PricingPlan[] = [
     id: 'growth',
     name: 'Growth',
     description: 'For growing businesses',
-    price: 79,
+    price: 149,
     priceId: process.env.STRIPE_PRICE_GROWTH || '',
     features: [
       'Up to 2,000 products',
-      '3 users',
+      '5 users',
       'Full inventory tracking',
       'CSV import',
       'Expiry alerts',
@@ -74,31 +74,56 @@ export const PRICING_PLANS: PricingPlan[] = [
     ],
     limits: {
       products: 2000,
-      users: 3,
+      users: 5,
       aiRequests: 2000,
     },
     popular: true,
   },
   {
-    id: 'business',
-    name: 'Business',
-    description: 'For larger operations',
-    price: 149,
-    priceId: process.env.STRIPE_PRICE_BUSINESS || '',
+    id: 'pro',
+    name: 'Pro',
+    description: 'For scaling operations',
+    price: 299,
+    priceId: process.env.STRIPE_PRICE_PRO || '',
     features: [
       'Up to 10,000 products',
-      '10 users',
+      '15 users',
+      'Full inventory tracking',
+      'CSV import',
+      'Expiry alerts',
+      'Smart ordering recommendations',
+      'API access',
+      '10,000 AI requests/month',
+      'Dedicated support',
+    ],
+    limits: {
+      products: 10000,
+      users: 15,
+      aiRequests: 10000,
+    },
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    description: 'For large organizations',
+    price: 799,
+    priceId: process.env.STRIPE_PRICE_ENTERPRISE || '',
+    features: [
+      'Unlimited products',
+      'Unlimited users',
       'Full inventory tracking',
       'CSV import',
       'Expiry alerts',
       'Smart ordering recommendations',
       'API access',
       'Unlimited AI requests',
-      'Dedicated support',
+      'Custom integrations',
+      'Dedicated account manager',
+      'SLA guarantee',
     ],
     limits: {
-      products: 10000,
-      users: 10,
+      products: -1, // unlimited
+      users: -1, // unlimited
       aiRequests: -1, // unlimited
     },
   },
