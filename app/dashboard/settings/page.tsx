@@ -18,6 +18,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserCircle, Upload, Save, Loader2, CheckCircle } from "lucide-react";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
+import { UsageDashboard } from "@/components/billing/UsageDashboard";
+import { TeamManagement } from "@/components/team/TeamManagement";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -734,11 +736,17 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Usage & Limits */}
+      <UsageDashboard />
+
       {/* Subscription & Billing */}
       <SubscriptionCard
         organization={organization}
         onSubscriptionChange={fetchUserData}
       />
+
+      {/* Team Management */}
+      <TeamManagement />
 
       {/* Password Change */}
       <Card>

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { daysUntilExpiration } from "@/lib/utils";
 import Link from "next/link";
+import { UsageDashboard } from "@/components/billing/UsageDashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -421,56 +422,13 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Restock Recommendations */}
-        <Card
-          variant="default"
+        {/* Plan Usage - Compact */}
+        <div
           className="animate-fade-up opacity-0"
           style={{ animationDelay: '800ms', animationFillMode: 'forwards' }}
         >
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">Restock Needed</CardTitle>
-                <CardDescription>Below reorder threshold</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center justify-between py-3 animate-shimmer rounded-lg h-16" />
-                ))}
-              </div>
-            ) : lowStockItems.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <div className="w-12 h-12 rounded-xl bg-[hsl(var(--success))]/10 flex items-center justify-center mx-auto mb-3">
-                  <TrendingUp className="w-6 h-6 text-[hsl(var(--success))]" />
-                </div>
-                <p className="text-sm font-medium text-[hsl(var(--success))]">Nothing to restock</p>
-                <p className="text-xs text-muted-foreground mt-1">All inventory levels healthy</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {lowStockItems.slice(0, 5).map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors animate-fade-up opacity-0 gap-1 sm:gap-0"
-                    style={{ animationDelay: `${900 + index * 50}ms`, animationFillMode: 'forwards' }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm line-clamp-2 sm:truncate">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.quantity} / {item.reorder_threshold} threshold
-                      </p>
-                    </div>
-                    <Badge variant="warning" className="w-fit">Order soon</Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <UsageDashboard compact />
+        </div>
       </div>
     </div>
   );

@@ -58,3 +58,45 @@ CREATE POLICY "Users can insert own org ai_requests" ON ai_requests
   FOR INSERT WITH CHECK (
     org_id IN (SELECT org_id FROM users WHERE id = auth.uid())
   );
+
+-- Team Invites table
+CREATE TABLE IF NOT EXISTS team_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  role TEXT DEFAULT 'member', -- 'admin' or 'member'
+  invited_by UUID REFERENCES auth.users(id),
+  token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for looking up invites by token
+CREATE INDEX IF NOT EXISTS idx_team_invites_token ON team_invites(token);
+CREATE INDEX IF NOT EXISTS idx_team_invites_email ON team_invites(email);
+CREATE INDEX IF NOT EXISTS idx_team_invites_org ON team_invites(org_id);
+
+-- Enable RLS
+ALTER TABLE team_invites ENABLE ROW LEVEL SECURITY;
+
+-- RLS policy: org members can view invites
+CREATE POLICY "Org members can view team_invites" ON team_invites
+  FOR SELECT USING (
+    org_id IN (SELECT org_id FROM users WHERE id = auth.uid())
+  );
+
+-- RLS policy: org members can create invites
+CREATE POLICY "Org members can create team_invites" ON team_invites
+  FOR INSERT WITH CHECK (
+    org_id IN (SELECT org_id FROM users WHERE id = auth.uid())
+  );
+
+-- RLS policy: org members can delete invites
+CREATE POLICY "Org members can delete team_invites" ON team_invites
+  FOR DELETE USING (
+    org_id IN (SELECT org_id FROM users WHERE id = auth.uid())
+  );
+
+-- Add role column to users table if not exists
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'member';
