@@ -190,11 +190,11 @@ export function checkFeatureAccess(
 }
 
 /**
- * Check if organization can use BigCommerce integration
+ * Check if organization can use ecommerce integrations
  */
 export function checkIntegrationAccess(
   tier: PlanTier,
-  integration: 'csv' | 'bigcommerce' | 'api'
+  integration: 'csv' | 'bigcommerce' | 'shopify' | 'api'
 ): TierLimitResult {
   // CSV is available for all tiers
   if (integration === 'csv') {
@@ -203,6 +203,11 @@ export function checkIntegrationAccess(
 
   // BigCommerce requires Growth+
   if (integration === 'bigcommerce') {
+    return checkFeatureAccess(tier, 'integrations');
+  }
+
+  // Shopify requires Growth+
+  if (integration === 'shopify') {
     return checkFeatureAccess(tier, 'integrations');
   }
 

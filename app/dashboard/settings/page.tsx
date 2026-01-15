@@ -20,6 +20,8 @@ import { UserCircle, Upload, Save, Loader2, CheckCircle } from "lucide-react";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
 import { UsageDashboard } from "@/components/billing/UsageDashboard";
 import { TeamManagement } from "@/components/team/TeamManagement";
+import { BigCommerceConnect } from "@/components/integrations/BigCommerceConnect";
+import { ShopifyConnect } from "@/components/integrations/ShopifyConnect";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -747,6 +749,26 @@ export default function SettingsPage() {
 
       {/* Team Management */}
       <TeamManagement />
+
+      {/* Integrations Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Integrations</CardTitle>
+          <CardDescription>
+            Connect your e-commerce platforms to sync inventory automatically
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <BigCommerceConnect
+            organization={organization}
+            onConnectionChange={fetchUserData}
+          />
+          <ShopifyConnect
+            organization={organization}
+            onConnectionChange={fetchUserData}
+          />
+        </CardContent>
+      </Card>
 
       {/* Password Change */}
       <Card>

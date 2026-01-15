@@ -31,6 +31,8 @@ export interface InventorySyncItem {
   expiration_date?: string | null;
   bigcommerce_product_id?: string | number | null;
   bigcommerce_variant_id?: string | number | null;
+  shopify_product_id?: string | number | null;
+  shopify_variant_id?: string | number | null;
 }
 
 export interface InventorySyncResult {

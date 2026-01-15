@@ -25,6 +25,9 @@ export interface Organization {
   bigcommerce_client_id?: string;
   bigcommerce_access_token?: string;
   bigcommerce_connected_at?: string;
+  shopify_store_domain?: string;
+  shopify_access_token?: string;
+  shopify_connected_at?: string;
   created_at: string;
 }
 
@@ -41,6 +44,8 @@ export interface InventoryItem {
   expiration_date?: string;
   bigcommerce_product_id?: string;
   bigcommerce_variant_id?: string;
+  shopify_product_id?: string;
+  shopify_variant_id?: string;
   last_restock: string;
   created_at: string;
 }
