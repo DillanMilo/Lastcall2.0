@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Bot, User, X, Sparkles, RotateCcw } from "lucide-react";
+import { Send, Loader2, X, Sparkles, RotateCcw, Zap } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -17,21 +17,105 @@ interface AIAssistantProps {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "What should I order?",
-  "What's expiring soon?",
-  "Set expiry dates",
-  "Daily summary",
-  "Low stock alerts",
+  { text: "What should I order?", icon: "order" },
+  { text: "What's expiring soon?", icon: "expire" },
+  { text: "Set expiry dates", icon: "calendar" },
+  { text: "Daily summary", icon: "summary" },
+  { text: "Low stock alerts", icon: "alert" },
 ];
 
-// Helper to create welcome message
 function getWelcomeMessage(): Message {
   return {
     role: "assistant",
     content:
-      '👋 Hi! I\'m your Inventory assistant. I can help you with:\n\n📦 **Smart Ordering** - Tell you exactly what to order based on sales\n📅 **Set Expiry Dates** - Just say "Set expiry for [items] to [date]"\n⚠️ **Alerts** - Low stock and expiring items\n📊 **Reports** - Daily/weekly summaries\n\nWhat would you like to do?',
+      "Hey! I'm your inventory co-pilot. I can help you with smart ordering, expiry tracking, alerts, and reports. What do you need?",
     timestamp: new Date(),
   };
+}
+
+// Typing indicator with warm pulse
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1.5 px-4 py-3">
+      <div className="flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-2 h-2 rounded-full bg-primary/60"
+            style={{
+              animation: `typing-bounce 1.4s ease-in-out ${i * 0.16}s infinite`,
+            }}
+          />
+        ))}
+      </div>
+      <span className="text-xs text-muted-foreground ml-2 opacity-70">thinking...</span>
+    </div>
+  );
+}
+
+// Message bubble with distinctive styling
+function MessageBubble({ message, isLatest }: { message: Message; isLatest: boolean }) {
+  const isUser = message.role === "user";
+
+  return (
+    <div
+      className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"} ${
+        isLatest ? "animate-message-in" : ""
+      }`}
+    >
+      {/* AI Avatar */}
+      {!isUser && (
+        <div className="relative flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center border border-primary/10 shadow-sm">
+            <Sparkles className="h-4 w-4 text-primary" />
+          </div>
+          {/* Subtle glow */}
+          <div className="absolute inset-0 rounded-xl bg-primary/10 blur-md -z-10 opacity-50" />
+        </div>
+      )}
+
+      {/* Message Content */}
+      <div
+        className={`relative max-w-[80%] ${
+          isUser
+            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md shadow-md"
+            : "bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl rounded-bl-md shadow-sm"
+        }`}
+      >
+        {/* Decorative corner for AI messages */}
+        {!isUser && (
+          <div className="absolute -left-px top-3 w-0.5 h-6 bg-gradient-to-b from-primary/50 to-transparent rounded-full" />
+        )}
+
+        <div className="px-4 py-3">
+          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+            {message.content}
+          </p>
+        </div>
+
+        {/* Timestamp */}
+        <div
+          className={`px-4 pb-2 ${
+            isUser ? "text-primary-foreground/60" : "text-muted-foreground/60"
+          }`}
+        >
+          <span className="text-[10px] font-mono">
+            {message.timestamp.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+      </div>
+
+      {/* User Avatar */}
+      {isUser && (
+        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-md">
+          <span className="text-primary-foreground font-semibold text-sm">You</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
@@ -39,12 +123,12 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Load messages from localStorage on mount
   useEffect(() => {
     const savedMessages = localStorage.getItem(`ai-chat-${orgId}`);
     if (savedMessages) {
@@ -54,10 +138,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
           ...m,
           timestamp: new Date(m.timestamp),
         }));
-        // Keep only last 10 messages (5 pairs)
         setMessages(messagesWithDates.slice(-10));
-      } catch (error) {
-        console.error("Error loading saved messages:", error);
+      } catch {
         setMessages([getWelcomeMessage()]);
       }
     } else {
@@ -65,8 +147,6 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     }
   }, [orgId]);
 
-  // Save messages to localStorage whenever they change
-  // Keep only last 12 messages (6 pairs including welcome) to limit storage
   useEffect(() => {
     if (messages.length > 0) {
       const messagesToSave = messages.slice(-12);
@@ -78,11 +158,15 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Focus input on mount
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
   const handleSend = async (messageText?: string) => {
     const userMessage = messageText || input.trim();
     if (!userMessage || loading) return;
 
-    // Add user message
     const newUserMessage: Message = {
       role: "user",
       content: userMessage,
@@ -94,14 +178,10 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     setLoading(true);
 
     try {
-      // Get last 10 messages (5 pairs of user/assistant) for context
-      // Skip the initial welcome message, keep recent conversation
       const recentMessages = messages.slice(-10).filter((m) => {
-        // Don't send the initial welcome message to save tokens
-        return !(m.role === "assistant" && m.content.includes("👋 Hi!"));
+        return !(m.role === "assistant" && m.content.includes("Hey! I'm your"));
       });
 
-      // Send to AI API
       const response = await fetch("/api/ai/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +201,6 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         throw new Error(data.error || "Failed to get response");
       }
 
-      // Add AI response
       const aiMessage: Message = {
         role: "assistant",
         content:
@@ -136,7 +215,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
       console.error("Error getting AI response:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: `❌ Sorry, I encountered an error: ${message}. Please try again or check your OpenAI API key configuration.`,
+        content: `Sorry, I hit an error: ${message}. Try again?`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -153,32 +232,49 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   };
 
   const handleClearHistory = () => {
-    if (confirm("Clear conversation history? This cannot be undone.")) {
+    if (confirm("Clear conversation history?")) {
       setMessages([getWelcomeMessage()]);
       localStorage.removeItem(`ai-chat-${orgId}`);
     }
   };
 
+  const showSuggestions = messages.length === 1;
+
   return (
-    <div className="flex flex-col h-full w-full bg-background sm:rounded-xl overflow-hidden shadow-2xl">
-      {/* Header - Clean and spacious */}
-      <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4 border-b bg-card/80 backdrop-blur-sm">
+    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
+      {/* Ambient background effect */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
+      </div>
+
+      {/* Header */}
+      <div className="relative flex items-center justify-between px-5 py-4 border-b bg-card/60 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-primary/10">
-            <Sparkles className="h-5 w-5 text-primary" />
+          {/* Animated AI icon */}
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+              <Zap className="h-5 w-5 text-primary-foreground" />
+            </div>
+            {/* Pulse ring */}
+            <div className="absolute inset-0 rounded-xl bg-primary/30 animate-ping-slow opacity-75" />
           </div>
           <div>
-            <h2 className="font-semibold text-base sm:text-lg">AI Assistant</h2>
-            <p className="text-xs text-muted-foreground">Ask about your inventory</p>
+            <h2 className="font-semibold text-base tracking-tight">Inventory AI</h2>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-muted-foreground">Online</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={handleClearHistory}
-            title="Clear conversation"
-            className="h-9 w-9 rounded-xl hover:bg-muted"
+            title="Clear history"
+            className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50"
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
@@ -187,7 +283,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive"
+              className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -196,53 +292,24 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 min-h-0 bg-muted/20">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4 min-h-0">
         {messages.map((message, index) => (
-          <div
+          <MessageBubble
             key={index}
-            className={`flex gap-3 ${
-              message.role === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
-            {message.role === "assistant" && (
-              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-            )}
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                message.role === "user"
-                  ? "bg-primary text-primary-foreground rounded-br-md"
-                  : "bg-card border shadow-sm rounded-bl-md"
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
-                {message.content}
-              </p>
-              <p className={`text-[10px] mt-2 ${
-                message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
-              }`}>
-                {message.timestamp.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-            {message.role === "user" && (
-              <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-                <User className="h-4 w-4 text-primary-foreground" />
-              </div>
-            )}
-          </div>
+            message={message}
+            isLatest={index === messages.length - 1}
+          />
         ))}
 
         {loading && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-primary" />
+          <div className="flex gap-3 justify-start animate-message-in">
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center border border-primary/10">
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+              </div>
             </div>
-            <div className="bg-card border shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <div className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl rounded-bl-md shadow-sm">
+              <TypingIndicator />
             </div>
           </div>
         )}
@@ -250,43 +317,47 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Questions */}
-      {messages.length === 1 && (
-        <div className="px-4 py-3 border-t bg-card/50">
-          <p className="text-xs text-muted-foreground mb-2">Quick actions:</p>
+      {/* Quick Actions */}
+      {showSuggestions && (
+        <div className="relative px-5 py-4 border-t border-border/50 bg-muted/30 backdrop-blur-sm">
+          <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+            Quick Actions
+          </p>
           <div className="flex flex-wrap gap-2">
-            {SUGGESTED_QUESTIONS.map((question, index) => (
-              <Button
+            {SUGGESTED_QUESTIONS.map((q, index) => (
+              <button
                 key={index}
-                variant="outline"
-                size="sm"
-                onClick={() => handleSend(question)}
+                onClick={() => handleSend(q.text)}
                 disabled={loading}
-                className="text-xs h-8 px-3 rounded-full hover:bg-primary hover:text-primary-foreground transition-colors"
+                className="group relative px-4 py-2 text-sm font-medium rounded-full border border-border/50 bg-card/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 hover:shadow-md hover:shadow-primary/10 disabled:opacity-50 disabled:pointer-events-none"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                {question}
-              </Button>
+                <span className="relative z-10">{q.text}</span>
+              </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Input Area - Clean and modern */}
-      <div className="p-4 border-t bg-card safe-bottom">
-        <div className="flex gap-3">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            disabled={loading}
-            className="flex-1 text-base sm:text-sm h-11 rounded-xl bg-muted/50 border-0 focus-visible:ring-1"
-          />
+      {/* Input Area */}
+      <div className="relative p-4 border-t border-border/50 bg-card/80 backdrop-blur-md safe-bottom">
+        <div className="flex gap-3 items-center">
+          <div className="relative flex-1">
+            <Input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Ask about your inventory..."
+              disabled={loading}
+              className="w-full h-12 pl-4 pr-4 text-base rounded-xl bg-muted/50 border-border/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 placeholder:text-muted-foreground/50"
+            />
+          </div>
           <Button
             onClick={() => handleSend()}
             disabled={!input.trim() || loading}
             size="icon"
-            className="flex-shrink-0 h-11 w-11 rounded-xl"
+            className="flex-shrink-0 h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50 disabled:shadow-none"
           >
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -295,7 +366,56 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
             )}
           </Button>
         </div>
+
+        {/* Keyboard hint */}
+        <p className="hidden sm:block text-[10px] text-muted-foreground/50 text-center mt-2">
+          Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono text-[9px]">Enter</kbd> to send
+        </p>
       </div>
+
+      {/* Custom styles */}
+      <style jsx>{`
+        @keyframes typing-bounce {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.4;
+          }
+          30% {
+            transform: translateY(-4px);
+            opacity: 1;
+          }
+        }
+
+        @keyframes message-in {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes ping-slow {
+          0% {
+            transform: scale(1);
+            opacity: 0.75;
+          }
+          75%, 100% {
+            transform: scale(1.3);
+            opacity: 0;
+          }
+        }
+
+        .animate-message-in {
+          animation: message-in 0.3s ease-out forwards;
+        }
+
+        .animate-ping-slow {
+          animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+      `}</style>
     </div>
   );
 }
