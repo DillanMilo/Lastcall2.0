@@ -1,6 +1,7 @@
 import { Navigation } from "@/components/dashboard/Navigation";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { DashboardWrapper } from "@/components/dashboard/DashboardWrapper";
+import { PageWrapper } from "@/components/dashboard/PageWrapper";
 
 export default function DashboardLayout({
   children,
@@ -23,7 +24,7 @@ export default function DashboardLayout({
           {/* Page Content */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="container max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 dashboard-content-padding">
-              {children}
+              <PageWrapper>{children}</PageWrapper>
             </div>
           </div>
         </main>

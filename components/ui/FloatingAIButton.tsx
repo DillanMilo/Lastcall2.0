@@ -89,7 +89,7 @@ export function FloatingAIButton() {
           {/* Modal Container */}
           <div className="absolute inset-0 flex items-end sm:items-center justify-center modal-safe-padding">
             <div
-              className="relative w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-xl sm:rounded-2xl overflow-hidden shadow-2xl animate-slide-up bg-background border border-border/50"
+              className="relative w-full h-full sm:h-[85vh] sm:max-h-[85vh] sm:max-w-xl sm:rounded-2xl overflow-hidden shadow-2xl animate-slide-up bg-background border border-border/50"
             >
               {/* Decorative top border */}
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
