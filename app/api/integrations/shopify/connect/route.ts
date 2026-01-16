@@ -16,9 +16,9 @@ interface ConnectRequest {
 }
 
 /**
- * Verify user is authenticated and belongs to the specified organization
+ * Verify user is authenticated, belongs to the specified organization, and is an admin
  */
-async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ valid: boolean; error?: string }> {
+async function verifyUserOrgAdmin(request: NextRequest, orgId: string): Promise<{ valid: boolean; error?: string; status?: number }> {
   const response = NextResponse.next();
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -38,18 +38,23 @@ async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ val
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return { valid: false, error: 'Unauthorized' };
+    return { valid: false, error: 'Unauthorized', status: 401 };
   }
 
-  // Verify user belongs to this organization
+  // Verify user belongs to this organization and is an admin
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('org_id')
+    .select('org_id, role')
     .eq('id', user.id)
     .single();
 
   if (userError || !userData || userData.org_id !== orgId) {
-    return { valid: false, error: 'Access denied - you do not belong to this organization' };
+    return { valid: false, error: 'Access denied - you do not belong to this organization', status: 403 };
+  }
+
+  // Only admins can manage integrations
+  if (userData.role !== 'admin') {
+    return { valid: false, error: 'Only admins can manage integrations', status: 403 };
   }
 
   return { valid: true };
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user belongs to this organization
-    const authCheck = await verifyUserOrg(request, org_id);
+    const authCheck = await verifyUserOrgAdmin(request, org_id);
     if (!authCheck.valid) {
       return NextResponse.json(
         { error: authCheck.error },
@@ -211,7 +216,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verify user belongs to this organization
-    const authCheck = await verifyUserOrg(request, org_id);
+    const authCheck = await verifyUserOrgAdmin(request, org_id);
     if (!authCheck.valid) {
       return NextResponse.json(
         { error: authCheck.error },

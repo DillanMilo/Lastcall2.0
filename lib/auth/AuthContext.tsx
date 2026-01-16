@@ -4,11 +4,14 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
+export type UserRole = 'admin' | 'member';
+
 export interface UserWithOrg {
   id: string;
   email: string;
   full_name?: string;
   org_id: string;
+  role: UserRole;
   organization?: {
     id: string;
     name: string;
@@ -28,6 +31,7 @@ interface AuthContextType {
   userWithOrg: UserWithOrg | null;
   orgId: string | null;
   loading: boolean;
+  isAdmin: boolean;
   signOut: () => Promise<void>;
   refetchUser: () => void;
 }
@@ -110,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: authUser.email || '',
           full_name: authUser.user_metadata?.full_name || null,
           org_id: newOrg.id,
+          role: 'admin', // Organization creator is always admin
         })
         .select('*')
         .single();
@@ -280,12 +285,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isAdmin = userWithOrg?.role === 'admin';
+
   return (
     <AuthContext.Provider value={{
       user,
       userWithOrg,
       orgId,
       loading,
+      isAdmin,
       signOut,
       refetchUser,
     }}>

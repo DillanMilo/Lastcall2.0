@@ -131,13 +131,21 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/team/invites
- * Create a new team invite
+ * Create a new team invite (Admin only)
  */
 export async function POST(request: NextRequest) {
   try {
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only admins can invite team members
+    if (userOrg.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden', message: 'Only admins can invite team members' },
+        { status: 403 }
+      );
     }
 
     const { email, role = 'member' } = await request.json();
@@ -308,13 +316,21 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/team/invites
- * Cancel a pending invite
+ * Cancel a pending invite (Admin only)
  */
 export async function DELETE(request: NextRequest) {
   try {
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only admins can cancel invites
+    if (userOrg.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden', message: 'Only admins can cancel invites' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);

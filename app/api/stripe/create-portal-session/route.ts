@@ -44,14 +44,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organization
+    // Get user's organization and role
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
     const { data: userData, error: userError } = await adminClient
       .from('users')
-      .select('org_id')
+      .select('org_id, role')
       .eq('id', user.id)
       .single();
 
@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
+      );
+    }
+
+    // Only admins can access billing portal
+    if (userData.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden', message: 'Only admins can manage billing' },
+        { status: 403 }
       );
     }
 
