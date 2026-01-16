@@ -16,16 +16,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UserCircle, Upload, Save, Loader2, CheckCircle } from "lucide-react";
+import { UserCircle, Upload, Save, Loader2, CheckCircle, Lock } from "lucide-react";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
 import { UsageDashboard } from "@/components/billing/UsageDashboard";
 import { TeamManagement } from "@/components/team/TeamManagement";
 import { BigCommerceConnect } from "@/components/integrations/BigCommerceConnect";
 import { ShopifyConnect } from "@/components/integrations/ShopifyConnect";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 export default function SettingsPage() {
+  const { isAdmin } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -741,34 +743,76 @@ export default function SettingsPage() {
       {/* Usage & Limits */}
       <UsageDashboard />
 
-      {/* Subscription & Billing */}
-      <SubscriptionCard
-        organization={organization}
-        onSubscriptionChange={fetchUserData}
-      />
+      {/* Subscription & Billing - Admin Only */}
+      {isAdmin ? (
+        <SubscriptionCard
+          organization={organization}
+          onSubscriptionChange={fetchUserData}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              Subscription & Billing
+            </CardTitle>
+            <CardDescription>
+              Contact your team admin to manage billing and subscription settings.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
-      {/* Team Management */}
-      <TeamManagement />
+      {/* Team Management - Admin Only */}
+      {isAdmin ? (
+        <TeamManagement />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              Team Management
+            </CardTitle>
+            <CardDescription>
+              Contact your team admin to manage team members and invitations.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
-      {/* Integrations Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Integrations</CardTitle>
-          <CardDescription>
-            Connect your e-commerce platforms to sync inventory automatically
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <BigCommerceConnect
-            organization={organization}
-            onConnectionChange={fetchUserData}
-          />
-          <ShopifyConnect
-            organization={organization}
-            onConnectionChange={fetchUserData}
-          />
-        </CardContent>
-      </Card>
+      {/* Integrations Section - Admin Only */}
+      {isAdmin ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Integrations</CardTitle>
+            <CardDescription>
+              Connect your e-commerce platforms to sync inventory automatically
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <BigCommerceConnect
+              organization={organization}
+              onConnectionChange={fetchUserData}
+            />
+            <ShopifyConnect
+              organization={organization}
+              onConnectionChange={fetchUserData}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              Integrations
+            </CardTitle>
+            <CardDescription>
+              Contact your team admin to manage e-commerce integrations.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Password Change */}
       <Card>

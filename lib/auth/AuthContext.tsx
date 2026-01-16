@@ -4,23 +4,35 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
+export type UserRole = 'admin' | 'member';
+
+export interface Organization {
+  id: string;
+  name: string;
+  subscription_tier: 'free' | 'starter' | 'growth' | 'pro' | 'enterprise' | 'trial';
+  subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  subscription_period_end?: string;
+  payment_failed_at?: string;
+  canceled_at?: string;
+  is_read_only?: boolean;
+}
+
+export interface OrgMembership {
+  org_id: string;
+  role: UserRole;
+  is_active: boolean;
+  organization: Organization;
+}
+
 export interface UserWithOrg {
   id: string;
   email: string;
   full_name?: string;
   org_id: string;
-  organization?: {
-    id: string;
-    name: string;
-    subscription_tier: 'free' | 'starter' | 'growth' | 'pro' | 'enterprise' | 'trial';
-    subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null;
-    stripe_customer_id?: string;
-    stripe_subscription_id?: string;
-    subscription_period_end?: string;
-    payment_failed_at?: string;
-    canceled_at?: string;
-    is_read_only?: boolean;
-  };
+  role: UserRole;
+  organization?: Organization;
 }
 
 interface AuthContextType {
@@ -28,6 +40,9 @@ interface AuthContextType {
   userWithOrg: UserWithOrg | null;
   orgId: string | null;
   loading: boolean;
+  isAdmin: boolean;
+  organizations: OrgMembership[];
+  switchOrganization: (orgId: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   refetchUser: () => void;
 }
@@ -39,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userWithOrg, setUserWithOrg] = useState<UserWithOrg | null>(null);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<OrgMembership[]>([]);
 
   const bootstrapViaServer = useCallback(async () => {
     try {
@@ -67,6 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUserWithOrg(combined);
       setOrgId(payload.user.org_id);
+
+      // Set organizations list from bootstrap response
+      if (payload.organizations && Array.isArray(payload.organizations)) {
+        setOrganizations(payload.organizations);
+      }
+
       return combined;
     } catch (error) {
       console.error('Bootstrap API error:', error);
@@ -110,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: authUser.email || '',
           full_name: authUser.user_metadata?.full_name || null,
           org_id: newOrg.id,
+          role: 'admin', // Organization creator is always admin
         })
         .select('*')
         .single();
@@ -256,6 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setUserWithOrg(null);
       setOrgId(null);
+      setOrganizations([]);
 
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
@@ -271,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setUserWithOrg(null);
       setOrgId(null);
+      setOrganizations([]);
     }
   };
 
@@ -280,12 +305,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const switchOrganization = async (newOrgId: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/organizations/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ org_id: newOrgId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Switch org error:', data.error);
+        return false;
+      }
+
+      // Update local state with the new organization
+      if (data.organization) {
+        setOrgId(newOrgId);
+        setUserWithOrg(prev => prev ? {
+          ...prev,
+          org_id: newOrgId,
+          role: data.role,
+          organization: data.organization,
+        } : null);
+
+        // Update organizations list to reflect new active state
+        setOrganizations(prev => prev.map(org => ({
+          ...org,
+          is_active: org.org_id === newOrgId,
+        })));
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Switch organization error:', error);
+      return false;
+    }
+  };
+
+  const isAdmin = userWithOrg?.role === 'admin';
+
   return (
     <AuthContext.Provider value={{
       user,
       userWithOrg,
       orgId,
       loading,
+      isAdmin,
+      organizations,
+      switchOrganization,
       signOut,
       refetchUser,
     }}>

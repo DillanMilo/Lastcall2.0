@@ -167,24 +167,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already belongs to an org
-    const { data: existingUser } = await adminClient
-      .from('users')
-      .select('org_id')
-      .eq('id', user.id)
-      .single();
+    // Check if user already belongs to this specific org
+    const { data: existingMembership } = await adminClient
+      .from('user_organizations')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('org_id', invite.org_id)
+      .maybeSingle();
 
-    if (existingUser?.org_id && existingUser.org_id !== invite.org_id) {
+    if (existingMembership) {
       return NextResponse.json(
         {
-          error: 'Already in another organization',
-          message: 'You are already a member of another organization. Please contact support to switch organizations.',
+          error: 'Already a member',
+          message: 'You are already a member of this organization.',
         },
         { status: 400 }
       );
     }
 
-    // Update or create user record
+    // Update or create user record (set this org as their primary/current org)
     const { error: userError } = await adminClient
       .from('users')
       .upsert({
@@ -201,6 +202,28 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to join organization' },
         { status: 500 }
       );
+    }
+
+    // Deactivate all other org memberships for this user
+    await adminClient
+      .from('user_organizations')
+      .update({ is_active: false })
+      .eq('user_id', user.id);
+
+    // Add to user_organizations table with this org as active
+    const { error: membershipError } = await adminClient
+      .from('user_organizations')
+      .upsert({
+        user_id: user.id,
+        org_id: invite.org_id,
+        role: invite.role,
+        is_active: true,
+        joined_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,org_id' });
+
+    if (membershipError) {
+      console.error('Error creating org membership:', membershipError);
+      // Non-fatal - user record was already updated
     }
 
     // Mark invite as accepted

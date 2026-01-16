@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/useAuth";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -165,6 +166,11 @@ export function Navigation() {
 
       {/* User Section */}
       <div className="p-3 border-t border-border/50 bg-muted/30">
+        {/* Organization Switcher - only shows if user has multiple orgs */}
+        <div className="mb-2">
+          <OrganizationSwitcher />
+        </div>
+
         {userWithOrg && (
           <Link href="/dashboard/settings">
             <div className="flex items-center gap-3 px-3 py-2.5 mb-2 rounded-lg hover:bg-background/60 transition-colors group">
