@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/useAuth";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -129,6 +130,11 @@ export function MobileNav() {
         )}
       >
         <div className="p-3">
+          {/* Organization Switcher - only shows if user has multiple orgs */}
+          <div className="mb-3">
+            <OrganizationSwitcher />
+          </div>
+
           {/* User Info */}
           {userWithOrg && (
             <Link href="/dashboard/settings" onClick={closeMenu}>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
@@ -11,13 +11,24 @@ import { Label } from "@/components/ui/label";
 import { CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import AuthLayout from "@/components/auth/AuthLayout";
 
-export default function SignUpPage() {
+function SignUpContent() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const prefilledEmail = searchParams.get("email") ?? "";
+  const redirectUrl = searchParams.get("redirect");
+
+  const [email, setEmail] = useState(prefilledEmail);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill email from query params
+  useEffect(() => {
+    if (prefilledEmail) {
+      setEmail(prefilledEmail);
+    }
+  }, [prefilledEmail]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,11 +42,17 @@ export default function SignUpPage() {
     }
 
     try {
+      // Build the email redirect URL - if there's a pending invite, include it
+      const baseRedirectUrl = `${getSiteUrl()}/auth/signin`;
+      const emailRedirectUrl = redirectUrl
+        ? `${baseRedirectUrl}?redirect=${encodeURIComponent(redirectUrl)}`
+        : baseRedirectUrl;
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${getSiteUrl()}/auth/signin`,
+          emailRedirectTo: emailRedirectUrl,
         },
       });
 
@@ -53,15 +70,25 @@ export default function SignUpPage() {
       }
 
       if (data.user && !data.session) {
-        router.push(
-          `/auth/signin?verify=1&email=${encodeURIComponent(email.trim())}`
-        );
+        // Redirect to signin with verify flag, preserving the redirect URL
+        const signinUrl = redirectUrl
+          ? `/auth/signin?verify=1&email=${encodeURIComponent(email.trim())}&redirect=${encodeURIComponent(redirectUrl)}`
+          : `/auth/signin?verify=1&email=${encodeURIComponent(email.trim())}`;
+        router.push(signinUrl);
         return;
       }
 
       if (data.session) {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        window.location.href = "/dashboard";
+        // Check for pending invite or redirect URL
+        const pendingInviteToken = localStorage.getItem("pendingInviteToken");
+        if (pendingInviteToken) {
+          window.location.href = `/auth/invite?token=${pendingInviteToken}`;
+        } else if (redirectUrl) {
+          window.location.href = redirectUrl;
+        } else {
+          window.location.href = "/dashboard";
+        }
         return;
       }
     } catch (err: unknown) {
@@ -134,5 +161,13 @@ export default function SignUpPage() {
         </div>
       </CardContent>
     </AuthLayout>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="py-24 text-center text-muted-foreground">Loading…</div>}>
+      <SignUpContent />
+    </Suspense>
   );
 }
