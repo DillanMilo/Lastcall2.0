@@ -12,7 +12,8 @@ import {
   Zap,
   Shield,
   Users,
-  Store
+  Store,
+  ChevronDown
 } from "lucide-react";
 
 export default function Home() {
@@ -105,10 +106,9 @@ export default function Home() {
         </div>
 
         {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-2">
-            <div className="w-1 h-2 bg-muted-foreground/50 rounded-full animate-pulse" />
-          </div>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 animate-bounce">
+          <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-widest">Scroll</span>
+          <ChevronDown className="w-5 h-5 text-muted-foreground/70" />
         </div>
       </section>
 
