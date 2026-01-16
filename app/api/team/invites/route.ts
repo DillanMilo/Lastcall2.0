@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { checkUserLimit } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 import { randomBytes } from 'crypto';
+import { sendEmail } from '@/lib/email';
+import { generateTeamInviteEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -259,11 +261,44 @@ export async function POST(request: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const inviteUrl = `${siteUrl}/auth/invite?token=${token}`;
 
+    // Get inviter's name for the email
+    const { data: inviterData } = await adminClient
+      .from('users')
+      .select('full_name, email')
+      .eq('id', userOrg.userId)
+      .single();
+
+    const inviterName = inviterData?.full_name || inviterData?.email?.split('@')[0] || 'A team member';
+
+    // Send invitation email
+    const { subject, html } = generateTeamInviteEmail({
+      inviteeEmail: normalizedEmail,
+      inviterName,
+      organizationName: orgData.name || 'Your Team',
+      role: role === 'admin' ? 'admin' : 'member',
+      inviteUrl,
+      expiresInDays: 7,
+    });
+
+    const emailResult = await sendEmail({
+      to: normalizedEmail,
+      subject,
+      html,
+    });
+
+    if (!emailResult.success) {
+      console.warn('Failed to send invite email:', emailResult.error);
+      // Don't fail the request - the invite was created, just log the email failure
+    }
+
     return NextResponse.json({
       success: true,
       invite,
       inviteUrl,
-      message: `Invite sent to ${normalizedEmail}`,
+      emailSent: emailResult.success,
+      message: emailResult.success
+        ? `Invitation email sent to ${normalizedEmail}`
+        : `Invite created for ${normalizedEmail}. Email delivery failed - share the link manually.`,
     });
   } catch (error) {
     console.error('Error in POST /api/team/invites:', error);

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/email';
+import { generateWelcomeEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -214,9 +216,31 @@ export async function POST(request: NextRequest) {
       .eq('id', invite.org_id)
       .single();
 
+    const organizationName = orgData?.name || 'the team';
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    // Send welcome email
+    const { subject, html } = generateWelcomeEmail({
+      userName: user.user_metadata?.full_name,
+      userEmail: user.email!,
+      organizationName,
+      role: invite.role as 'admin' | 'member',
+      dashboardUrl: `${siteUrl}/dashboard`,
+    });
+
+    const emailResult = await sendEmail({
+      to: user.email!,
+      subject,
+      html,
+    });
+
+    if (!emailResult.success) {
+      console.warn('Failed to send welcome email:', emailResult.error);
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Welcome to ${orgData?.name || 'the team'}!`,
+      message: `Welcome to ${organizationName}!`,
       organizationId: invite.org_id,
     });
   } catch (error) {
