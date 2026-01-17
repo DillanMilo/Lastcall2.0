@@ -190,6 +190,29 @@ function InviteContent() {
     );
   }
 
+  // Handle error state with retry option
+  if (status === "error") {
+    return (
+      <Card className="w-full max-w-md">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+            <XCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+          <p className="text-muted-foreground text-center mb-6">{error || "Failed to accept invite"}</p>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+            <Link href="/auth/signin">
+              <Button>Sign In</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const emailMismatch = isAuthenticated && userEmail && inviteInfo &&
     userEmail.toLowerCase() !== inviteInfo.email.toLowerCase();
 

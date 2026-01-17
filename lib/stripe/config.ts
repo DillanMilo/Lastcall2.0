@@ -136,3 +136,43 @@ export function getPlanByTier(tier: PlanTier): PricingPlan | undefined {
 export function getPlanByPriceId(priceId: string): PricingPlan | undefined {
   return PRICING_PLANS.find((plan) => plan.priceId === priceId);
 }
+
+/**
+ * Get the seat limit for a subscription tier
+ * Returns -1 for unlimited
+ */
+export function getSeatLimit(tier: PlanTier | string): number {
+  const plan = PRICING_PLANS.find((p) => p.id === tier);
+  return plan?.limits.users ?? 1; // Default to 1 if tier not found
+}
+
+/**
+ * Check if an organization can add more team members
+ * @param tier - The organization's subscription tier
+ * @param currentMemberCount - Current number of members in the org
+ * @returns Object with canAdd boolean and details
+ */
+export function canAddTeamMember(
+  tier: PlanTier | string,
+  currentMemberCount: number
+): { canAdd: boolean; limit: number; current: number; remaining: number } {
+  const limit = getSeatLimit(tier);
+
+  // -1 means unlimited
+  if (limit === -1) {
+    return {
+      canAdd: true,
+      limit: -1,
+      current: currentMemberCount,
+      remaining: -1, // unlimited
+    };
+  }
+
+  const remaining = limit - currentMemberCount;
+  return {
+    canAdd: remaining > 0,
+    limit,
+    current: currentMemberCount,
+    remaining: Math.max(0, remaining),
+  };
+}
