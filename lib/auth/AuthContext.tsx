@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<OrgMembership[]>([]);
 
-  const bootstrapViaServer = useCallback(async () => {
+  const bootstrapViaServer = useCallback(async (): Promise<{ user: UserWithOrg | null; pendingInvite?: boolean }> => {
     try {
       const response = await fetch('/api/auth/bootstrap', {
         method: 'POST',
@@ -68,12 +68,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         console.error('Bootstrap API error:', payload?.error || response.statusText);
-        return null;
+        return { user: null };
       }
 
       if (!payload?.user) {
         console.error('Bootstrap API error: invalid response payload');
-        return null;
+        return { user: null };
+      }
+
+      // Check if user has a pending invite - they need to accept it first
+      if (payload.pendingInvite) {
+        console.log('User has pending invite, checking for invite token...');
+        const pendingInviteToken = typeof window !== 'undefined'
+          ? localStorage.getItem("pendingInviteToken")
+          : null;
+
+        if (pendingInviteToken) {
+          // Redirect to invite page to accept
+          console.log('Redirecting to accept pending invite...');
+          window.location.href = `/auth/invite?token=${pendingInviteToken}`;
+          return { user: null, pendingInvite: true };
+        }
+
+        // No token stored, check API for pending invite
+        try {
+          const inviteResponse = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(payload.user.email)}`);
+          const inviteData = await inviteResponse.json();
+          if (inviteData.token) {
+            console.log('Found pending invite via API, redirecting...');
+            window.location.href = `/auth/invite?token=${inviteData.token}`;
+            return { user: null, pendingInvite: true };
+          }
+        } catch (e) {
+          console.error('Error checking for pending invite:', e);
+        }
       }
 
       const combined: UserWithOrg = {
@@ -89,10 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setOrganizations(payload.organizations);
       }
 
-      return combined;
+      return { user: combined };
     } catch (error) {
       console.error('Bootstrap API error:', error);
-      return null;
+      return { user: null };
     }
   }, []);
 
@@ -122,7 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // User exists but has no valid org - try bootstrap to fix it
         console.log('User has no valid org_id, attempting bootstrap...');
         const bootstrapResult = await bootstrapViaServer();
-        if (!bootstrapResult) {
+
+        // If user has pending invite, bootstrap will redirect them - don't continue
+        if (bootstrapResult.pendingInvite) {
+          return;
+        }
+
+        if (!bootstrapResult.user) {
           // Bootstrap failed - set user without org so they can at least see something
           if (userRecord) {
             setUserWithOrg({
@@ -149,7 +183,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!organization) {
         console.log('Organization not found, attempting bootstrap...');
         const bootstrapResult = await bootstrapViaServer();
-        if (!bootstrapResult) {
+
+        // If user has pending invite, bootstrap will redirect them - don't continue
+        if (bootstrapResult.pendingInvite) {
+          return;
+        }
+
+        if (!bootstrapResult.user) {
           setUserWithOrg({
             ...userRecord,
             organization: undefined,
