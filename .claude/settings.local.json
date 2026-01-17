@@ -6,7 +6,10 @@
       "Skill(frontend-design)",
       "Bash(npm run build:*)",
       "Bash(npm install:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
