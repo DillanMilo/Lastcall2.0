@@ -28,7 +28,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 export default function SettingsPage() {
-  const { isAdmin, userWithOrg } = useAuth();
+  const { isOwner, isAdmin, userWithOrg, canManageBilling, canInviteMembers, canManageSettings } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -548,7 +548,7 @@ export default function SettingsPage() {
       </div>
 
       {/* User Info Card */}
-      <Card className={isAdmin ? "border-primary/30 bg-primary/5" : ""}>
+      <Card className={isOwner ? "border-amber-500/30 bg-amber-500/5" : isAdmin ? "border-primary/30 bg-primary/5" : ""}>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             {/* Avatar */}
@@ -566,7 +566,12 @@ export default function SettingsPage() {
                   <UserCircle className="w-10 h-10 text-muted-foreground" />
                 </div>
               )}
-              {isAdmin && (
+              {isOwner && (
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
+                  <Shield className="w-3.5 h-3.5 text-white" />
+                </div>
+              )}
+              {isAdmin && !isOwner && (
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                   <Shield className="w-3.5 h-3.5 text-primary-foreground" />
                 </div>
@@ -579,8 +584,16 @@ export default function SettingsPage() {
                 <h2 className="text-lg font-semibold truncate">
                   {userWithOrg?.full_name || user?.full_name || user?.email?.split("@")[0] || "User"}
                 </h2>
-                <Badge variant={isAdmin ? "default" : "secondary"} className="shrink-0">
-                  {isAdmin ? (
+                <Badge
+                  variant={isOwner ? "default" : isAdmin ? "default" : "secondary"}
+                  className={isOwner ? "bg-amber-500 hover:bg-amber-600 shrink-0" : "shrink-0"}
+                >
+                  {isOwner ? (
+                    <span className="flex items-center gap-1">
+                      <Shield className="w-3 h-3" />
+                      Owner
+                    </span>
+                  ) : isAdmin ? (
                     <span className="flex items-center gap-1">
                       <Shield className="w-3 h-3" />
                       Admin
@@ -605,10 +618,10 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Admin Full Control Indicator */}
-            {isAdmin && (
+            {/* Owner/Admin Control Indicator */}
+            {isOwner && (
               <div className="hidden md:flex flex-col items-end text-right">
-                <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10">
+                <Badge variant="outline" className="border-amber-500/50 text-amber-600 bg-amber-500/10">
                   Full Control
                 </Badge>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -616,15 +629,36 @@ export default function SettingsPage() {
                 </p>
               </div>
             )}
+            {isAdmin && !isOwner && (
+              <div className="hidden md:flex flex-col items-end text-right">
+                <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10">
+                  Admin Access
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Team & Integrations
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Admin capabilities summary - mobile */}
-          {isAdmin && (
+          {/* Owner capabilities summary - mobile */}
+          {isOwner && (
             <div className="md:hidden mt-4 pt-4 border-t border-border/50">
-              <div className="flex items-center gap-2 text-sm text-primary">
+              <div className="flex items-center gap-2 text-sm text-amber-600">
                 <Shield className="w-4 h-4" />
                 <span className="font-medium">Full Control:</span>
                 <span className="text-muted-foreground">Billing, Team & Integrations</span>
+              </div>
+            </div>
+          )}
+
+          {/* Admin capabilities summary - mobile */}
+          {isAdmin && !isOwner && (
+            <div className="md:hidden mt-4 pt-4 border-t border-border/50">
+              <div className="flex items-center gap-2 text-sm text-primary">
+                <Shield className="w-4 h-4" />
+                <span className="font-medium">Admin Access:</span>
+                <span className="text-muted-foreground">Team & Integrations</span>
               </div>
             </div>
           )}
@@ -633,7 +667,7 @@ export default function SettingsPage() {
           {!isAdmin && (
             <div className="mt-4 pt-4 border-t border-border/50">
               <p className="text-sm text-muted-foreground">
-                Some settings are managed by your organization admin. Contact them to make changes to billing, team members, or integrations.
+                Some settings are managed by your organization owner or admin. Contact them to make changes to billing, team members, or integrations.
               </p>
             </div>
           )}
@@ -837,8 +871,8 @@ export default function SettingsPage() {
       {/* Usage & Limits */}
       <UsageDashboard />
 
-      {/* Subscription & Billing - Admin Only */}
-      {isAdmin ? (
+      {/* Subscription & Billing - Owner Only */}
+      {canManageBilling ? (
         <SubscriptionCard
           organization={organization}
           onSubscriptionChange={fetchUserData}
@@ -851,14 +885,16 @@ export default function SettingsPage() {
               Subscription & Billing
             </CardTitle>
             <CardDescription>
-              Contact your team admin to manage billing and subscription settings.
+              {isAdmin
+                ? "Billing is managed by the organization owner."
+                : "Contact your organization owner to manage billing and subscription settings."}
             </CardDescription>
           </CardHeader>
         </Card>
       )}
 
-      {/* Team Management - Admin Only */}
-      {isAdmin ? (
+      {/* Team Management - Owner & Admin */}
+      {canInviteMembers ? (
         <TeamManagement />
       ) : (
         <Card>
@@ -868,14 +904,14 @@ export default function SettingsPage() {
               Team Management
             </CardTitle>
             <CardDescription>
-              Contact your team admin to manage team members and invitations.
+              Contact your organization owner or admin to manage team members and invitations.
             </CardDescription>
           </CardHeader>
         </Card>
       )}
 
-      {/* Integrations Section - Admin Only */}
-      {isAdmin ? (
+      {/* Integrations Section - Owner & Admin */}
+      {canManageSettings ? (
         <Card>
           <CardHeader>
             <CardTitle>Integrations</CardTitle>
@@ -902,7 +938,7 @@ export default function SettingsPage() {
               Integrations
             </CardTitle>
             <CardDescription>
-              Contact your team admin to manage e-commerce integrations.
+              Contact your organization owner or admin to manage e-commerce integrations.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -201,8 +201,74 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (pendingInvite) {
-      // User has a pending invite - create user record without org
-      // They'll be assigned to the org when they accept the invite
+      // User has a pending invite - AUTO-ACCEPT it during bootstrap
+      // This ensures the user gets assigned to the org immediately
+      console.log('Auto-accepting pending invite during bootstrap for:', user.email);
+
+      // Get the full invite details
+      const { data: fullInvite } = await adminClient
+        .from('team_invites')
+        .select('id, org_id, role, email')
+        .eq('id', pendingInvite.id)
+        .single();
+
+      if (fullInvite) {
+        // Create or update user with the invite's org_id
+        const { data: newUser, error: userError } = await adminClient
+          .from('users')
+          .upsert({
+            id: user.id,
+            email: user.email || '',
+            full_name: (user.user_metadata as { full_name?: string } | null)?.full_name || null,
+            org_id: fullInvite.org_id, // Set to invite's org immediately!
+            role: fullInvite.role || 'member',
+          }, { onConflict: 'id' })
+          .select('*')
+          .single();
+
+        if (userError) {
+          console.error('Error creating user record for invited user:', userError);
+          return NextResponse.json(
+            { error: userError.message || 'Failed to create user' },
+            { status: 500 }
+          );
+        }
+
+        // Add to user_organizations table
+        await adminClient
+          .from('user_organizations')
+          .upsert({
+            user_id: user.id,
+            org_id: fullInvite.org_id,
+            role: fullInvite.role || 'member',
+            is_active: true,
+            joined_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,org_id' });
+
+        // Mark invite as accepted
+        await adminClient
+          .from('team_invites')
+          .update({ accepted_at: new Date().toISOString() })
+          .eq('id', fullInvite.id);
+
+        console.log('Successfully auto-accepted invite, user org_id:', newUser?.org_id);
+
+        // Get the organization details
+        const { data: orgData } = await adminClient
+          .from('organizations')
+          .select('*')
+          .eq('id', fullInvite.org_id)
+          .single();
+
+        return NextResponse.json({
+          success: true,
+          user: newUser,
+          organization: orgData,
+          inviteAccepted: true, // Signal that invite was auto-accepted
+        });
+      }
+
+      // Fallback if invite details couldn't be fetched - create without org
       if (!existingUser) {
         const { data: newUser, error: userError } = await adminClient
           .from('users')
@@ -210,7 +276,7 @@ export async function POST(request: NextRequest) {
             id: user.id,
             email: user.email || '',
             full_name: (user.user_metadata as { full_name?: string } | null)?.full_name || null,
-            org_id: null, // No org yet - will be set when invite is accepted
+            org_id: null,
             role: 'member',
           })
           .select('*')
@@ -228,11 +294,10 @@ export async function POST(request: NextRequest) {
           success: true,
           user: newUser,
           organization: null,
-          pendingInvite: true, // Signal to frontend that user has pending invite
+          pendingInvite: true,
         });
       }
 
-      // Existing user without org, has pending invite
       return NextResponse.json({
         success: true,
         user: existingUser,
@@ -280,14 +345,14 @@ export async function POST(request: NextRequest) {
       .from('users')
       .update({
         org_id: targetOrg.id,
-        role: 'admin', // Organization creator is always admin
+        role: 'owner', // Organization creator is the owner
       })
       .eq('id', existingUser.id)
       .select('*')
       .single();
 
     if (updateError) {
-      console.error('Error updating user record (admin):', updateError);
+      console.error('Error updating user record:', updateError);
       return NextResponse.json(
         { error: updateError.message || 'Failed to update user' },
         { status: 500 }
@@ -300,7 +365,7 @@ export async function POST(request: NextRequest) {
       .upsert({
         user_id: existingUser.id,
         org_id: targetOrg.id,
-        role: 'admin',
+        role: 'owner',
         is_active: true,
       }, { onConflict: 'user_id,org_id' });
 
@@ -320,13 +385,13 @@ export async function POST(request: NextRequest) {
         email: user.email || '',
         full_name: (user.user_metadata as { full_name?: string } | null)?.full_name || null,
         org_id: targetOrg.id,
-        role: 'admin', // Organization creator is always admin
+        role: 'owner', // Organization creator is the owner
       })
       .select('*')
       .single();
 
     if (userError) {
-      console.error('Error creating user record (admin):', userError);
+      console.error('Error creating user record:', userError);
       return NextResponse.json(
         { error: userError.message || 'Failed to create user' },
         { status: 500 }
@@ -339,7 +404,7 @@ export async function POST(request: NextRequest) {
       .upsert({
         user_id: user.id,
         org_id: targetOrg.id,
-        role: 'admin',
+        role: 'owner',
         is_active: true,
       }, { onConflict: 'user_id,org_id' });
 

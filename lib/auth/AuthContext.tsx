@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
-export type UserRole = 'admin' | 'member';
+export type UserRole = 'owner' | 'admin' | 'member';
 
 export interface Organization {
   id: string;
@@ -40,11 +40,22 @@ interface AuthContextType {
   userWithOrg: UserWithOrg | null;
   orgId: string | null;
   loading: boolean;
-  isAdmin: boolean;
+  // Role checks - hierarchical permissions
+  isOwner: boolean;    // Only owners
+  isAdmin: boolean;    // Owners + Admins
+  isMember: boolean;   // Everyone (owners, admins, members)
+  role: UserRole | null;
   organizations: OrgMembership[];
   switchOrganization: (orgId: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   refetchUser: () => void;
+  // Permission helpers
+  canManageBilling: boolean;      // Owner only
+  canInviteMembers: boolean;      // Owner + Admin
+  canSwitchStores: boolean;       // Owner + Admin (multi-store)
+  canManageSettings: boolean;     // Owner + Admin
+  canViewInventory: boolean;      // Everyone
+  canEditInventory: boolean;      // Everyone
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -427,7 +438,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isAdmin = userWithOrg?.role === 'admin';
+  // Role and permission calculations
+  const role = (userWithOrg?.role as UserRole) || null;
+  const isOwner = role === 'owner';
+  const isAdmin = role === 'owner' || role === 'admin';  // Owners have admin privileges
+  const isMember = !!role;  // Any role means they're a member of the org
+
+  // Permission helpers based on role hierarchy
+  // Owner: Full access to everything
+  // Admin: Can manage team, settings, switch stores - but NOT billing
+  // Member: Can view/edit inventory, see reports - but NOT manage team or settings
+  const canManageBilling = isOwner;
+  const canInviteMembers = isAdmin;  // Owner + Admin
+  const canSwitchStores = isAdmin;   // Owner + Admin (for multi-store orgs)
+  const canManageSettings = isAdmin; // Owner + Admin
+  const canViewInventory = isMember; // Everyone
+  const canEditInventory = isMember; // Everyone
 
   return (
     <AuthContext.Provider value={{
@@ -435,11 +461,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userWithOrg,
       orgId,
       loading,
+      isOwner,
       isAdmin,
+      isMember,
+      role,
       organizations,
       switchOrganization,
       signOut,
       refetchUser,
+      canManageBilling,
+      canInviteMembers,
+      canSwitchStores,
+      canManageSettings,
+      canViewInventory,
+      canEditInventory,
     }}>
       {children}
     </AuthContext.Provider>

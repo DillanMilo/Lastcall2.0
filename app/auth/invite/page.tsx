@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -19,13 +21,15 @@ import {
   Users,
   ArrowRight,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 function InviteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
-  const [status, setStatus] = useState<"loading" | "valid" | "invalid" | "accepting" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "valid" | "invalid" | "accepting" | "success" | "error" | "creating">("loading");
   const [inviteInfo, setInviteInfo] = useState<{
     email: string;
     role: string;
@@ -34,6 +38,14 @@ function InviteContent() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [existingUser, setExistingUser] = useState(false);
+
+  // Password form state for new users
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuthAndValidate();
@@ -186,6 +198,83 @@ function InviteContent() {
     window.location.href = `/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}&fresh=1`;
   };
 
+  // Create account with password - simplified flow for invited users
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setError(null);
+
+    // Validate password
+    if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+
+    setStatus("creating");
+
+    try {
+      const response = await fetch("/api/team/invites/accept-with-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          password,
+          fullName: fullName.trim() || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // Check if the error indicates an existing user
+        if (result.existingUser) {
+          setExistingUser(true);
+          setError("An account with this email already exists. Please sign in instead.");
+          setStatus("valid");
+          return;
+        }
+        setError(result.error || "Failed to create account");
+        setStatus("error");
+        return;
+      }
+
+      // Account created successfully!
+      setStatus("success");
+
+      // Clean up the pending invite token
+      localStorage.removeItem("pendingInviteToken");
+
+      // Set Remember Me so they stay logged in
+      localStorage.setItem("rememberMe", "true");
+      sessionStorage.setItem("activeSession", "true");
+
+      // Sign in the new user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: inviteInfo?.email || "",
+        password: password,
+      });
+
+      if (signInError) {
+        console.error("Auto sign-in error:", signInError);
+        // Still redirect - they can sign in manually
+      }
+
+      // Redirect to dashboard after short delay
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 2000);
+    } catch (err) {
+      console.error("Create account error:", err);
+      setError("Failed to create account. Please try again.");
+      setStatus("error");
+    }
+  };
+
   if (status === "loading") {
     return (
       <Card className="w-full max-w-md">
@@ -323,28 +412,125 @@ function InviteContent() {
             )}
             Accept Invite
           </Button>
-        ) : (
+        ) : emailMismatch ? (
+          /* Email mismatch - need to switch accounts */
           <div className="space-y-3">
-            {!emailMismatch && (
-              <p className="text-sm text-center text-muted-foreground">
-                Sign in or create an account to accept this invite
-              </p>
-            )}
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" onClick={handleSignIn}>
-                {emailMismatch ? "Switch Account" : "Sign In"}
+                Switch Account
               </Button>
               <Button onClick={handleSignUp}>
-                {emailMismatch ? "Create Account" : "Sign Up"}
+                Create Account
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
-            {emailMismatch && (
-              <p className="text-xs text-center text-muted-foreground">
-                You&apos;ll be signed out and can sign in as {inviteInfo?.email}
-              </p>
-            )}
+            <p className="text-xs text-center text-muted-foreground">
+              You&apos;ll be signed out and can sign in as {inviteInfo?.email}
+            </p>
           </div>
+        ) : existingUser ? (
+          /* User already has an account - prompt to sign in */
+          <div className="space-y-3">
+            <p className="text-sm text-center text-muted-foreground">
+              You already have an account. Please sign in to accept this invite.
+            </p>
+            <Button className="w-full" onClick={handleSignIn}>
+              Sign In
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        ) : (
+          /* New user - show password creation form */
+          <form onSubmit={handleCreateAccount} className="space-y-4">
+            <p className="text-sm text-center text-muted-foreground">
+              Create your account to join the team
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name (optional)</Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="John Smith"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={status === "creating"}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create a password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={status === "creating"}
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={status === "creating"}
+                required
+                minLength={6}
+              />
+            </div>
+
+            {passwordError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {passwordError}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={status === "creating"}
+            >
+              {status === "creating" ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Create Account & Join Team
+            </Button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              Already have an account?{" "}
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={handleSignIn}
+              >
+                Sign in instead
+              </button>
+            </p>
+          </form>
         )}
       </CardContent>
     </Card>

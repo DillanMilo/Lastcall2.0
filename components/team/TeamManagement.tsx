@@ -54,7 +54,7 @@ export function TeamManagement() {
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member"); // Owners cannot be invited, only created
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -313,7 +313,9 @@ export function TeamManagement() {
             <div className="space-y-2">
               {data.members.map((member) => {
                 const isCurrentUser = member.id === data.currentUser.id;
+                const isOwner = member.role === "owner";
                 const isAdmin = member.role === "admin";
+                const hasElevatedRole = isOwner || isAdmin;
 
                 return (
                   <div
@@ -327,6 +329,7 @@ export function TeamManagement() {
                       <div
                         className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                          isOwner ? "bg-amber-500/10 text-amber-600" :
                           isAdmin ? "bg-primary/10 text-primary" : "bg-muted"
                         )}
                       >
@@ -344,13 +347,19 @@ export function TeamManagement() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isAdmin && (
+                      {isOwner && (
+                        <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600">
+                          <Crown className="h-3 w-3" />
+                          Owner
+                        </span>
+                      )}
+                      {isAdmin && !isOwner && (
                         <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
                           <Crown className="h-3 w-3" />
                           Admin
                         </span>
                       )}
-                      {!isAdmin && (
+                      {!hasElevatedRole && (
                         <span className="text-xs px-2 py-1 rounded-full bg-muted capitalize">
                           Member
                         </span>
