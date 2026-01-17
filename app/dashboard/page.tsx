@@ -130,13 +130,38 @@ export default function DashboardPage() {
       return;
     }
 
-    // If we have a user but no orgId, check for pending invite
+    // If we have a user but no orgId, check for pending invite in localStorage
     const pendingInviteToken = localStorage.getItem("pendingInviteToken");
     if (pendingInviteToken) {
       // User has a pending invite, redirect them to accept it
       window.location.href = `/auth/invite?token=${pendingInviteToken}`;
       return;
     }
+
+    // Also check the database for pending invites for this user
+    const checkPendingInvite = async () => {
+      if (!user?.email) return null;
+
+      try {
+        const response = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(user.email)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.token) {
+            return data.token;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for pending invite:', error);
+      }
+      return null;
+    };
+
+    // Check for pending invite and redirect if found
+    checkPendingInvite().then((token) => {
+      if (token) {
+        window.location.href = `/auth/invite?token=${token}`;
+      }
+    });
 
     // Set a timeout - if no orgId after 5 seconds, show stuck state
     const timeout = setTimeout(() => {
@@ -230,11 +255,17 @@ export default function DashboardPage() {
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground mb-2">What you can try:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>Check your email for a team invite and accept it</li>
+                <li><strong>Check your email</strong> for a team invite link and click it</li>
+                <li>Make sure you&apos;re signed in with the <strong>same email</strong> the invite was sent to</li>
                 <li>Refresh the page to retry loading</li>
-                <li>Sign out and sign back in</li>
+                <li>Sign out and sign back in with the correct account</li>
               </ul>
             </div>
+            {user?.email && (
+              <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
+                Currently signed in as: <span className="font-medium text-foreground">{user.email}</span>
+              </div>
+            )}
             <div className="flex gap-3">
               <Button variant="outline" onClick={handleRefresh} className="flex-1">
                 <RefreshCw className="h-4 w-4 mr-2" />
