@@ -95,9 +95,9 @@ function InviteContent() {
 
       setStatus("success");
 
-      // Redirect to dashboard after short delay
+      // Redirect to dashboard after short delay - use hard refresh to reload auth state
       setTimeout(() => {
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       }, 2000);
     } catch {
       setError("Failed to accept invite");
