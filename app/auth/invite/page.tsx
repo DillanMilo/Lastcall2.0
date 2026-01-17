@@ -64,6 +64,47 @@ function InviteContent() {
       }
 
       setInviteInfo(result.invite);
+
+      // AUTO-ACCEPT: If user is authenticated and email matches, automatically accept the invite
+      // This streamlines the flow for users coming from email verification
+      if (user && result.invite?.email &&
+          user.email?.toLowerCase() === result.invite.email.toLowerCase()) {
+        console.log('Auto-accepting invite for matching email...');
+        setStatus("accepting");
+
+        try {
+          const acceptResponse = await fetch("/api/team/invites/accept", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+
+          const acceptResult = await acceptResponse.json();
+
+          if (!acceptResponse.ok) {
+            // If auto-accept fails, fall back to manual accept
+            console.error('Auto-accept failed:', acceptResult);
+            setStatus("valid");
+            return;
+          }
+
+          setStatus("success");
+          // Clean up the pending invite token
+          localStorage.removeItem("pendingInviteToken");
+
+          // Redirect to dashboard after short delay
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 2000);
+          return;
+        } catch (autoAcceptError) {
+          console.error('Auto-accept error:', autoAcceptError);
+          // Fall back to manual accept
+          setStatus("valid");
+          return;
+        }
+      }
+
       setStatus("valid");
     } catch {
       setStatus("invalid");
