@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/email';
+import { generateWelcomeEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -165,25 +167,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already belongs to an org
-    const { data: existingUser } = await adminClient
-      .from('users')
-      .select('org_id')
-      .eq('id', user.id)
-      .single();
+    // Validate the invite has a proper org_id
+    if (!invite.org_id || invite.org_id === '00000000-0000-0000-0000-000000000000') {
+      console.error('Invalid invite org_id:', invite.org_id);
+      return NextResponse.json(
+        { error: 'Invalid invite - organization not found' },
+        { status: 400 }
+      );
+    }
 
-    if (existingUser?.org_id && existingUser.org_id !== invite.org_id) {
+    console.log('Processing invite acceptance:', {
+      userId: user.id,
+      userEmail: user.email,
+      inviteOrgId: invite.org_id,
+      inviteRole: invite.role,
+    });
+
+    // Check if user already belongs to this specific org
+    const { data: existingMembership } = await adminClient
+      .from('user_organizations')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('org_id', invite.org_id)
+      .maybeSingle();
+
+    if (existingMembership) {
       return NextResponse.json(
         {
-          error: 'Already in another organization',
-          message: 'You are already a member of another organization. Please contact support to switch organizations.',
+          error: 'Already a member',
+          message: 'You are already a member of this organization.',
         },
         { status: 400 }
       );
     }
 
-    // Update or create user record
-    const { error: userError } = await adminClient
+    // Update or create user record (set this org as their primary/current org)
+    const { data: updatedUser, error: userError } = await adminClient
       .from('users')
       .upsert({
         id: user.id,
@@ -191,7 +210,11 @@ export async function POST(request: NextRequest) {
         full_name: user.user_metadata?.full_name || null,
         org_id: invite.org_id,
         role: invite.role,
-      }, { onConflict: 'id' });
+      }, { onConflict: 'id' })
+      .select('id, org_id, role')
+      .single();
+
+    console.log('User upsert result:', { updatedUser, userError });
 
     if (userError) {
       console.error('Error updating user:', userError);
@@ -199,6 +222,28 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to join organization' },
         { status: 500 }
       );
+    }
+
+    // Deactivate all other org memberships for this user
+    await adminClient
+      .from('user_organizations')
+      .update({ is_active: false })
+      .eq('user_id', user.id);
+
+    // Add to user_organizations table with this org as active
+    const { error: membershipError } = await adminClient
+      .from('user_organizations')
+      .upsert({
+        user_id: user.id,
+        org_id: invite.org_id,
+        role: invite.role,
+        is_active: true,
+        joined_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,org_id' });
+
+    if (membershipError) {
+      console.error('Error creating org membership:', membershipError);
+      // Non-fatal - user record was already updated
     }
 
     // Mark invite as accepted
@@ -214,9 +259,31 @@ export async function POST(request: NextRequest) {
       .eq('id', invite.org_id)
       .single();
 
+    const organizationName = orgData?.name || 'the team';
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    // Send welcome email
+    const { subject, html } = generateWelcomeEmail({
+      userName: user.user_metadata?.full_name,
+      userEmail: user.email!,
+      organizationName,
+      role: invite.role as 'admin' | 'member',
+      dashboardUrl: `${siteUrl}/dashboard`,
+    });
+
+    const emailResult = await sendEmail({
+      to: user.email!,
+      subject,
+      html,
+    });
+
+    if (!emailResult.success) {
+      console.warn('Failed to send welcome email:', emailResult.error);
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Welcome to ${orgData?.name || 'the team'}!`,
+      message: `Welcome to ${organizationName}!`,
       organizationId: invite.org_id,
     });
   } catch (error) {

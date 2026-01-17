@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
@@ -24,6 +24,7 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const prefilledEmail = searchParams.get("email") ?? "";
   const verifyReminder = searchParams.get("verify");
+  const redirectUrl = searchParams.get("redirect");
   const [email, setEmail] = useState(prefilledEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,24 @@ function SignInContent() {
     setEmail(prefilledEmail);
     setResetEmail(prefilledEmail);
   }, [prefilledEmail]);
+
+  // Helper to handle redirect after successful authentication
+  const handleSuccessfulAuth = useCallback(() => {
+    // Check for pending invite token first
+    const pendingInviteToken = localStorage.getItem("pendingInviteToken");
+    if (pendingInviteToken) {
+      localStorage.removeItem("pendingInviteToken"); // Clean up
+      window.location.href = `/auth/invite?token=${pendingInviteToken}`;
+      return;
+    }
+    // Check for redirect URL from query params
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+      return;
+    }
+    // Default to dashboard
+    router.replace("/dashboard");
+  }, [redirectUrl, router]);
 
   useEffect(() => {
     if (verifyReminder) {
@@ -88,7 +107,7 @@ function SignInContent() {
           }
 
           if (data.session && active) {
-            router.replace("/dashboard");
+            handleSuccessfulAuth();
             return;
           }
         } catch (err: unknown) {
@@ -106,7 +125,7 @@ function SignInContent() {
       } = await supabase.auth.getSession();
 
       if (session && active) {
-        router.replace("/dashboard");
+        handleSuccessfulAuth();
       }
     };
 
@@ -116,7 +135,7 @@ function SignInContent() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        router.replace("/dashboard");
+        handleSuccessfulAuth();
       }
     });
 
@@ -124,7 +143,7 @@ function SignInContent() {
       active = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [handleSuccessfulAuth]);
 
   const disableForm = useMemo(
     () => loading || demoLoading || processingVerification,
@@ -158,7 +177,7 @@ function SignInContent() {
       }
 
       setMessage("Signing you in...");
-      router.replace("/dashboard");
+      handleSuccessfulAuth();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unable to sign in right now.";
       setError(errorMessage);
@@ -193,7 +212,7 @@ function SignInContent() {
         return;
       }
 
-      router.replace("/dashboard");
+      handleSuccessfulAuth();
     } catch (err: unknown) {
       setDemoLoading(false);
       const errorMessage = err instanceof Error ? err.message : "Unable to sign in to the demo account.";

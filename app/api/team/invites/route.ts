@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { checkUserLimit } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 import { randomBytes } from 'crypto';
+import { sendEmail } from '@/lib/email';
+import { generateTeamInviteEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -129,13 +131,21 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/team/invites
- * Create a new team invite
+ * Create a new team invite (Admin only)
  */
 export async function POST(request: NextRequest) {
   try {
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only admins can invite team members
+    if (userOrg.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden', message: 'Only admins can invite team members' },
+        { status: 403 }
+      );
     }
 
     const { email, role = 'member' } = await request.json();
@@ -259,11 +269,48 @@ export async function POST(request: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const inviteUrl = `${siteUrl}/auth/invite?token=${token}`;
 
+    // Get inviter's name for the email
+    const { data: inviterData } = await adminClient
+      .from('users')
+      .select('full_name, email')
+      .eq('id', userOrg.userId)
+      .single();
+
+    const inviterName = inviterData?.full_name || inviterData?.email?.split('@')[0] || 'A team member';
+
+    // Send invitation email
+    const { subject, html } = generateTeamInviteEmail({
+      inviteeEmail: normalizedEmail,
+      inviterName,
+      organizationName: orgData.name || 'Your Team',
+      role: role === 'admin' ? 'admin' : 'member',
+      inviteUrl,
+      expiresInDays: 7,
+    });
+
+    const emailResult = await sendEmail({
+      to: normalizedEmail,
+      subject,
+      html,
+    });
+
+    if (!emailResult.success) {
+      console.error('Failed to send invite email:', emailResult.error);
+      console.error('Email details - To:', normalizedEmail, 'Error:', emailResult.error);
+    } else {
+      console.log('Invite email sent successfully to:', normalizedEmail, 'Message ID:', emailResult.messageId);
+    }
+
     return NextResponse.json({
       success: true,
       invite,
       inviteUrl,
-      message: `Invite sent to ${normalizedEmail}`,
+      emailSent: emailResult.success,
+      emailError: emailResult.error || null,
+      emailMessageId: emailResult.messageId || null,
+      message: emailResult.success
+        ? `Invitation email sent to ${normalizedEmail}`
+        : `Invite created for ${normalizedEmail}. Email delivery failed: ${emailResult.error || 'Unknown error'}. Share the link manually.`,
     });
   } catch (error) {
     console.error('Error in POST /api/team/invites:', error);
@@ -273,13 +320,21 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/team/invites
- * Cancel a pending invite
+ * Cancel a pending invite (Admin only)
  */
 export async function DELETE(request: NextRequest) {
   try {
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only admins can cancel invites
+    if (userOrg.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden', message: 'Only admins can cancel invites' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
