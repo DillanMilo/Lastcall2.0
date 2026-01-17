@@ -159,6 +159,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // ALWAYS fetch the user's organizations list for multi-org support
+      // This enables the organization switcher for users with multiple orgs
+      const { data: userOrgs, error: userOrgsError } = await supabase
+        .from('user_organizations')
+        .select(`
+          org_id,
+          role,
+          is_active,
+          organizations (
+            id,
+            name,
+            subscription_tier,
+            subscription_status,
+            stripe_customer_id,
+            stripe_subscription_id,
+            subscription_period_end,
+            payment_failed_at,
+            canceled_at,
+            is_read_only
+          )
+        `)
+        .eq('user_id', userId);
+
+      if (userOrgsError) {
+        console.error('Error fetching user organizations:', userOrgsError.message || userOrgsError);
+      }
+
+      // Transform and set organizations list
+      if (userOrgs && userOrgs.length > 0) {
+        const orgsList: OrgMembership[] = userOrgs.map(uo => ({
+          org_id: uo.org_id,
+          role: uo.role as UserRole,
+          is_active: uo.is_active,
+          organization: (Array.isArray(uo.organizations) ? uo.organizations[0] : uo.organizations) as Organization,
+        }));
+        setOrganizations(orgsList);
+      }
+
       setUserWithOrg({
         ...userRecord,
         organization: organization ?? undefined,

@@ -201,6 +201,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // IMPORTANT: Before switching orgs, ensure user's CURRENT org is in user_organizations
+    // This preserves their ability to switch back to their original org
+    const { data: currentUserRecord } = await adminClient
+      .from('users')
+      .select('org_id, role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (currentUserRecord?.org_id && currentUserRecord.org_id !== invite.org_id) {
+      // Check if their current org is already in user_organizations
+      const { data: currentOrgMembership } = await adminClient
+        .from('user_organizations')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('org_id', currentUserRecord.org_id)
+        .maybeSingle();
+
+      // If not, add it (will be marked inactive when we switch)
+      if (!currentOrgMembership) {
+        console.log('Preserving user\'s original org in user_organizations:', currentUserRecord.org_id);
+        await adminClient
+          .from('user_organizations')
+          .insert({
+            user_id: user.id,
+            org_id: currentUserRecord.org_id,
+            role: currentUserRecord.role || 'admin',
+            is_active: false, // Will be inactive after switch
+            joined_at: new Date().toISOString(),
+          });
+      }
+    }
+
     // Update or create user record (set this org as their primary/current org)
     const { data: updatedUser, error: userError } = await adminClient
       .from('users')
