@@ -295,8 +295,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!emailResult.success) {
-      console.warn('Failed to send invite email:', emailResult.error);
-      // Don't fail the request - the invite was created, just log the email failure
+      console.error('Failed to send invite email:', emailResult.error);
+      console.error('Email details - To:', normalizedEmail, 'Error:', emailResult.error);
+    } else {
+      console.log('Invite email sent successfully to:', normalizedEmail, 'Message ID:', emailResult.messageId);
     }
 
     return NextResponse.json({
@@ -304,9 +306,11 @@ export async function POST(request: NextRequest) {
       invite,
       inviteUrl,
       emailSent: emailResult.success,
+      emailError: emailResult.error || null,
+      emailMessageId: emailResult.messageId || null,
       message: emailResult.success
         ? `Invitation email sent to ${normalizedEmail}`
-        : `Invite created for ${normalizedEmail}. Email delivery failed - share the link manually.`,
+        : `Invite created for ${normalizedEmail}. Email delivery failed: ${emailResult.error || 'Unknown error'}. Share the link manually.`,
     });
   } catch (error) {
     console.error('Error in POST /api/team/invites:', error);
