@@ -108,12 +108,16 @@ function InviteContent() {
   const handleSignIn = () => {
     // Store the invite token for after sign in
     localStorage.setItem("pendingInviteToken", token || "");
-    router.push(`/auth/signin?redirect=/auth/invite?token=${token}`);
+    // Properly encode the redirect URL to avoid query param parsing issues
+    const redirectUrl = `/auth/invite?token=${token}`;
+    router.push(`/auth/signin?redirect=${encodeURIComponent(redirectUrl)}`);
   };
 
   const handleSignUp = () => {
     localStorage.setItem("pendingInviteToken", token || "");
-    router.push(`/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=/auth/invite?token=${token}`);
+    // Properly encode the redirect URL to avoid query param parsing issues
+    const redirectUrl = `/auth/invite?token=${token}`;
+    router.push(`/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}`);
   };
 
   if (status === "loading") {

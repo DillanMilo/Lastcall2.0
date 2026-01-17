@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Package,
   AlertCircle,
@@ -20,6 +21,8 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
+  LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { daysUntilExpiration } from "@/lib/utils";
 import Link from "next/link";
@@ -27,9 +30,10 @@ import { UsageDashboard } from "@/components/billing/UsageDashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, orgId, loading: authLoading } = useAuth();
+  const { user, orgId, loading: authLoading, signOut } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stuckState, setStuckState] = useState(false);
 
   const isSupabaseConfigured =
     !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -118,6 +122,7 @@ export default function DashboardPage() {
     }
 
     if (orgId) {
+      setStuckState(false);
       const aiChatKey = `ai-chat-${orgId}`;
       localStorage.removeItem(aiChatKey);
 
@@ -125,11 +130,22 @@ export default function DashboardPage() {
       return;
     }
 
+    // If we have a user but no orgId, check for pending invite
+    const pendingInviteToken = localStorage.getItem("pendingInviteToken");
+    if (pendingInviteToken) {
+      // User has a pending invite, redirect them to accept it
+      window.location.href = `/auth/invite?token=${pendingInviteToken}`;
+      return;
+    }
+
+    // Set a timeout - if no orgId after 5 seconds, show stuck state
     const timeout = setTimeout(() => {
       if (!orgId && user) {
-        console.warn('User authenticated but no orgId found. User record may need to be created.');
+        console.warn('User authenticated but no orgId found after timeout.');
+        setStuckState(true);
+        setLoading(false);
       }
-    }, 2000);
+    }, 5000);
     return () => clearTimeout(timeout);
   }, [authLoading, user, orgId, router, fetchInventory]);
 
@@ -180,6 +196,60 @@ export default function DashboardPage() {
   ];
 
   const isLoading = authLoading || loading;
+
+  const handleForceSignOut = async () => {
+    try {
+      localStorage.clear(); // Clear any stuck tokens
+      await signOut();
+      window.location.href = '/auth/signin';
+    } catch {
+      // Force redirect even if sign out fails
+      window.location.href = '/auth/signin';
+    }
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
+  // Show stuck state recovery UI
+  if (stuckState) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-8 w-8 text-amber-500" />
+            </div>
+            <CardTitle>Account Setup Incomplete</CardTitle>
+            <CardDescription>
+              Your account isn&apos;t fully set up yet. This can happen if you haven&apos;t accepted a team invite or if there was an issue during sign up.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-2">What you can try:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Check your email for a team invite and accept it</li>
+                <li>Refresh the page to retry loading</li>
+                <li>Sign out and sign back in</li>
+              </ul>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleRefresh} className="flex-1">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button onClick={handleForceSignOut} className="flex-1">
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
