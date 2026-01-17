@@ -16,7 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UserCircle, Upload, Save, Loader2, CheckCircle, Lock } from "lucide-react";
+import { UserCircle, Upload, Save, Loader2, CheckCircle, Lock, Shield, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
 import { UsageDashboard } from "@/components/billing/UsageDashboard";
 import { TeamManagement } from "@/components/team/TeamManagement";
@@ -27,7 +28,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 export default function SettingsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, userWithOrg } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -545,6 +546,99 @@ export default function SettingsPage() {
           Manage your account and preferences
         </p>
       </div>
+
+      {/* User Info Card */}
+      <Card className={isAdmin ? "border-primary/30 bg-primary/5" : ""}>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Avatar */}
+            <div className="relative">
+              {user?.avatar_url ? (
+                <Image
+                  src={user.avatar_url}
+                  alt="Profile"
+                  width={64}
+                  height={64}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-muted"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-muted">
+                  <UserCircle className="w-10 h-10 text-muted-foreground" />
+                </div>
+              )}
+              {isAdmin && (
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                  <Shield className="w-3.5 h-3.5 text-primary-foreground" />
+                </div>
+              )}
+            </div>
+
+            {/* User Details */}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h2 className="text-lg font-semibold truncate">
+                  {userWithOrg?.full_name || user?.full_name || user?.email?.split("@")[0] || "User"}
+                </h2>
+                <Badge variant={isAdmin ? "default" : "secondary"} className="shrink-0">
+                  {isAdmin ? (
+                    <span className="flex items-center gap-1">
+                      <Shield className="w-3 h-3" />
+                      Admin
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      Member
+                    </span>
+                  )}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground truncate">
+                {user?.email}
+              </p>
+              {organization && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  <span className="font-medium text-foreground">{organization.name}</span>
+                  {" · "}
+                  <span className="capitalize">{organization.subscription_tier} plan</span>
+                </p>
+              )}
+            </div>
+
+            {/* Admin Full Control Indicator */}
+            {isAdmin && (
+              <div className="hidden md:flex flex-col items-end text-right">
+                <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10">
+                  Full Control
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Billing, Team & Integrations
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Admin capabilities summary - mobile */}
+          {isAdmin && (
+            <div className="md:hidden mt-4 pt-4 border-t border-border/50">
+              <div className="flex items-center gap-2 text-sm text-primary">
+                <Shield className="w-4 h-4" />
+                <span className="font-medium">Full Control:</span>
+                <span className="text-muted-foreground">Billing, Team & Integrations</span>
+              </div>
+            </div>
+          )}
+
+          {/* Member limited access notice */}
+          {!isAdmin && (
+            <div className="mt-4 pt-4 border-t border-border/50">
+              <p className="text-sm text-muted-foreground">
+                Some settings are managed by your organization admin. Contact them to make changes to billing, team members, or integrations.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Success Message */}
       {success && (
