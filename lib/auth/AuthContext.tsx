@@ -4,11 +4,14 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
+export type UserRole = 'admin' | 'member';
+
 export interface UserWithOrg {
   id: string;
   email: string;
   full_name?: string;
   org_id: string;
+  role?: UserRole;
   organization?: {
     id: string;
     name: string;
@@ -28,6 +31,7 @@ interface AuthContextType {
   userWithOrg: UserWithOrg | null;
   orgId: string | null;
   loading: boolean;
+  isAdmin: boolean;
   signOut: () => Promise<void>;
   refetchUser: () => void;
 }
@@ -74,65 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createUserAndOrg = useCallback(async (userId: string) => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        return null;
-      }
-
-      const orgName = `${authUser.email?.split('@')[0] || 'User'}'s Organization`;
-
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: orgName,
-          subscription_tier: 'growth',
-        })
-        .select('*')
-        .single();
-
-      if (orgError) {
-        if (
-          typeof orgError.message === 'string' &&
-          orgError.message.toLowerCase().includes('row-level security')
-        ) {
-          return await bootstrapViaServer();
-        }
-        console.error('Error creating organization:', orgError.message || orgError);
-        return null;
-      }
-
-      const { data: newUser, error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          email: authUser.email || '',
-          full_name: authUser.user_metadata?.full_name || null,
-          org_id: newOrg.id,
-        })
-        .select('*')
-        .single();
-
-      if (userError) {
-        console.error('Error creating user record:', userError.message || userError);
-        return null;
-      }
-
-      const combined: UserWithOrg = {
-        ...newUser,
-        organization: newOrg ?? undefined,
-      };
-
-      setUserWithOrg(combined);
-      setOrgId(newUser.org_id);
-      return combined;
-    } catch (error) {
-      console.error('Error creating user and org:', error);
-      return null;
-    }
-  }, [bootstrapViaServer]);
-
   const fetchUserWithOrg = useCallback(async (userId: string) => {
     try {
       const { data: userRecord, error } = await supabase
@@ -147,8 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!userRecord || !userRecord.org_id) {
-        await createUserAndOrg(userId);
+      // Check for invalid/placeholder org_ids
+      const invalidOrgIds = ['00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000001'];
+      const hasValidOrgId = userRecord?.org_id && !invalidOrgIds.includes(userRecord.org_id);
+
+      if (!userRecord || !hasValidOrgId) {
+        // Try bootstrap to fix the user's org
+        const bootstrapResult = await bootstrapViaServer();
+        if (!bootstrapResult && userRecord) {
+          // Set user without org so UI doesn't break
+          setUserWithOrg({ ...userRecord, organization: undefined });
+        }
         setLoading(false);
         return;
       }
@@ -163,6 +117,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching organization:', orgError.message || orgError);
       }
 
+      // If org doesn't exist, try bootstrap
+      if (!organization) {
+        const bootstrapResult = await bootstrapViaServer();
+        if (!bootstrapResult) {
+          setUserWithOrg({ ...userRecord, organization: undefined });
+        }
+        setLoading(false);
+        return;
+      }
+
       setUserWithOrg({
         ...userRecord,
         organization: organization ?? undefined,
@@ -173,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error in fetchUserWithOrg:', error);
       setLoading(false);
     }
-  }, [createUserAndOrg]);
+  }, [bootstrapViaServer]);
 
   useEffect(() => {
     let isMounted = true;
@@ -280,12 +244,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isAdmin = userWithOrg?.role === 'admin';
+
   return (
     <AuthContext.Provider value={{
       user,
       userWithOrg,
       orgId,
       loading,
+      isAdmin,
       signOut,
       refetchUser,
     }}>
