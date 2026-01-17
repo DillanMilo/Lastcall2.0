@@ -207,6 +207,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
+          // Check "Remember Me" preference
+          // If user has an active session (same browser session) or checked "Remember Me", allow login
+          // Otherwise, sign them out (they didn't want to be remembered)
+          const hasActiveSession = sessionStorage.getItem("activeSession") === "true";
+          const rememberMe = localStorage.getItem("rememberMe") === "true";
+
+          if (!hasActiveSession && !rememberMe) {
+            // User didn't want to be remembered and this is a new browser session
+            console.log('Session found but user did not check "Remember Me" - signing out');
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+
+          // Mark this as an active session for page refreshes
+          sessionStorage.setItem("activeSession", "true");
+
           setUser(session.user);
           await fetchUserWithOrg(session.user.id);
         } else {
@@ -254,6 +271,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOrgId(null);
       setOrganizations([]);
 
+      // Clear remember me and session flags
+      localStorage.removeItem("rememberMe");
+      sessionStorage.removeItem("activeSession");
+
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
 
@@ -267,6 +288,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserWithOrg(null);
       setOrgId(null);
       setOrganizations([]);
+      localStorage.removeItem("rememberMe");
+      sessionStorage.removeItem("activeSession");
     }
   };
 

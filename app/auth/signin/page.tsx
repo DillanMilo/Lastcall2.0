@@ -40,6 +40,7 @@ function SignInContent() {
   const [resetEmail, setResetEmail] = useState(prefilledEmail);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
     setEmail(prefilledEmail);
@@ -107,6 +108,9 @@ function SignInContent() {
           }
 
           if (data.session && active) {
+            // Email verification - mark as active session
+            // Don't auto-remember, user can sign in again with "remember me" if they want
+            sessionStorage.setItem("activeSession", "true");
             handleSuccessfulAuth();
             return;
           }
@@ -176,6 +180,15 @@ function SignInContent() {
         return;
       }
 
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem("rememberMe", "true");
+      } else {
+        localStorage.removeItem("rememberMe");
+      }
+      // Mark this as an active session
+      sessionStorage.setItem("activeSession", "true");
+
       setMessage("Signing you in...");
       handleSuccessfulAuth();
     } catch (err: unknown) {
@@ -211,6 +224,10 @@ function SignInContent() {
         );
         return;
       }
+
+      // Demo logins don't persist - session only
+      localStorage.removeItem("rememberMe");
+      sessionStorage.setItem("activeSession", "true");
 
       handleSuccessfulAuth();
     } catch (err: unknown) {
@@ -301,6 +318,20 @@ function SignInContent() {
               disabled={disableForm}
               autoComplete="current-password"
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={disableForm}
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+              Remember me
+            </Label>
           </div>
 
           {error && (

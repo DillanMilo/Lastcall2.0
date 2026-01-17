@@ -80,6 +80,8 @@ function SignUpContent() {
 
       if (data.session) {
         await new Promise((resolve) => setTimeout(resolve, 100));
+        // New signups don't auto-remember - user can sign in with "remember me" later
+        sessionStorage.setItem("activeSession", "true");
         // Check for pending invite or redirect URL
         const pendingInviteToken = localStorage.getItem("pendingInviteToken");
         if (pendingInviteToken) {
