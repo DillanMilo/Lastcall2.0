@@ -170,8 +170,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!userRecord || !userRecord.org_id) {
-        await createUserAndOrg(userId);
+      // Check for invalid/placeholder org_ids
+      const invalidOrgIds = [
+        null,
+        undefined,
+        '',
+        '00000000-0000-0000-0000-000000000000',
+        '00000000-0000-0000-0000-000000000001',
+      ];
+
+      const hasValidOrgId = userRecord?.org_id && !invalidOrgIds.includes(userRecord.org_id);
+
+      if (!userRecord || !hasValidOrgId) {
+        // User exists but has no valid org - try bootstrap to fix it
+        console.log('User has no valid org_id, attempting bootstrap...');
+        const bootstrapResult = await bootstrapViaServer();
+        if (!bootstrapResult) {
+          // Bootstrap failed - set user without org so they can at least see something
+          if (userRecord) {
+            setUserWithOrg({
+              ...userRecord,
+              organization: undefined,
+            });
+          }
+        }
         setLoading(false);
         return;
       }
@@ -186,6 +208,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching organization:', orgError.message || orgError);
       }
 
+      // If organization doesn't exist, try bootstrap
+      if (!organization) {
+        console.log('Organization not found, attempting bootstrap...');
+        const bootstrapResult = await bootstrapViaServer();
+        if (!bootstrapResult) {
+          setUserWithOrg({
+            ...userRecord,
+            organization: undefined,
+          });
+        }
+        setLoading(false);
+        return;
+      }
+
       setUserWithOrg({
         ...userRecord,
         organization: organization ?? undefined,
@@ -196,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error in fetchUserWithOrg:', error);
       setLoading(false);
     }
-  }, [createUserAndOrg]);
+  }, [bootstrapViaServer]);
 
   useEffect(() => {
     let isMounted = true;

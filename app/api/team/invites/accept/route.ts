@@ -167,6 +167,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate the invite has a proper org_id
+    if (!invite.org_id || invite.org_id === '00000000-0000-0000-0000-000000000000') {
+      console.error('Invalid invite org_id:', invite.org_id);
+      return NextResponse.json(
+        { error: 'Invalid invite - organization not found' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Processing invite acceptance:', {
+      userId: user.id,
+      userEmail: user.email,
+      inviteOrgId: invite.org_id,
+      inviteRole: invite.role,
+    });
+
     // Check if user already belongs to this specific org
     const { data: existingMembership } = await adminClient
       .from('user_organizations')
@@ -186,7 +202,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update or create user record (set this org as their primary/current org)
-    const { error: userError } = await adminClient
+    const { data: updatedUser, error: userError } = await adminClient
       .from('users')
       .upsert({
         id: user.id,
@@ -194,7 +210,11 @@ export async function POST(request: NextRequest) {
         full_name: user.user_metadata?.full_name || null,
         org_id: invite.org_id,
         role: invite.role,
-      }, { onConflict: 'id' });
+      }, { onConflict: 'id' })
+      .select('id, org_id, role')
+      .single();
+
+    console.log('User upsert result:', { updatedUser, userError });
 
     if (userError) {
       console.error('Error updating user:', userError);

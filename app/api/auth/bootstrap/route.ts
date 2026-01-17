@@ -177,7 +177,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (existingUser && existingUser.org_id) {
+  // Check for valid org_id (not placeholder values)
+  const invalidOrgIds = [
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000001',
+  ];
+  const hasValidOrgId = existingUser?.org_id && !invalidOrgIds.includes(existingUser.org_id);
+
+  if (existingUser && hasValidOrgId) {
     return buildResponse(existingUser);
   }
 
@@ -260,7 +267,10 @@ export async function POST(request: NextRequest) {
 
   let targetOrg = null;
 
-  if (existingUser && !existingUser.org_id) {
+  // Handle existing user without valid org (including placeholder org_ids)
+  const existingUserNeedsOrg = existingUser && (!existingUser.org_id || invalidOrgIds.includes(existingUser.org_id));
+
+  if (existingUserNeedsOrg) {
     targetOrg = await ensureOrganization();
 
     const {
