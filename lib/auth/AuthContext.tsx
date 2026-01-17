@@ -251,7 +251,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const hasActiveSession = sessionStorage.getItem("activeSession") === "true";
           const rememberMe = localStorage.getItem("rememberMe") === "true";
 
-          if (!hasActiveSession && !rememberMe) {
+          // Don't apply "Remember Me" check in these cases:
+          // 1. Auth pages handle their own session management
+          // 2. Email verification flows (hash params with tokens)
+          // 3. Pending invite flows (user is accepting an invite)
+          const isAuthPage = typeof window !== 'undefined' &&
+            (window.location.pathname.startsWith('/auth/') ||
+             window.location.hash.includes('access_token'));
+          const hasPendingInvite = typeof window !== 'undefined' &&
+            localStorage.getItem("pendingInviteToken");
+
+          if (!hasActiveSession && !rememberMe && !isAuthPage && !hasPendingInvite) {
             // User didn't want to be remembered and this is a new browser session
             console.log('Session found but user did not check "Remember Me" - signing out');
             await supabase.auth.signOut();
