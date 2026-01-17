@@ -175,6 +175,7 @@ export async function syncInventoryItems({
         }
 
         // Build base item data (bigcommerce columns may not exist in DB yet)
+        // Items synced from external sources (BigCommerce, Shopify, etc.) are always stock items
         const itemData: Record<string, unknown> = {
           org_id: orgId,
           name: item.name,
@@ -185,6 +186,7 @@ export async function syncInventoryItems({
           category: item.category ?? aiData.category,
           ai_label: item.ai_label ?? aiData.ai_label,
           expiration_date: item.expiration_date ?? null,
+          item_type: 'stock', // Synced items are always stock (not operational)
         };
 
         const existing = await findExistingInventoryItem(supabase, orgId, item);

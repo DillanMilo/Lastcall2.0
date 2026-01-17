@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { InventoryItem } from "@/types";
+import { InventoryItem, ItemType, OPERATIONAL_CATEGORIES } from "@/types";
 import { useAuth } from "@/lib/auth/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
+  Boxes,
+  ShoppingCart,
 } from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
@@ -49,6 +51,7 @@ export default function InventoryPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [currentPage, setCurrentPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<ItemType>("stock");
 
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
@@ -61,7 +64,8 @@ export default function InventoryPage() {
       let query = supabase
         .from("inventory_items")
         .select("*", { count: "exact" })
-        .eq("org_id", orgId);
+        .eq("org_id", orgId)
+        .eq("item_type", activeTab);
 
       if (debouncedSearch) {
         query = query.or(
@@ -98,7 +102,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, currentPage, debouncedSearch]);
+  }, [orgId, currentPage, debouncedSearch, activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -107,6 +111,13 @@ export default function InventoryPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Reset page when tab changes
+  useEffect(() => {
+    setCurrentPage(0);
+    setSearchQuery("");
+    setDebouncedSearch("");
+  }, [activeTab]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -161,12 +172,37 @@ export default function InventoryPage() {
             Inventory
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {totalCount > 0 ? `${totalCount.toLocaleString()} items` : "Manage your stock"}
+            {totalCount > 0 ? `${totalCount.toLocaleString()} ${activeTab === 'stock' ? 'stock' : 'operational'} items` : `Manage your ${activeTab === 'stock' ? 'stock' : 'operational items'}`}
           </p>
         </div>
         <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
-          Add Item
+          Add {activeTab === 'stock' ? 'Stock' : 'Operational'} Item
+        </Button>
+      </div>
+
+      {/* Inventory Type Tabs */}
+      <div
+        className="flex gap-2 p-1 bg-muted rounded-xl w-fit animate-fade-up"
+        style={{ animationDelay: '50ms' }}
+      >
+        <Button
+          variant={activeTab === "stock" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveTab("stock")}
+          className="gap-2"
+        >
+          <ShoppingCart className="h-4 w-4" />
+          Stock Items
+        </Button>
+        <Button
+          variant={activeTab === "operational" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveTab("operational")}
+          className="gap-2"
+        >
+          <Boxes className="h-4 w-4" />
+          Operational
         </Button>
       </div>
 
@@ -174,7 +210,7 @@ export default function InventoryPage() {
       {lowStockItems.length > 0 && (
         <div
           className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/20 animate-fade-up"
-          style={{ animationDelay: '100ms' }}
+          style={{ animationDelay: '150ms' }}
         >
           <div className="w-10 h-10 rounded-lg bg-[hsl(var(--warning))]/20 flex items-center justify-center shrink-0">
             <AlertTriangle className="h-5 w-5 text-[hsl(var(--warning))]" />
@@ -194,7 +230,7 @@ export default function InventoryPage() {
       <Card
         variant="default"
         className="animate-fade-up"
-        style={{ animationDelay: '200ms' }}
+        style={{ animationDelay: '250ms' }}
       >
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -250,23 +286,35 @@ export default function InventoryPage() {
           ) : items.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                <Package className="w-8 h-8 text-muted-foreground" />
+                {activeTab === 'stock' ? (
+                  <ShoppingCart className="w-8 h-8 text-muted-foreground" />
+                ) : (
+                  <Boxes className="w-8 h-8 text-muted-foreground" />
+                )}
               </div>
               <p className="text-lg font-medium mb-1">
-                {debouncedSearch ? "No results found" : "No inventory yet"}
+                {debouncedSearch
+                  ? "No results found"
+                  : activeTab === 'stock'
+                    ? "No stock items yet"
+                    : "No operational items yet"}
               </p>
               <p className="text-sm text-muted-foreground mb-6">
                 {debouncedSearch
                   ? `No items match "${debouncedSearch}"`
-                  : "Start by importing your inventory or adding items manually"}
+                  : activeTab === 'stock'
+                    ? "Start by importing your inventory or adding stock items manually"
+                    : "Add operational items like cleaning supplies, office materials, or tableware"}
               </p>
               {!debouncedSearch && (
                 <div className="flex gap-3 justify-center">
-                  <Button onClick={() => router.push("/dashboard/import")}>
-                    Import CSV
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowAddModal(true)}>
-                    Add Manually
+                  {activeTab === 'stock' && (
+                    <Button onClick={() => router.push("/dashboard/import")}>
+                      Import CSV
+                    </Button>
+                  )}
+                  <Button variant={activeTab === 'stock' ? "outline" : "default"} onClick={() => setShowAddModal(true)}>
+                    Add {activeTab === 'stock' ? 'Manually' : 'Operational Item'}
                   </Button>
                 </div>
               )}
@@ -359,7 +407,11 @@ export default function InventoryPage() {
                             : <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell>
-                          {item.category ? (
+                          {item.item_type === 'operational' && item.operational_category ? (
+                            <Badge variant="muted" size="sm">
+                              {OPERATIONAL_CATEGORIES.find(c => c.value === item.operational_category)?.label || item.operational_category}
+                            </Badge>
+                          ) : item.category ? (
                             <Badge variant="muted" size="sm">
                               {item.category}
                             </Badge>
@@ -427,6 +479,7 @@ export default function InventoryPage() {
           orgId={orgId}
           onClose={() => setShowAddModal(false)}
           onSuccess={fetchInventory}
+          itemType={activeTab}
         />
       )}
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { InventoryItem } from "@/types";
+import { InventoryItem, OPERATIONAL_CATEGORIES } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Package, Calendar, Tag } from "lucide-react";
+import { Edit2, Package, Calendar, Tag, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 interface InventoryCardProps {
@@ -23,6 +23,10 @@ export function InventoryCard({
   index = 0,
 }: InventoryCardProps) {
   const isLowStock = item.quantity <= item.reorder_threshold;
+  const isOperational = item.item_type === 'operational';
+  const operationalCategoryLabel = item.operational_category
+    ? OPERATIONAL_CATEGORIES.find(c => c.value === item.operational_category)?.label
+    : null;
 
   return (
     <Card
@@ -39,7 +43,15 @@ export function InventoryCard({
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-base line-clamp-2">{item.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-base line-clamp-2">{item.name}</h3>
+                {isOperational && (
+                  <Badge variant="outline" size="sm" className="shrink-0 text-purple-600 border-purple-300 dark:border-purple-700 dark:text-purple-400">
+                    <Boxes className="h-3 w-3 mr-1" />
+                    Ops
+                  </Badge>
+                )}
+              </div>
               {item.sku && (
                 <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                   SKU: {item.sku}
@@ -114,14 +126,14 @@ export function InventoryCard({
                 </span>
               </div>
             )}
-            {item.category && (
+            {(item.category || operationalCategoryLabel) && (
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Tag className="h-3.5 w-3.5" />
                   Category
                 </span>
                 <Badge variant="muted" size="sm">
-                  {item.category}
+                  {operationalCategoryLabel || item.category}
                 </Badge>
               </div>
             )}

@@ -16,6 +16,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-11-15",
     last_restock: "2024-10-28T09:30:00Z",
     created_at: "2024-02-05T14:00:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-002",
@@ -30,6 +31,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-08-20",
     last_restock: "2024-10-15T16:20:00Z",
     created_at: "2024-03-12T10:15:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-003",
@@ -44,6 +46,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-09-05",
     last_restock: "2024-11-04T12:05:00Z",
     created_at: "2024-03-22T08:45:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-004",
@@ -58,6 +61,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-06-12",
     last_restock: "2024-10-30T11:00:00Z",
     created_at: "2024-04-08T09:10:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-005",
@@ -72,6 +76,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2026-01-10",
     last_restock: "2024-09-25T14:45:00Z",
     created_at: "2024-04-19T15:30:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-006",
@@ -86,6 +91,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-12-05",
     last_restock: "2024-09-25T14:45:00Z",
     created_at: "2024-04-19T15:45:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-007",
@@ -100,6 +106,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-07-18",
     last_restock: "2024-10-18T10:25:00Z",
     created_at: "2024-05-03T13:05:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-008",
@@ -114,6 +121,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-10-01",
     last_restock: "2024-10-18T10:25:00Z",
     created_at: "2024-05-03T13:20:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-009",
@@ -128,6 +136,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2026-02-28",
     last_restock: "2024-09-12T09:50:00Z",
     created_at: "2024-05-28T11:40:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-010",
@@ -142,6 +151,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2026-03-15",
     last_restock: "2024-09-12T09:50:00Z",
     created_at: "2024-05-28T11:55:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-011",
@@ -156,6 +166,7 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-09-28",
     last_restock: "2024-10-08T08:20:00Z",
     created_at: "2024-06-11T10:05:00Z",
+    item_type: "stock",
   },
   {
     id: "demo-item-012",
@@ -170,5 +181,6 @@ export const demoInventoryItems: InventoryItem[] = [
     expiration_date: "2025-09-28",
     last_restock: "2024-10-08T08:20:00Z",
     created_at: "2024-06-11T10:20:00Z",
+    item_type: "stock",
   },
 ];

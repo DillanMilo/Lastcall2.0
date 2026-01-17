@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { ItemType, OperationalCategory, OPERATIONAL_CATEGORIES } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { X, Upload, Check, AlertCircle, Search, Package } from "lucide-react";
+import { X, Upload, Check, AlertCircle, Search, Package, Boxes } from "lucide-react";
 
 interface BigCommerceProduct {
   id: number;
@@ -25,14 +26,17 @@ interface AddItemModalProps {
   orgId: string;
   onClose: () => void;
   onSuccess: () => void;
+  itemType?: ItemType;
 }
 
-export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
+export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: AddItemModalProps) {
+  const isOperational = itemType === "operational";
   const [loading, setLoading] = useState(false);
   const [syncToBigCommerce, setSyncToBigCommerce] = useState(false);
   const [bigCommerceConnected, setBigCommerceConnected] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [syncMessage, setSyncMessage] = useState("");
+  const [operationalCategory, setOperationalCategory] = useState<OperationalCategory | "">("");
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
@@ -146,13 +150,15 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
           quantity: parseInt(formData.quantity) || 0,
           reorder_threshold: parseInt(formData.reorder_threshold) || 0,
           expiration_date: formData.expiration_date || null,
+          item_type: itemType,
+          operational_category: isOperational && operationalCategory ? operationalCategory : null,
         },
       ]);
 
       if (error) throw error;
 
-      // If sync to BigCommerce is enabled, push to BigCommerce
-      if (syncToBigCommerce && bigCommerceConnected) {
+      // If sync to BigCommerce is enabled, push to BigCommerce (only for stock items)
+      if (!isOperational && syncToBigCommerce && bigCommerceConnected) {
         setSyncStatus("syncing");
         try {
           const response = await fetch("/api/integrations/bigcommerce/create-product", {
@@ -216,11 +222,24 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
       <div className="min-h-full sm:min-h-0 w-full sm:w-auto flex items-center justify-center py-4 sm:py-8">
         <Card className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:my-auto sm:rounded-lg overflow-y-auto">
           <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6 sticky top-0 bg-card border-b z-10">
-            <div className="min-w-0 flex-1 pr-2">
-              <CardTitle className="text-lg sm:text-xl">Add New Item</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                Manually add a new inventory item
-              </CardDescription>
+            <div className="min-w-0 flex-1 pr-2 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isOperational ? 'bg-purple-100 dark:bg-purple-950/50' : 'bg-primary/10'}`}>
+                {isOperational ? (
+                  <Boxes className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                ) : (
+                  <Package className="h-5 w-5 text-primary" />
+                )}
+              </div>
+              <div>
+                <CardTitle className="text-lg sm:text-xl">
+                  Add {isOperational ? 'Operational' : 'Stock'} Item
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  {isOperational
+                    ? 'Add back-of-house items (not synced to POS)'
+                    : 'Manually add a new inventory item'}
+                </CardDescription>
+              </div>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
               <X className="h-4 w-4" />
@@ -230,7 +249,7 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  Product Name <span className="text-destructive">*</span>
+                  {isOperational ? 'Item Name' : 'Product Name'} <span className="text-destructive">*</span>
                 </Label>
                 <div className="relative">
                   <div className="relative">
@@ -239,31 +258,31 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
                       id="name"
                       required
                       value={formData.name}
-                      onChange={(e) => handleNameChange(e.target.value)}
+                      onChange={(e) => isOperational ? setFormData({ ...formData, name: e.target.value }) : handleNameChange(e.target.value)}
                       onFocus={() => {
-                        if (searchResults.length > 0) setShowSuggestions(true);
+                        if (!isOperational && searchResults.length > 0) setShowSuggestions(true);
                       }}
                       onBlur={() => {
                         // Delay hiding to allow click on suggestion
                         setTimeout(() => setShowSuggestions(false), 200);
                       }}
-                      placeholder={bigCommerceConnected ? "Start typing to search BigCommerce..." : "Angus Biltong Original 100g"}
-                      className={selectedProduct ? "pr-10 border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
+                      placeholder={isOperational ? "Paper Towels, Cleaning Supplies, etc." : (bigCommerceConnected ? "Start typing to search BigCommerce..." : "Angus Biltong Original 100g")}
+                      className={!isOperational && selectedProduct ? "pr-10 border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
                     />
-                    {searching && (
+                    {!isOperational && searching && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                       </div>
                     )}
-                    {selectedProduct && !searching && (
+                    {!isOperational && selectedProduct && !searching && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
                         <Check className="h-4 w-4 text-green-600" />
                       </div>
                     )}
                   </div>
 
-                  {/* Autocomplete dropdown */}
-                  {showSuggestions && searchResults.length > 0 && (
+                  {/* Autocomplete dropdown - only for stock items */}
+                  {!isOperational && showSuggestions && searchResults.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-card border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       <div className="p-2 text-xs text-muted-foreground border-b">
                         <Search className="h-3 w-3 inline mr-1" />
@@ -289,8 +308,8 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
                     </div>
                   )}
 
-                  {/* Selected product indicator */}
-                  {selectedProduct && (
+                  {/* Selected product indicator - only for stock items */}
+                  {!isOperational && selectedProduct && (
                     <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                       <Check className="h-3 w-3" />
                       Linked to BigCommerce product (ID: {selectedProduct.id})
@@ -298,6 +317,26 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
                   )}
                 </div>
               </div>
+
+              {/* Operational Category - only for operational items */}
+              {isOperational && (
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <select
+                    id="category"
+                    value={operationalCategory}
+                    onChange={(e) => setOperationalCategory(e.target.value as OperationalCategory | "")}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">Select a category...</option>
+                    {OPERATIONAL_CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -371,8 +410,8 @@ export function AddItemModal({ orgId, onClose, onSuccess }: AddItemModalProps) {
                 />
               </div>
 
-              {/* BigCommerce Sync Toggle */}
-              {bigCommerceConnected && (
+              {/* BigCommerce Sync Toggle - only for stock items */}
+              {!isOperational && bigCommerceConnected && (
                 <div className="border rounded-lg p-4 bg-muted/30">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">

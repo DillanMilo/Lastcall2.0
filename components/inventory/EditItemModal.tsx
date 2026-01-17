@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { InventoryItem } from "@/types";
+import { InventoryItem, OperationalCategory, OPERATIONAL_CATEGORIES } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Package, Boxes } from "lucide-react";
 
 interface EditItemModalProps {
   item: InventoryItem;
@@ -26,7 +26,11 @@ export function EditItemModal({
   onClose,
   onSuccess,
 }: EditItemModalProps) {
+  const isOperational = item.item_type === 'operational';
   const [loading, setLoading] = useState(false);
+  const [operationalCategory, setOperationalCategory] = useState<OperationalCategory | "">(
+    item.operational_category || ""
+  );
   const [formData, setFormData] = useState({
     name: item.name,
     sku: item.sku || "",
@@ -50,6 +54,7 @@ export function EditItemModal({
           quantity: parseInt(formData.quantity) || 0,
           reorder_threshold: parseInt(formData.reorder_threshold) || 0,
           expiration_date: formData.expiration_date || null,
+          operational_category: isOperational && operationalCategory ? operationalCategory : null,
         })
         .eq("id", item.id);
 
@@ -103,9 +108,22 @@ export function EditItemModal({
       <div className="min-h-full sm:min-h-0 w-full sm:w-auto flex items-center justify-center py-4 sm:py-8">
         <Card className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:my-auto sm:rounded-lg overflow-y-auto">
           <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6 sticky top-0 bg-card border-b z-10">
-            <div className="min-w-0 flex-1 pr-2">
-              <CardTitle className="text-lg sm:text-xl">Edit Item</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Update inventory item details</CardDescription>
+            <div className="min-w-0 flex-1 pr-2 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isOperational ? 'bg-purple-100 dark:bg-purple-950/50' : 'bg-primary/10'}`}>
+                {isOperational ? (
+                  <Boxes className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                ) : (
+                  <Package className="h-5 w-5 text-primary" />
+                )}
+              </div>
+              <div>
+                <CardTitle className="text-lg sm:text-xl">
+                  Edit {isOperational ? 'Operational' : 'Stock'} Item
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  {isOperational ? 'Update operational item details' : 'Update inventory item details'}
+                </CardDescription>
+              </div>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
               <X className="h-4 w-4" />
@@ -115,7 +133,7 @@ export function EditItemModal({
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  Product Name <span className="text-destructive">*</span>
+                  {isOperational ? 'Item Name' : 'Product Name'} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -126,6 +144,26 @@ export function EditItemModal({
                   }
                 />
               </div>
+
+              {/* Operational Category - only for operational items */}
+              {isOperational && (
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <select
+                    id="category"
+                    value={operationalCategory}
+                    onChange={(e) => setOperationalCategory(e.target.value as OperationalCategory | "")}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">Select a category...</option>
+                    {OPERATIONAL_CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">

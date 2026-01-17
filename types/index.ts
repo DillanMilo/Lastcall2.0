@@ -31,6 +31,29 @@ export interface Organization {
   created_at: string;
 }
 
+export type ItemType = 'stock' | 'operational';
+
+export type OperationalCategory =
+  | 'cleaning'
+  | 'office'
+  | 'kitchen'
+  | 'packaging'
+  | 'tableware'
+  | 'maintenance'
+  | 'safety'
+  | 'other';
+
+export const OPERATIONAL_CATEGORIES: { value: OperationalCategory; label: string }[] = [
+  { value: 'cleaning', label: 'Cleaning Supplies' },
+  { value: 'office', label: 'Office Supplies' },
+  { value: 'kitchen', label: 'Kitchen & Cooking' },
+  { value: 'packaging', label: 'Packaging & Labels' },
+  { value: 'tableware', label: 'Tableware & Utensils' },
+  { value: 'maintenance', label: 'Maintenance & Tools' },
+  { value: 'safety', label: 'Safety & First Aid' },
+  { value: 'other', label: 'Other' },
+];
+
 export interface InventoryItem {
   id: string;
   org_id: string;
@@ -46,6 +69,8 @@ export interface InventoryItem {
   bigcommerce_variant_id?: string;
   shopify_product_id?: string;
   shopify_variant_id?: string;
+  item_type: ItemType;
+  operational_category?: OperationalCategory;
   last_restock: string;
   created_at: string;
 }
