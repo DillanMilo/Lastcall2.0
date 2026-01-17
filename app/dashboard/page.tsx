@@ -222,6 +222,34 @@ export default function DashboardPage() {
 
   const isLoading = authLoading || loading;
 
+  const handleCheckPendingInvite = async () => {
+    // First check localStorage
+    const storedToken = localStorage.getItem("pendingInviteToken");
+    if (storedToken) {
+      window.location.href = `/auth/invite?token=${storedToken}`;
+      return;
+    }
+
+    // Then check database
+    if (user?.email) {
+      try {
+        const response = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(user.email)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.token) {
+            window.location.href = `/auth/invite?token=${data.token}`;
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking pending invite:', error);
+      }
+    }
+
+    // No pending invite found
+    alert('No pending invite found for your email. Please check that you are signed in with the correct email address, or ask your team admin to send a new invite.');
+  };
+
   const handleForceSignOut = async () => {
     try {
       localStorage.clear(); // Clear any stuck tokens
@@ -266,15 +294,20 @@ export default function DashboardPage() {
                 Currently signed in as: <span className="font-medium text-foreground">{user.email}</span>
               </div>
             )}
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleRefresh} className="flex-1">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+            <div className="flex flex-col gap-3">
+              <Button onClick={handleCheckPendingInvite} className="w-full">
+                Check for Pending Invite
               </Button>
-              <Button onClick={handleForceSignOut} className="flex-1">
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={handleRefresh} className="flex-1">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+                <Button variant="outline" onClick={handleForceSignOut} className="flex-1">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
