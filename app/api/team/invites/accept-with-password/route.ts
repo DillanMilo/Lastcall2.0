@@ -104,16 +104,20 @@ export async function POST(request: NextRequest) {
 
     const newUser = authData.user;
 
-    // Create the user record in our users table
+    // Create or update the user record in our users table
+    // Use upsert in case there's an orphaned record from a previous failed attempt
     const { error: userError } = await adminClient
       .from('users')
-      .insert({
+      .upsert({
         id: newUser.id,
         email: invite.email,
         full_name: fullName || null,
         org_id: invite.org_id,
         role: invite.role || 'member',
         created_at: new Date().toISOString(),
+      }, {
+        onConflict: 'email',
+        ignoreDuplicates: false
       })
       .select('*')
       .single();
