@@ -96,66 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createUserAndOrg = useCallback(async (userId: string) => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        return null;
-      }
-
-      const orgName = `${authUser.email?.split('@')[0] || 'User'}'s Organization`;
-
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: orgName,
-          subscription_tier: 'growth',
-        })
-        .select('*')
-        .single();
-
-      if (orgError) {
-        if (
-          typeof orgError.message === 'string' &&
-          orgError.message.toLowerCase().includes('row-level security')
-        ) {
-          return await bootstrapViaServer();
-        }
-        console.error('Error creating organization:', orgError.message || orgError);
-        return null;
-      }
-
-      const { data: newUser, error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          email: authUser.email || '',
-          full_name: authUser.user_metadata?.full_name || null,
-          org_id: newOrg.id,
-          role: 'admin', // Organization creator is always admin
-        })
-        .select('*')
-        .single();
-
-      if (userError) {
-        console.error('Error creating user record:', userError.message || userError);
-        return null;
-      }
-
-      const combined: UserWithOrg = {
-        ...newUser,
-        organization: newOrg ?? undefined,
-      };
-
-      setUserWithOrg(combined);
-      setOrgId(newUser.org_id);
-      return combined;
-    } catch (error) {
-      console.error('Error creating user and org:', error);
-      return null;
-    }
-  }, [bootstrapViaServer]);
-
   const fetchUserWithOrg = useCallback(async (userId: string) => {
     try {
       const { data: userRecord, error } = await supabase

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
@@ -47,7 +47,7 @@ function SignInContent() {
   }, [prefilledEmail]);
 
   // Helper to handle redirect after successful authentication
-  const handleSuccessfulAuth = () => {
+  const handleSuccessfulAuth = useCallback(() => {
     // Check for pending invite token first
     const pendingInviteToken = localStorage.getItem("pendingInviteToken");
     if (pendingInviteToken) {
@@ -62,7 +62,7 @@ function SignInContent() {
     }
     // Default to dashboard
     router.replace("/dashboard");
-  };
+  }, [redirectUrl, router]);
 
   useEffect(() => {
     if (verifyReminder) {
@@ -143,7 +143,7 @@ function SignInContent() {
       active = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [handleSuccessfulAuth]);
 
   const disableForm = useMemo(
     () => loading || demoLoading || processingVerification,
