@@ -6,7 +6,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-export type UserRole = 'admin' | 'member';
+export type UserRole = 'owner' | 'admin' | 'member';
 
 export interface AuthenticatedUser {
   userId: string;
@@ -65,14 +65,37 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<Authen
 }
 
 /**
- * Check if user is an admin
+ * Check if user is an owner
  */
-export function isAdmin(user: AuthenticatedUser): boolean {
-  return user.role === 'admin';
+export function isOwner(user: AuthenticatedUser): boolean {
+  return user.role === 'owner';
 }
 
 /**
- * Require admin role - returns error response if not admin
+ * Check if user is an admin (includes owners)
+ */
+export function isAdmin(user: AuthenticatedUser): boolean {
+  return user.role === 'owner' || user.role === 'admin';
+}
+
+/**
+ * Require owner role - returns error response if not owner
+ */
+export function requireOwner(user: AuthenticatedUser): NextResponse | null {
+  if (!isOwner(user)) {
+    return NextResponse.json(
+      {
+        error: 'Forbidden',
+        message: 'Owner access required for this action'
+      },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
+/**
+ * Require admin role (owner or admin) - returns error response if not admin
  */
 export function requireAdmin(user: AuthenticatedUser): NextResponse | null {
   if (!isAdmin(user)) {

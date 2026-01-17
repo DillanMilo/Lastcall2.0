@@ -52,9 +52,9 @@ async function verifyUserOrgAdmin(request: NextRequest, orgId: string): Promise<
     return { valid: false, error: 'Access denied - you do not belong to this organization', status: 403 };
   }
 
-  // Only admins can manage integrations
-  if (userData.role !== 'admin') {
-    return { valid: false, error: 'Only admins can manage integrations', status: 403 };
+  // Only owners and admins can manage integrations
+  if (userData.role !== 'owner' && userData.role !== 'admin') {
+    return { valid: false, error: 'Only owners and admins can manage integrations', status: 403 };
   }
 
   return { valid: true };

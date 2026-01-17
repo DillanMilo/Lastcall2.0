@@ -140,10 +140,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins can invite team members
-    if (userOrg.role !== 'admin') {
+    // Only owners and admins can invite team members
+    if (userOrg.role !== 'owner' && userOrg.role !== 'admin') {
       return NextResponse.json(
-        { error: 'Forbidden', message: 'Only admins can invite team members' },
+        { error: 'Forbidden', message: 'Only owners and admins can invite team members' },
         { status: 403 }
       );
     }
@@ -329,10 +329,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins can cancel invites
-    if (userOrg.role !== 'admin') {
+    // Only owners and admins can cancel invites
+    if (userOrg.role !== 'owner' && userOrg.role !== 'admin') {
       return NextResponse.json(
-        { error: 'Forbidden', message: 'Only admins can cancel invites' },
+        { error: 'Forbidden', message: 'Only owners and admins can cancel invites' },
         { status: 403 }
       );
     }

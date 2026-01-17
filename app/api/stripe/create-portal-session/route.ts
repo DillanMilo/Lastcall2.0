@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Only admins can access billing portal
-    if (userData.role !== 'admin') {
+    // Only owners can access billing portal
+    if (userData.role !== 'owner') {
       return NextResponse.json(
-        { error: 'Forbidden', message: 'Only admins can manage billing' },
+        { error: 'Forbidden', message: 'Only organization owners can manage billing' },
         { status: 403 }
       );
     }

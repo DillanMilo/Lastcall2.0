@@ -81,10 +81,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Only admins can manage billing
-    if (userData.role !== 'admin') {
+    // Only owners can manage billing
+    if (userData.role !== 'owner') {
       return NextResponse.json(
-        { error: 'Forbidden', message: 'Only admins can manage billing' },
+        { error: 'Forbidden', message: 'Only organization owners can manage billing' },
         { status: 403 }
       );
     }
