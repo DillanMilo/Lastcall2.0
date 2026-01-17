@@ -25,6 +25,7 @@ function SignInContent() {
   const prefilledEmail = searchParams.get("email") ?? "";
   const verifyReminder = searchParams.get("verify");
   const redirectUrl = searchParams.get("redirect");
+  const freshLogin = searchParams.get("fresh"); // Indicates user just signed out and needs fresh login
   const [email, setEmail] = useState(prefilledEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -124,6 +125,11 @@ function SignInContent() {
         }
       }
 
+      // Skip auto-redirect if this is a fresh login (user just signed out to switch accounts)
+      if (freshLogin === "1") {
+        return;
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -137,8 +143,10 @@ function SignInContent() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Only redirect on SIGNED_IN event (actual login), not on initial session detection
+      // This prevents redirect loops when coming from fresh logout
+      if (session && event === "SIGNED_IN") {
         handleSuccessfulAuth();
       }
     });
@@ -147,7 +155,7 @@ function SignInContent() {
       active = false;
       subscription.unsubscribe();
     };
-  }, [handleSuccessfulAuth]);
+  }, [handleSuccessfulAuth, freshLogin]);
 
   const disableForm = useMemo(
     () => loading || demoLoading || processingVerification,

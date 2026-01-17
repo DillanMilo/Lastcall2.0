@@ -110,12 +110,19 @@ function InviteContent() {
 
     // If user is logged in as wrong email, sign them out first
     if (isAuthenticated) {
+      // Clear all local storage except the invite token
+      const inviteToken = localStorage.getItem("pendingInviteToken");
+      localStorage.clear();
+      if (inviteToken) localStorage.setItem("pendingInviteToken", inviteToken);
+
       await supabase.auth.signOut();
+      // Small delay to ensure sign-out propagates
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Properly encode the redirect URL to avoid query param parsing issues
     const redirectUrl = `/auth/invite?token=${token}`;
-    window.location.href = `/auth/signin?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `/auth/signin?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}&fresh=1`;
   };
 
   const handleSignUp = async () => {
@@ -123,12 +130,19 @@ function InviteContent() {
 
     // If user is logged in as wrong email, sign them out first
     if (isAuthenticated) {
+      // Clear all local storage except the invite token
+      const inviteToken = localStorage.getItem("pendingInviteToken");
+      localStorage.clear();
+      if (inviteToken) localStorage.setItem("pendingInviteToken", inviteToken);
+
       await supabase.auth.signOut();
+      // Small delay to ensure sign-out propagates
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Properly encode the redirect URL to avoid query param parsing issues
     const redirectUrl = `/auth/invite?token=${token}`;
-    window.location.href = `/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}&fresh=1`;
   };
 
   if (status === "loading") {
