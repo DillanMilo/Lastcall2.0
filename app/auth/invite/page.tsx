@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 
 function InviteContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -105,19 +104,31 @@ function InviteContent() {
     }
   };
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     // Store the invite token for after sign in
     localStorage.setItem("pendingInviteToken", token || "");
+
+    // If user is logged in as wrong email, sign them out first
+    if (isAuthenticated) {
+      await supabase.auth.signOut();
+    }
+
     // Properly encode the redirect URL to avoid query param parsing issues
     const redirectUrl = `/auth/invite?token=${token}`;
-    router.push(`/auth/signin?redirect=${encodeURIComponent(redirectUrl)}`);
+    window.location.href = `/auth/signin?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     localStorage.setItem("pendingInviteToken", token || "");
+
+    // If user is logged in as wrong email, sign them out first
+    if (isAuthenticated) {
+      await supabase.auth.signOut();
+    }
+
     // Properly encode the redirect URL to avoid query param parsing issues
     const redirectUrl = `/auth/invite?token=${token}`;
-    router.push(`/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}`);
+    window.location.href = `/auth/signup?email=${encodeURIComponent(inviteInfo?.email || "")}&redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   if (status === "loading") {
@@ -206,9 +217,17 @@ function InviteContent() {
 
         {/* Email Mismatch Warning */}
         {emailMismatch && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            You&apos;re signed in as {userEmail}, but this invite is for {inviteInfo?.email}.
+          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Wrong Account
+            </div>
+            <p className="text-sm text-muted-foreground">
+              You&apos;re signed in as <strong className="text-foreground">{userEmail}</strong>, but this invite was sent to <strong className="text-foreground">{inviteInfo?.email}</strong>.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Click below to sign out and use the correct account.
+            </p>
           </div>
         )}
 
@@ -228,20 +247,25 @@ function InviteContent() {
           </Button>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-center text-muted-foreground">
-              {emailMismatch
-                ? "Sign in with the correct email to accept"
-                : "Sign in or create an account to accept"}
-            </p>
+            {!emailMismatch && (
+              <p className="text-sm text-center text-muted-foreground">
+                Sign in or create an account to accept this invite
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" onClick={handleSignIn}>
-                Sign In
+                {emailMismatch ? "Switch Account" : "Sign In"}
               </Button>
               <Button onClick={handleSignUp}>
-                Sign Up
+                {emailMismatch ? "Create Account" : "Sign Up"}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
+            {emailMismatch && (
+              <p className="text-xs text-center text-muted-foreground">
+                You&apos;ll be signed out and can sign in as {inviteInfo?.email}
+              </p>
+            )}
           </div>
         )}
       </CardContent>
