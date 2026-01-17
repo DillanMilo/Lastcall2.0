@@ -113,16 +113,23 @@ export async function POST(request: NextRequest) {
         full_name: fullName || null,
         org_id: invite.org_id,
         role: invite.role || 'member',
+        created_at: new Date().toISOString(),
       })
       .select('*')
       .single();
 
     if (userError) {
       console.error('Error creating user record:', userError);
+      console.error('User insert details:', {
+        id: newUser.id,
+        email: invite.email,
+        org_id: invite.org_id,
+        role: invite.role,
+      });
       // Try to clean up the auth user if user record creation fails
       await adminClient.auth.admin.deleteUser(newUser.id);
       return NextResponse.json(
-        { error: 'Failed to create user record' },
+        { error: `Failed to create user record: ${userError.message || userError.code || 'Unknown error'}` },
         { status: 500 }
       );
     }
