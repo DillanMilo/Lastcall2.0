@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import type { InventorySyncItem } from '@/lib/inventory/syncInventoryItems';
 
 /**
@@ -38,11 +39,6 @@ interface CloverItem {
 
 interface CloverItemsResponse {
   elements: CloverItem[];
-  href?: string;
-}
-
-interface CloverInventoryResponse {
-  elements: CloverItemStock[];
   href?: string;
 }
 
@@ -280,7 +276,6 @@ export function verifyCloverWebhookSignature(
   signature: string,
   secret: string
 ): boolean {
-  const crypto = require('crypto');
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(payload)
