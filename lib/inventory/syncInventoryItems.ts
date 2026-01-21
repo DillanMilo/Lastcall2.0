@@ -33,6 +33,7 @@ export interface InventorySyncItem {
   bigcommerce_variant_id?: string | number | null;
   shopify_product_id?: string | number | null;
   shopify_variant_id?: string | number | null;
+  clover_item_id?: string | null;
 }
 
 export interface InventorySyncResult {
@@ -55,7 +56,7 @@ export interface SyncInventoryResponse {
   summary: string;
 }
 
-const KNOWN_SOURCES = new Set(['shopify', 'square', 'custom', 'bigcommerce']);
+const KNOWN_SOURCES = new Set(['shopify', 'square', 'custom', 'bigcommerce', 'clover']);
 
 function parseInteger(value: InventorySyncItem['quantity']): number {
   if (value === null || value === undefined) {

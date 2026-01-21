@@ -9,9 +9,20 @@ export interface TierLimitResult {
 }
 
 /**
- * Get the limits for a specific tier
+ * Unlimited limits for billing-exempt organizations
  */
-export function getTierLimits(tier: PlanTier) {
+const UNLIMITED_LIMITS = { products: -1, users: -1, aiRequests: -1 };
+
+/**
+ * Get the limits for a specific tier
+ * @param tier - The subscription tier
+ * @param billingExempt - If true, returns unlimited limits (for lifetime/invoice customers)
+ */
+export function getTierLimits(tier: PlanTier, billingExempt?: boolean) {
+  // Billing exempt organizations get unlimited everything
+  if (billingExempt) {
+    return UNLIMITED_LIMITS;
+  }
   const plan = PRICING_PLANS.find((p) => p.id === tier);
   return plan?.limits || { products: 50, users: 1, aiRequests: 50 };
 }
@@ -22,9 +33,10 @@ export function getTierLimits(tier: PlanTier) {
 export async function checkInventoryLimit(
   supabase: SupabaseClient,
   orgId: string,
-  tier: PlanTier
+  tier: PlanTier,
+  billingExempt?: boolean
 ): Promise<TierLimitResult> {
-  const limits = getTierLimits(tier);
+  const limits = getTierLimits(tier, billingExempt);
 
   // Unlimited (-1) means no limit
   if (limits.products === -1) {
@@ -60,9 +72,10 @@ export async function checkInventoryLimit(
 export async function checkUserLimit(
   supabase: SupabaseClient,
   orgId: string,
-  tier: PlanTier
+  tier: PlanTier,
+  billingExempt?: boolean
 ): Promise<TierLimitResult> {
-  const limits = getTierLimits(tier);
+  const limits = getTierLimits(tier, billingExempt);
 
   // Unlimited (-1) means no limit
   if (limits.users === -1) {
@@ -98,9 +111,10 @@ export async function checkUserLimit(
 export async function checkAIRequestLimit(
   supabase: SupabaseClient,
   orgId: string,
-  tier: PlanTier
+  tier: PlanTier,
+  billingExempt?: boolean
 ): Promise<TierLimitResult> {
-  const limits = getTierLimits(tier);
+  const limits = getTierLimits(tier, billingExempt);
 
   // Unlimited (-1) means no limit
   if (limits.aiRequests === -1) {
@@ -164,8 +178,13 @@ export async function logAIRequest(
  */
 export function checkFeatureAccess(
   tier: PlanTier,
-  feature: 'ai_assistant' | 'integrations' | 'api_access' | 'smart_ordering'
+  feature: 'ai_assistant' | 'integrations' | 'api_access' | 'smart_ordering',
+  billingExempt?: boolean
 ): TierLimitResult {
+  // Billing exempt organizations have access to all features
+  if (billingExempt) {
+    return { allowed: true };
+  }
   const tierIndex = PRICING_PLANS.findIndex((p) => p.id === tier);
 
   const featureRequirements: Record<string, number> = {
@@ -194,8 +213,14 @@ export function checkFeatureAccess(
  */
 export function checkIntegrationAccess(
   tier: PlanTier,
-  integration: 'csv' | 'bigcommerce' | 'shopify' | 'api'
+  integration: 'csv' | 'bigcommerce' | 'shopify' | 'clover' | 'api',
+  billingExempt?: boolean
 ): TierLimitResult {
+  // Billing exempt organizations have access to all integrations
+  if (billingExempt) {
+    return { allowed: true };
+  }
+
   // CSV is available for all tiers
   if (integration === 'csv') {
     return { allowed: true };
@@ -203,17 +228,22 @@ export function checkIntegrationAccess(
 
   // BigCommerce requires Growth+
   if (integration === 'bigcommerce') {
-    return checkFeatureAccess(tier, 'integrations');
+    return checkFeatureAccess(tier, 'integrations', billingExempt);
   }
 
   // Shopify requires Growth+
   if (integration === 'shopify') {
-    return checkFeatureAccess(tier, 'integrations');
+    return checkFeatureAccess(tier, 'integrations', billingExempt);
+  }
+
+  // Clover requires Growth+
+  if (integration === 'clover') {
+    return checkFeatureAccess(tier, 'integrations', billingExempt);
   }
 
   // API access requires Pro+
   if (integration === 'api') {
-    return checkFeatureAccess(tier, 'api_access');
+    return checkFeatureAccess(tier, 'api_access', billingExempt);
   }
 
   return { allowed: false, message: 'Unknown integration type' };

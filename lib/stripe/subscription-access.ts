@@ -13,6 +13,7 @@ export interface SubscriptionAccessStatus {
 /**
  * Check if an organization has subscription access and whether they're in read-only mode.
  * This handles:
+ * - Billing exempt organizations (lifetime/invoice customers)
  * - 7-day grace period for failed payments
  * - Access until end of billing period for cancellations
  * - Read-only mode after grace/period expires
@@ -24,6 +25,15 @@ export function checkSubscriptionAccess(org: Organization | null): SubscriptionA
       hasAccess: false,
       isReadOnly: false,
       reason: 'expired',
+    };
+  }
+
+  // Billing exempt organizations always have full access (lifetime/invoice customers)
+  if (org.billing_exempt) {
+    return {
+      hasAccess: true,
+      isReadOnly: false,
+      reason: 'active',
     };
   }
 

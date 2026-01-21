@@ -21,6 +21,7 @@ export interface Organization {
   payment_failed_at?: string; // When payment last failed (for grace period)
   canceled_at?: string; // When subscription was cancelled
   is_read_only?: boolean; // Read-only mode after grace period expires
+  billing_exempt?: boolean; // Exempt from billing - full access, no billing prompts
   bigcommerce_store_hash?: string;
   bigcommerce_client_id?: string;
   bigcommerce_access_token?: string;
@@ -28,6 +29,10 @@ export interface Organization {
   shopify_store_domain?: string;
   shopify_access_token?: string;
   shopify_connected_at?: string;
+  // Clover integration
+  clover_merchant_id?: string;
+  clover_access_token?: string;
+  clover_connected_at?: string;
   created_at: string;
 }
 
@@ -69,6 +74,7 @@ export interface InventoryItem {
   bigcommerce_variant_id?: string;
   shopify_product_id?: string;
   shopify_variant_id?: string;
+  clover_item_id?: string;
   item_type: ItemType;
   operational_category?: OperationalCategory;
   last_restock: string;

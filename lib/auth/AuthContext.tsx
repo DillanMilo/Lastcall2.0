@@ -17,6 +17,7 @@ export interface Organization {
   payment_failed_at?: string;
   canceled_at?: string;
   is_read_only?: boolean;
+  billing_exempt?: boolean;
 }
 
 export interface OrgMembership {
@@ -228,7 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             subscription_period_end,
             payment_failed_at,
             canceled_at,
-            is_read_only
+            is_read_only,
+            billing_exempt
           )
         `)
         .eq('user_id', userId);

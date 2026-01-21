@@ -55,10 +55,10 @@ export async function GET(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Get organization tier
+    // Get organization tier and billing exempt status
     const { data: orgData, error: orgError } = await adminClient
       .from('organizations')
-      .select('subscription_tier, name')
+      .select('subscription_tier, name, billing_exempt')
       .eq('id', orgId)
       .single();
 
@@ -67,7 +67,8 @@ export async function GET(request: NextRequest) {
     }
 
     const tier = (orgData.subscription_tier || 'free') as PlanTier;
-    const limits = getTierLimits(tier);
+    const billingExempt = orgData.billing_exempt === true;
+    const limits = getTierLimits(tier, billingExempt);
 
     // Get product count
     const { count: productCount } = await adminClient
@@ -125,6 +126,7 @@ export async function GET(request: NextRequest) {
         id: orgId,
         name: orgData.name,
         tier,
+        billingExempt,
       },
       usage,
       limits,

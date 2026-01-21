@@ -39,6 +39,7 @@ export function SubscriptionCard({
 
   const currentTier = organization?.subscription_tier || "free";
   const subscriptionStatus = organization?.subscription_status;
+  const billingExempt = organization?.billing_exempt === true;
   const currentPlan = PRICING_PLANS.find((p) => p.id === currentTier);
   const currentPlanIndex = PRICING_PLANS.findIndex((p) => p.id === currentTier);
 
@@ -46,6 +47,42 @@ export function SubscriptionCard({
   const upgradePlans = PRICING_PLANS.filter(
     (_, index) => index > currentPlanIndex
   );
+
+  // Billing exempt organizations see a simplified view
+  if (billingExempt) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-primary" />
+                Enterprise Account
+              </CardTitle>
+              <CardDescription>
+                Your organization has full access to all features
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-xl border bg-gradient-to-br from-primary/5 to-primary/10 p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Check className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Unlimited Access</p>
+                <p className="text-sm text-muted-foreground">
+                  All features enabled with no usage limits
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleSelectPlan = async (planId: PlanTier) => {
     if (planId === "free" || planId === currentTier) return;
