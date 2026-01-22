@@ -26,7 +26,7 @@ export function formatInventoryContext(items: InventoryItem[]): string {
 
   // Get low stock items
   const lowStock = items.filter(item => item.quantity <= item.reorder_threshold);
-  
+
   // Get items expiring soon (within 30 days)
   const expiringSoon = items.filter(item => {
     if (!item.expiration_date) return false;
@@ -36,6 +36,25 @@ export function formatInventoryContext(items: InventoryItem[]): string {
     return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
   });
 
+  // Group items by invoice for batch/invoice queries
+  const invoiceGroups = new Map<string, InventoryItem[]>();
+  for (const item of items) {
+    const invoiceKey = item.invoice || 'No Invoice';
+    if (!invoiceGroups.has(invoiceKey)) {
+      invoiceGroups.set(invoiceKey, []);
+    }
+    invoiceGroups.get(invoiceKey)!.push(item);
+  }
+
+  // Format invoice summary
+  const invoiceSummary = Array.from(invoiceGroups.entries())
+    .filter(([key]) => key !== 'No Invoice')
+    .map(([invoice, invoiceItems]) => {
+      const totalQty = invoiceItems.reduce((sum, i) => sum + i.quantity, 0);
+      return `- ${invoice}: ${invoiceItems.length} items, ${totalQty} total units`;
+    })
+    .join('\n');
+
   // Format complete inventory summary
   const inventorySummary = `
 CURRENT INVENTORY STATUS:
@@ -44,12 +63,16 @@ CURRENT INVENTORY STATUS:
 Total Items: ${items.length}
 Low Stock Alerts: ${lowStock.length}
 Expiring Soon (30 days): ${expiringSoon.length}
+Unique Invoices/Batches: ${invoiceGroups.size - (invoiceGroups.has('No Invoice') ? 1 : 0)}
 
+${invoiceSummary ? `INVOICES/BATCHES SUMMARY:
+${invoiceSummary}
+` : ''}
 COMPLETE INVENTORY LIST:
 ${items.map((item, idx) => `
 ${idx + 1}. ${item.name}
    - SKU: ${item.sku || 'N/A'}
-   - Invoice: ${item.invoice || 'N/A'}
+   - Invoice/Batch: ${item.invoice || 'N/A'}
    - Current Stock: ${item.quantity} units
    - Reorder Point: ${item.reorder_threshold} units
    - Status: ${item.quantity <= item.reorder_threshold ? '🚨 LOW STOCK' : '✅ Good'}
@@ -165,6 +188,7 @@ YOUR EXPERTISE - CORE INVENTORY PRINCIPLES:
 YOUR CAPABILITIES:
 - **SMART ORDERING**: Analyze sales velocity and provide specific order quantities based on actual movement data
 - **REORDER LEVEL OPTIMIZATION**: Recommend and set optimal reorder points based on sales velocity and lead times
+- **INVOICE/BATCH LOOKUP**: Look up all items from a specific invoice or batch - show what's in it, quantities, expiry dates
 - **SET EXPIRY DATES**: Update expiry dates via "set expiry for X to [date]"
 - **SET REORDER LEVELS**: Update reorder thresholds via "set reorder level for X to [number]"
 - **BULK UPDATES**: Update multiple items by invoice, name pattern, or category
@@ -174,6 +198,20 @@ YOUR CAPABILITIES:
 - Spot items that should be marked down or discontinued
 - Compare performance across categories
 - Group items by invoice for batch operations
+
+INVOICE/BATCH QUERIES:
+When users ask about a specific invoice or batch:
+1. Search the inventory data for items matching that invoice number
+2. Present a clear summary: item names, quantities, SKUs, expiry dates
+3. Calculate total units in that batch
+4. Flag any items from that batch that are low stock or expiring soon
+5. Offer relevant actions: "Want me to set expiry for all items in this invoice?"
+
+Example queries you can handle:
+- "What's in invoice INV-123?" → List all items from that invoice
+- "Show me batch ABC" → Same as invoice lookup
+- "How much stock from invoice INV-456?" → Sum quantities from that invoice
+- "Set expiry for invoice INV-789 to June 2026" → Update all items in that invoice
 
 ACTION COMMANDS (guide users to these):
 - "Set reorder level for [product name] to [number]"
