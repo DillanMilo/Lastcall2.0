@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createStreamingResponse, getFallbackResponse } from '@/lib/ai/streamingAssistant';
 import { StockMovement } from '@/lib/ai/inventoryAssistant';
-import { getImprovedAssistantResponse, getFallbackResponse } from '@/lib/ai/streamingAssistant';
 import { InventoryItem } from '@/types';
 import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
@@ -21,7 +21,6 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Try to get stock movement data from inventory_history table
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
 
@@ -33,11 +32,9 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     .order('created_at', { ascending: true });
 
   if (error || !history || history.length === 0) {
-    // Table might not exist yet or no data - return empty
     return [];
   }
 
-  // Get current inventory quantities
   const { data: inventory } = await supabase
     .from('inventory_items')
     .select('id, name, sku, quantity')
@@ -47,7 +44,6 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     return [];
   }
 
-  // Calculate movements per item
   const movementsByItem = new Map<string, {
     item_name: string;
     sku: string | null;
@@ -56,7 +52,6 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     current_qty: number;
   }>();
 
-  // Initialize with current inventory
   for (const item of inventory) {
     movementsByItem.set(item.id, {
       item_name: item.name,
@@ -67,7 +62,6 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     });
   }
 
-  // Process history
   for (const h of history) {
     const existing = movementsByItem.get(h.item_id);
     if (existing) {
@@ -79,17 +73,15 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     }
   }
 
-  // Calculate metrics
   const movements: StockMovement[] = [];
-  const daysOfData = 28; // 4 weeks
+  const daysOfData = 28;
 
   for (const [itemId, data] of movementsByItem) {
     const avgDailySales = data.total_sold / daysOfData;
-    const daysOfStockLeft = avgDailySales > 0 
-      ? Math.floor(data.current_qty / avgDailySales) 
-      : 999; // Infinity for non-moving items
-    
-    // Suggest 4-week supply plus 20% buffer
+    const daysOfStockLeft = avgDailySales > 0
+      ? Math.floor(data.current_qty / avgDailySales)
+      : 999;
+
     const suggestedOrderQty = Math.ceil(avgDailySales * 28 * 1.2);
 
     movements.push({
@@ -104,34 +96,34 @@ async function getStockMovements(orgId: string): Promise<StockMovement[]> {
     });
   }
 
-  // Sort by urgency (days of stock left)
   return movements.filter(m => m.total_sold > 0).sort((a, b) => a.days_of_stock_left - b.days_of_stock_left);
 }
 
 export async function POST(request: NextRequest) {
+  const encoder = new TextEncoder();
+
   try {
     const { message, orgId, conversationHistory } = await request.json();
 
     if (!message || typeof message !== 'string') {
-      return NextResponse.json(
-        { error: 'Message is required' },
-        { status: 400 }
+      return new Response(
+        JSON.stringify({ error: 'Message is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     if (!orgId) {
-      return NextResponse.json(
-        { error: 'Organization ID is required' },
-        { status: 400 }
+      return new Response(
+        JSON.stringify({ error: 'Organization ID is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use service role client to bypass RLS
     const supabase = createClient(supabaseUrl, serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Get organization tier for limit checking
+    // Get organization tier
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
       .select('subscription_tier, billing_exempt')
@@ -139,9 +131,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json(
-        { error: 'Organization not found. Please refresh the page and try again.' },
-        { status: 404 }
+      return new Response(
+        JSON.stringify({ error: 'Organization not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -151,20 +143,19 @@ export async function POST(request: NextRequest) {
     // Check AI request limit
     const limitCheck = await checkAIRequestLimit(supabase, orgId, tier, billingExempt);
     if (!limitCheck.allowed) {
-      return NextResponse.json(
-        {
+      return new Response(
+        JSON.stringify({
           error: 'AI request limit reached',
           message: limitCheck.message,
           currentCount: limitCheck.currentCount,
           limit: limitCheck.limit,
           upgradeRequired: true,
-          suggestion: 'Upgrade your plan to get more AI requests, or wait until next month when your quota resets.',
-        },
-        { status: 403 }
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Fetch current inventory for this organization
+    // Fetch current inventory
     const { data: inventory, error: inventoryError } = await supabase
       .from('inventory_items')
       .select('*')
@@ -172,20 +163,13 @@ export async function POST(request: NextRequest) {
 
     if (inventoryError) {
       console.error('Error fetching inventory:', inventoryError);
-      return NextResponse.json(
-        {
-          error: 'Failed to fetch inventory data',
-          message: 'Unable to load your inventory. Please refresh the page and try again.',
-          suggestion: 'If this problem persists, check your internet connection.',
-        },
-        { status: 500 }
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch inventory data. Please refresh and try again.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Fetch stock movements for smart ordering recommendations
-    const stockMovements = await getStockMovements(orgId);
-
-    // Check if this is an action request (setting expiry, updating quantities, reorder levels, etc.)
+    // Check if this is an action request
     const actionKeywords = [
       'set expiry', 'set expiration', 'update expiry', 'change expiry',
       'set reorder', 'update reorder', 'change reorder', 'reorder level', 'reorder threshold',
@@ -197,11 +181,10 @@ export async function POST(request: NextRequest) {
     );
 
     if (isLikelyAction) {
-      // Try to execute as an action
       try {
         const actionResponse = await fetch(new URL('/api/ai/action', request.url).toString(), {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Cookie': request.headers.get('cookie') || '',
           },
@@ -211,89 +194,91 @@ export async function POST(request: NextRequest) {
         const actionData = await actionResponse.json();
 
         if (actionData.isAction && actionData.success) {
-          // Action was executed successfully
           const actionMessage = `✅ **Action Completed!**\n\n${actionData.message}\n\n**Items updated:**\n${actionData.details?.map((d: string) => `• ${d}`).join('\n') || 'See inventory for details'}`;
-          
-          return NextResponse.json({
-            success: true,
-            response: actionMessage,
-            timestamp: new Date().toISOString(),
-            actionExecuted: true,
-          });
+
+          // Log the AI request
+          await logAIRequest(supabase, orgId, 'action');
+
+          // Return as non-streaming response for actions
+          return new Response(
+            JSON.stringify({
+              success: true,
+              response: actionMessage,
+              timestamp: new Date().toISOString(),
+              actionExecuted: true,
+              streaming: false,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
         } else if (actionData.isAction && !actionData.success) {
-          // Action was recognized but failed
-          return NextResponse.json({
-            success: true,
-            response: `⚠️ I understood you want to update inventory, but: ${actionData.message}\n\nPlease try being more specific, for example:\n• "Set expiry for all Biltong products to March 30, 2026"\n• "Update invoice INV-123 expiry to June 2026"`,
-            timestamp: new Date().toISOString(),
-          });
+          return new Response(
+            JSON.stringify({
+              success: true,
+              response: `⚠️ I understood you want to update inventory, but: ${actionData.message}\n\nPlease try being more specific, for example:\n• "Set expiry for all Biltong products to March 30, 2026"\n• "Update invoice INV-123 expiry to June 2026"`,
+              timestamp: new Date().toISOString(),
+              streaming: false,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
         }
-        // If not an action, fall through to regular AI response
       } catch (actionError) {
         console.error('Action processing error:', actionError);
-        // Fall through to regular AI response
       }
     }
 
-    // Log the AI request for usage tracking
+    // Fetch stock movements
+    const stockMovements = await getStockMovements(orgId);
+
+    // Log the AI request
     await logAIRequest(supabase, orgId, 'assistant');
 
-    // Get AI response with inventory and movement context (with fallback support)
-    const { response: aiResponse, usedFallback } = await getImprovedAssistantResponse(
-      message,
-      inventory as InventoryItem[],
-      conversationHistory || [],
-      stockMovements.length > 0 ? stockMovements : undefined
-    );
+    // Create streaming response
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const generator = createStreamingResponse(
+            message,
+            inventory as InventoryItem[],
+            conversationHistory || [],
+            stockMovements.length > 0 ? stockMovements : undefined
+          );
 
-    return NextResponse.json({
-      success: true,
-      response: aiResponse,
-      timestamp: new Date().toISOString(),
-      hasMovementData: stockMovements.length > 0,
-      usedFallback,
+          for await (const chunk of generator) {
+            // Send each chunk as a Server-Sent Event
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`));
+          }
+
+          // Send done signal
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, hasMovementData: stockMovements.length > 0 })}\n\n`));
+          controller.close();
+        } catch (error) {
+          console.error('Stream error:', error);
+          // Send error as final message
+          const errorMessage = getFallbackResponse(message, inventory as InventoryItem[]);
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: errorMessage, error: true })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
   } catch (error: unknown) {
-    console.error('Error in AI assistant API:', error);
-
-    // Try to provide a fallback response
-    try {
-      const supabase = createClient(supabaseUrl, serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-
-      const body = await request.clone().json().catch(() => ({}));
-      const { message, orgId } = body;
-
-      if (message && orgId) {
-        const { data: inventory } = await supabase
-          .from('inventory_items')
-          .select('*')
-          .eq('org_id', orgId);
-
-        if (inventory) {
-          const fallback = getFallbackResponse(message, inventory as InventoryItem[]);
-          return NextResponse.json({
-            success: true,
-            response: fallback,
-            timestamp: new Date().toISOString(),
-            usedFallback: true,
-          });
-        }
-      }
-    } catch {
-      // Ignore fallback errors
-    }
-
+    console.error('Error in streaming AI assistant API:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    return NextResponse.json(
-      {
+    return new Response(
+      JSON.stringify({
         error: 'Something went wrong',
         message: errorMessage,
         suggestion: 'Please try again. If the problem persists, try refreshing the page.',
-      },
-      { status: 500 }
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
-
