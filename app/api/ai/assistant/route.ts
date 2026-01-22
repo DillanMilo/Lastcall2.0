@@ -178,9 +178,14 @@ export async function POST(request: NextRequest) {
     // Fetch stock movements for smart ordering recommendations
     const stockMovements = await getStockMovements(orgId);
 
-    // Check if this is an action request (setting expiry, updating quantities, etc.)
-    const actionKeywords = ['set expiry', 'set expiration', 'update expiry', 'change expiry', 'set all', 'update all'];
-    const isLikelyAction = actionKeywords.some(keyword => 
+    // Check if this is an action request (setting expiry, updating quantities, reorder levels, etc.)
+    const actionKeywords = [
+      'set expiry', 'set expiration', 'update expiry', 'change expiry',
+      'set reorder', 'update reorder', 'change reorder', 'reorder level', 'reorder threshold',
+      'set quantity', 'update quantity', 'change quantity',
+      'set all', 'update all', 'apply recommend', 'use recommend'
+    ];
+    const isLikelyAction = actionKeywords.some(keyword =>
       message.toLowerCase().includes(keyword)
     );
 

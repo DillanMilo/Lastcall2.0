@@ -18,10 +18,10 @@ interface AIAssistantProps {
 
 const SUGGESTED_QUESTIONS = [
   { text: "What should I order?", icon: "order" },
+  { text: "Optimize reorder levels", icon: "reorder" },
   { text: "What's expiring soon?", icon: "expire" },
-  { text: "Set expiry dates", icon: "calendar" },
-  { text: "Daily summary", icon: "summary" },
   { text: "Low stock alerts", icon: "alert" },
+  { text: "Daily summary", icon: "summary" },
 ];
 
 function getWelcomeMessage(): Message {

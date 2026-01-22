@@ -95,13 +95,19 @@ Respond with JSON only:
     "name_contains": "product name pattern if mentioned (e.g. 'Biltong', 'Nuts')",
     "category": "category if mentioned"
   },
-  "value": "the new value (date as YYYY-MM-DD for expiry, number for quantity/threshold)",
+  "value": "the new value (date as YYYY-MM-DD for expiry, INTEGER NUMBER ONLY for quantity/threshold - no text, just digits)",
   "confidence": 0.0-1.0
 }
+
+IMPORTANT: For quantity and reorder threshold values, extract ONLY the number as a string of digits. Do not include units like "units" or other text.
 
 Examples:
 - "Set expiry for all Biltong to March 2026" → {"action":"set_expiry","filters":{"name_contains":"Biltong"},"value":"2026-03-31","confidence":0.9}
 - "Update invoice INV-123 expiry to June 30, 2026" → {"action":"set_expiry","filters":{"invoice":"INV-123"},"value":"2026-06-30","confidence":0.95}
+- "Set reorder level for Biltong to 50" → {"action":"set_reorder_threshold","filters":{"name_contains":"Biltong"},"value":"50","confidence":0.95}
+- "Set reorder threshold for all Nuts to 25 units" → {"action":"set_reorder_threshold","filters":{"name_contains":"Nuts"},"value":"25","confidence":0.9}
+- "Update reorder level for SKU ABC123 to 100" → {"action":"set_reorder_threshold","filters":{"sku":"ABC123"},"value":"100","confidence":0.95}
+- "Change quantity of Droewors to 75" → {"action":"update_quantity","filters":{"name_contains":"Droewors"},"value":"75","confidence":0.9}
 - "What's running low?" → {"action":"none","filters":{},"confidence":1.0}`,
       },
       {
