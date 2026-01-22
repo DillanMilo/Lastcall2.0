@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader2, X, Sparkles, RotateCcw, Zap } from "lucide-react";
@@ -9,6 +9,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  isStreaming?: boolean;
 }
 
 interface AIAssistantProps {
@@ -24,6 +25,58 @@ const SUGGESTED_QUESTIONS = [
   { text: "Daily summary", icon: "summary" },
 ];
 
+// Error types for better UX
+type ErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
+
+interface ParsedError {
+  type: ErrorType;
+  message: string;
+  action?: string;
+}
+
+function parseError(error: unknown, responseData?: Record<string, unknown>): ParsedError {
+  // Check for rate limit from response
+  if (responseData?.upgradeRequired) {
+    return {
+      type: 'rate_limit',
+      message: `You've used all your AI requests this month (${responseData.currentCount}/${responseData.limit}).`,
+      action: 'Upgrade your plan for more AI capabilities.',
+    };
+  }
+
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return {
+      type: 'network',
+      message: 'Unable to connect to the AI service.',
+      action: 'Check your internet connection and try again.',
+    };
+  }
+
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+    return {
+      type: 'server',
+      message: 'The request took too long.',
+      action: 'Try a shorter question or try again in a moment.',
+    };
+  }
+
+  if (errorMessage.includes('500') || errorMessage.includes('502') || errorMessage.includes('503')) {
+    return {
+      type: 'server',
+      message: 'AI service is temporarily unavailable.',
+      action: 'Please try again in a few seconds.',
+    };
+  }
+
+  return {
+    type: 'unknown',
+    message: errorMessage || 'Something went wrong.',
+    action: 'Please try again.',
+  };
+}
+
 function getWelcomeMessage(): Message {
   return {
     role: "assistant",
@@ -34,7 +87,7 @@ function getWelcomeMessage(): Message {
 }
 
 // Typing indicator with warm pulse
-function TypingIndicator() {
+function TypingIndicator({ isStreaming }: { isStreaming?: boolean }) {
   return (
     <div className="flex items-center gap-1.5 px-4 py-3">
       <div className="flex gap-1">
@@ -48,25 +101,41 @@ function TypingIndicator() {
           />
         ))}
       </div>
-      <span className="text-xs text-muted-foreground ml-2 opacity-70">thinking...</span>
+      <span className="text-xs text-muted-foreground ml-2 opacity-70">
+        {isStreaming ? "responding..." : "thinking..."}
+      </span>
     </div>
+  );
+}
+
+// Streaming cursor for real-time response feel
+function StreamingCursor() {
+  return (
+    <span className="inline-block w-2 h-4 bg-primary/60 ml-0.5 animate-pulse" />
   );
 }
 
 // Message bubble with distinctive styling
 function MessageBubble({ message, isLatest }: { message: Message; isLatest: boolean }) {
   const isUser = message.role === "user";
+  const isStreaming = message.isStreaming && message.content.length > 0;
+  const isWaiting = message.isStreaming && message.content.length === 0;
+
+  // Don't render empty streaming messages as bubbles
+  if (isWaiting) {
+    return null;
+  }
 
   return (
     <div
       className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"} ${
-        isLatest ? "animate-message-in" : ""
+        isLatest && !isStreaming ? "animate-message-in" : ""
       }`}
     >
       {/* AI Avatar */}
       {!isUser && (
         <div className="relative flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center border border-primary/10 shadow-sm">
+          <div className={`w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center border border-primary/10 shadow-sm ${isStreaming ? 'animate-pulse' : ''}`}>
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
           {/* Subtle glow */}
@@ -90,22 +159,25 @@ function MessageBubble({ message, isLatest }: { message: Message; isLatest: bool
         <div className="px-4 py-3">
           <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
             {message.content}
+            {isStreaming && <StreamingCursor />}
           </p>
         </div>
 
-        {/* Timestamp */}
-        <div
-          className={`px-4 pb-2 ${
-            isUser ? "text-primary-foreground/60" : "text-muted-foreground/60"
-          }`}
-        >
-          <span className="text-[10px] font-mono">
-            {message.timestamp.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-        </div>
+        {/* Timestamp - only show when not streaming */}
+        {!isStreaming && (
+          <div
+            className={`px-4 pb-2 ${
+              isUser ? "text-primary-foreground/60" : "text-muted-foreground/60"
+            }`}
+          >
+            <span className="text-[10px] font-mono">
+              {message.timestamp.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* User Avatar */}
@@ -137,8 +209,10 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         const messagesWithDates = parsed.map((m) => ({
           ...m,
           timestamp: new Date(m.timestamp),
+          isStreaming: false, // Ensure no streaming state persists
         }));
-        setMessages(messagesWithDates.slice(-10));
+        // Increased from 10 to 20 for better context
+        setMessages(messagesWithDates.slice(-20));
       } catch {
         setMessages([getWelcomeMessage()]);
       }
@@ -149,7 +223,10 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
   useEffect(() => {
     if (messages.length > 0) {
-      const messagesToSave = messages.slice(-12);
+      // Only save non-streaming messages, and save more (24 instead of 12)
+      const messagesToSave = messages
+        .filter(m => !m.isStreaming)
+        .slice(-24);
       localStorage.setItem(`ai-chat-${orgId}`, JSON.stringify(messagesToSave));
     }
   }, [messages, orgId]);
@@ -163,7 +240,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
-  const handleSend = async (messageText?: string) => {
+  const handleSend = useCallback(async (messageText?: string) => {
     const userMessage = messageText || input.trim();
     if (!userMessage || loading) return;
 
@@ -177,12 +254,22 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
     setInput("");
     setLoading(true);
 
+    // Create placeholder for streaming response
+    const streamingMessage: Message = {
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+    setMessages((prev) => [...prev, streamingMessage]);
+
     try {
-      const recentMessages = messages.slice(-10).filter((m) => {
+      // Get recent messages for context (increased from 10 to 20)
+      const recentMessages = messages.slice(-20).filter((m) => {
         return !(m.role === "assistant" && m.content.includes("Hey! I'm your"));
       });
 
-      const response = await fetch("/api/ai/assistant", {
+      const response = await fetch("/api/ai/assistant/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,34 +282,145 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
         }),
       });
 
-      const data: { response?: string; error?: string } = await response.json();
+      // Check for non-streaming error responses (rate limit, etc.)
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to get response");
+        if (!response.ok) {
+          const parsed = parseError(new Error(data.error || 'Request failed'), data);
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIndex = updated.length - 1;
+            if (updated[lastIndex]?.isStreaming) {
+              updated[lastIndex] = {
+                role: "assistant",
+                content: `⚠️ **${parsed.message}**${parsed.action ? `\n\n${parsed.action}` : ''}`,
+                timestamp: new Date(),
+                isStreaming: false,
+              };
+            }
+            return updated;
+          });
+          return;
+        }
+
+        // Non-streaming response (for actions)
+        if (data.response) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIndex = updated.length - 1;
+            if (updated[lastIndex]?.isStreaming) {
+              updated[lastIndex] = {
+                role: "assistant",
+                content: data.response,
+                timestamp: new Date(),
+                isStreaming: false,
+              };
+            }
+            return updated;
+          });
+          return;
+        }
       }
 
-      const aiMessage: Message = {
-        role: "assistant",
-        content:
-          data.response ??
-          "I couldn't generate a response, but your request was received.",
-        timestamp: new Date(),
-      };
+      // Handle streaming response
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-      setMessages((prev) => [...prev, aiMessage]);
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.content) {
+                fullContent += data.content;
+                // Update the streaming message with new content
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastIndex = updated.length - 1;
+                  if (updated[lastIndex]?.isStreaming) {
+                    updated[lastIndex] = {
+                      ...updated[lastIndex],
+                      content: fullContent,
+                    };
+                  }
+                  return updated;
+                });
+              }
+
+              if (data.done) {
+                // Finalize the message
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastIndex = updated.length - 1;
+                  if (updated[lastIndex]?.isStreaming) {
+                    updated[lastIndex] = {
+                      ...updated[lastIndex],
+                      isStreaming: false,
+                    };
+                  }
+                  return updated;
+                });
+              }
+            } catch {
+              // Ignore parse errors for malformed chunks
+            }
+          }
+        }
+      }
+
+      // Ensure streaming flag is removed
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex]?.isStreaming) {
+          updated[lastIndex] = {
+            ...updated[lastIndex],
+            isStreaming: false,
+            content: fullContent || "I couldn't generate a response. Please try again.",
+          };
+        }
+        return updated;
+      });
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
       console.error("Error getting AI response:", error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: `Sorry, I hit an error: ${message}. Try again?`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      const parsed = parseError(error);
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex]?.isStreaming) {
+          updated[lastIndex] = {
+            role: "assistant",
+            content: `⚠️ **${parsed.message}**${parsed.action ? `\n\n${parsed.action}` : ''}`,
+            timestamp: new Date(),
+            isStreaming: false,
+          };
+        }
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, loading, messages, orgId]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -301,7 +499,8 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
           />
         ))}
 
-        {loading && (
+        {/* Show typing indicator when waiting for first chunk */}
+        {loading && messages[messages.length - 1]?.isStreaming && messages[messages.length - 1]?.content === "" && (
           <div className="flex gap-3 justify-start animate-message-in">
             <div className="relative flex-shrink-0">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center border border-primary/10">
@@ -309,7 +508,7 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
               </div>
             </div>
             <div className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl rounded-bl-md shadow-sm">
-              <TypingIndicator />
+              <TypingIndicator isStreaming={false} />
             </div>
           </div>
         )}
