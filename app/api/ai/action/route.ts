@@ -60,7 +60,7 @@ async function parseActionIntent(
   message: string,
   inventoryContext: string
 ): Promise<{
-  action: 'set_expiry' | 'update_quantity' | 'set_reorder_threshold' | 'none';
+  action: 'set_expiry' | 'update_quantity' | 'add_quantity' | 'subtract_quantity' | 'set_reorder_threshold' | 'none';
   filters: {
     invoice?: string;
     sku?: string;
@@ -79,7 +79,9 @@ async function parseActionIntent(
 
 Available actions:
 - set_expiry: Set expiration date for items
-- update_quantity: Adjust quantity for items
+- update_quantity: Set quantity to a specific number (absolute value)
+- add_quantity: Add/increase quantity (received stock, restocking)
+- subtract_quantity: Subtract/decrease quantity (sold, used, damaged, removed)
 - set_reorder_threshold: Set reorder point for items
 - none: User is just asking a question, not requesting an action
 
@@ -88,7 +90,7 @@ ${inventoryContext}
 
 Respond with JSON only:
 {
-  "action": "set_expiry" | "update_quantity" | "set_reorder_threshold" | "none",
+  "action": "set_expiry" | "update_quantity" | "add_quantity" | "subtract_quantity" | "set_reorder_threshold" | "none",
   "filters": {
     "invoice": "invoice number if specified",
     "sku": "specific SKU if mentioned",
@@ -101,13 +103,21 @@ Respond with JSON only:
 
 IMPORTANT: For quantity and reorder threshold values, extract ONLY the number as a string of digits. Do not include units like "units" or other text.
 
+IMPORTANT: Distinguish between SET (absolute) vs ADD/SUBTRACT (relative):
+- "Set quantity to 50" or "Change quantity to 50" → update_quantity (absolute)
+- "Add 20" or "Received 20" or "Restock 20" or "Got 20 more" → add_quantity (relative increase)
+- "Remove 10" or "Sold 10" or "Used 10" or "Subtract 10" or "Damaged 5" → subtract_quantity (relative decrease)
+
 Examples:
 - "Set expiry for all Biltong to March 2026" → {"action":"set_expiry","filters":{"name_contains":"Biltong"},"value":"2026-03-31","confidence":0.9}
 - "Update invoice INV-123 expiry to June 30, 2026" → {"action":"set_expiry","filters":{"invoice":"INV-123"},"value":"2026-06-30","confidence":0.95}
 - "Set reorder level for Biltong to 50" → {"action":"set_reorder_threshold","filters":{"name_contains":"Biltong"},"value":"50","confidence":0.95}
-- "Set reorder threshold for all Nuts to 25 units" → {"action":"set_reorder_threshold","filters":{"name_contains":"Nuts"},"value":"25","confidence":0.9}
-- "Update reorder level for SKU ABC123 to 100" → {"action":"set_reorder_threshold","filters":{"sku":"ABC123"},"value":"100","confidence":0.95}
 - "Change quantity of Droewors to 75" → {"action":"update_quantity","filters":{"name_contains":"Droewors"},"value":"75","confidence":0.9}
+- "Add 20 units to Biltong" → {"action":"add_quantity","filters":{"name_contains":"Biltong"},"value":"20","confidence":0.95}
+- "Received 100 Droewors" → {"action":"add_quantity","filters":{"name_contains":"Droewors"},"value":"100","confidence":0.9}
+- "Sold 15 Nuts today" → {"action":"subtract_quantity","filters":{"name_contains":"Nuts"},"value":"15","confidence":0.9}
+- "Remove 5 from invoice INV-123" → {"action":"subtract_quantity","filters":{"invoice":"INV-123"},"value":"5","confidence":0.95}
+- "We used 10 of the Biltong" → {"action":"subtract_quantity","filters":{"name_contains":"Biltong"},"value":"10","confidence":0.9}
 - "What's running low?" → {"action":"none","filters":{},"confidence":1.0}`,
       },
       {
@@ -183,18 +193,97 @@ async function executeAction(
 
   // Execute the action
   const itemIds = matchingItems.map(i => i.id);
-  let updateData: Record<string, unknown> = {};
+  let updateError: { message: string } | null = null;
 
   switch (action) {
-    case 'set_expiry':
-      updateData = { expiration_date: value };
+    case 'set_expiry': {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ expiration_date: value })
+        .in('id', itemIds);
+      updateError = error;
       break;
-    case 'update_quantity':
-      updateData = { quantity: parseInt(value) || 0 };
+    }
+    case 'update_quantity': {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ quantity: parseInt(value) || 0 })
+        .in('id', itemIds);
+      updateError = error;
       break;
-    case 'set_reorder_threshold':
-      updateData = { reorder_threshold: parseInt(value) || 0 };
+    }
+    case 'add_quantity': {
+      // Fetch current quantities and add the value
+      const { data: currentItems, error: fetchErr } = await supabase
+        .from('inventory_items')
+        .select('id, quantity')
+        .in('id', itemIds);
+
+      if (fetchErr) {
+        return {
+          success: false,
+          action,
+          itemsAffected: 0,
+          message: `Error fetching current quantities: ${fetchErr.message}`,
+        };
+      }
+
+      const addValue = parseInt(value) || 0;
+
+      // Update each item with its new quantity
+      for (const item of currentItems || []) {
+        const newQuantity = (item.quantity || 0) + addValue;
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ quantity: newQuantity })
+          .eq('id', item.id);
+        if (error) {
+          updateError = error;
+          break;
+        }
+      }
       break;
+    }
+    case 'subtract_quantity': {
+      // Fetch current quantities and subtract the value
+      const { data: currentItems, error: fetchErr } = await supabase
+        .from('inventory_items')
+        .select('id, quantity')
+        .in('id', itemIds);
+
+      if (fetchErr) {
+        return {
+          success: false,
+          action,
+          itemsAffected: 0,
+          message: `Error fetching current quantities: ${fetchErr.message}`,
+        };
+      }
+
+      const subtractValue = parseInt(value) || 0;
+
+      // Update each item with its new quantity (don't go below 0)
+      for (const item of currentItems || []) {
+        const newQuantity = Math.max(0, (item.quantity || 0) - subtractValue);
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ quantity: newQuantity })
+          .eq('id', item.id);
+        if (error) {
+          updateError = error;
+          break;
+        }
+      }
+      break;
+    }
+    case 'set_reorder_threshold': {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ reorder_threshold: parseInt(value) || 0 })
+        .in('id', itemIds);
+      updateError = error;
+      break;
+    }
     default:
       return {
         success: false,
@@ -203,11 +292,6 @@ async function executeAction(
         message: 'Unknown action type',
       };
   }
-
-  const { error: updateError } = await supabase
-    .from('inventory_items')
-    .update(updateData)
-    .in('id', itemIds);
 
   if (updateError) {
     return {
@@ -221,11 +305,25 @@ async function executeAction(
   const affectedNames = matchingItems.slice(0, 5).map(i => i.name);
   const moreCount = matchingItems.length > 5 ? matchingItems.length - 5 : 0;
 
+  // Create action-specific success message
+  let successMessage = `Successfully updated ${matchingItems.length} item(s)`;
+  if (action === 'add_quantity') {
+    successMessage = `Added ${value} units to ${matchingItems.length} item(s)`;
+  } else if (action === 'subtract_quantity') {
+    successMessage = `Removed ${value} units from ${matchingItems.length} item(s)`;
+  } else if (action === 'set_expiry') {
+    successMessage = `Set expiration date to ${value} for ${matchingItems.length} item(s)`;
+  } else if (action === 'set_reorder_threshold') {
+    successMessage = `Set reorder threshold to ${value} for ${matchingItems.length} item(s)`;
+  } else if (action === 'update_quantity') {
+    successMessage = `Set quantity to ${value} for ${matchingItems.length} item(s)`;
+  }
+
   return {
     success: true,
     action,
     itemsAffected: matchingItems.length,
-    message: `Successfully updated ${matchingItems.length} item(s)`,
+    message: successMessage,
     details: [
       ...affectedNames,
       ...(moreCount > 0 ? [`...and ${moreCount} more`] : []),

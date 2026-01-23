@@ -6,7 +6,7 @@ import { AIAssistant } from "@/components/inventory/AIAssistant";
 import { useAuth } from "@/lib/auth/useAuth";
 
 export function FloatingAIButton() {
-  const { orgId } = useAuth();
+  const { orgId, userWithOrg } = useAuth();
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -97,6 +97,8 @@ export function FloatingAIButton() {
               <AIAssistant
                 orgId={orgId}
                 onClose={() => setShowAIAssistant(false)}
+                subscriptionTier={userWithOrg?.organization?.subscription_tier}
+                billingExempt={userWithOrg?.organization?.billing_exempt}
               />
             </div>
           </div>

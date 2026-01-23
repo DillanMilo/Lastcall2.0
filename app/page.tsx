@@ -451,7 +451,7 @@ export default function Home() {
                 Meet your inventory <span className="text-primary">co-pilot</span>
               </h2>
               <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                Stop digging through reports. Just ask. Our AI assistant understands your inventory and gives you instant, actionable answers.
+                Stop digging through reports. Just ask. Our AI assistant understands your inventory and gives you instant, actionable answers. Type or speak — it understands both.
               </p>
 
               <div className="space-y-4">

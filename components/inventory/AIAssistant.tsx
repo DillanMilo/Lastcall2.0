@@ -3,7 +3,61 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, X, Sparkles, RotateCcw, Zap } from "lucide-react";
+import { Send, Loader2, X, Sparkles, RotateCcw, Zap, Mic, MicOff } from "lucide-react";
+import { checkFeatureAccess } from "@/lib/stripe/tier-limits";
+import type { PlanTier } from "@/lib/stripe/config";
+
+// Web Speech API type definitions
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -15,6 +69,8 @@ interface Message {
 interface AIAssistantProps {
   orgId: string;
   onClose?: () => void;
+  subscriptionTier?: PlanTier | 'trial';
+  billingExempt?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -190,12 +246,24 @@ function MessageBubble({ message, isLatest }: { message: Message; isLatest: bool
   );
 }
 
-export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
+export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Check if voice input is available for this tier (Starter+)
+  // Treat 'trial' as 'free' for feature access
+  const effectiveTier: PlanTier = subscriptionTier === 'trial' ? 'free' : (subscriptionTier || 'free');
+  const voiceInputAccess = checkFeatureAccess(
+    effectiveTier,
+    'voice_input',
+    billingExempt
+  );
+  const canUseVoiceInput = voiceInputAccess.allowed;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -239,6 +307,60 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognitionAPI) {
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          setInput(transcript);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in your browser.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInput(''); // Clear input when starting new dictation
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  }, [isListening]);
 
   const handleSend = useCallback(async (messageText?: string) => {
     const userMessage = messageText || input.trim();
@@ -540,18 +662,40 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
       {/* Input Area */}
       <div className="relative p-4 border-t border-border/50 bg-card/80 backdrop-blur-md safe-bottom">
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-2 items-center">
           <div className="relative flex-1">
             <Input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask about your inventory..."
-              disabled={loading}
-              className="w-full h-12 pl-4 pr-4 text-base rounded-xl bg-muted/50 border-border/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 placeholder:text-muted-foreground/50"
+              placeholder={isListening ? "Listening..." : "Ask about your inventory..."}
+              disabled={loading || isListening}
+              className={`w-full h-12 pl-4 pr-4 text-base rounded-xl bg-muted/50 border-border/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 placeholder:text-muted-foreground/50 ${isListening ? 'border-red-500/50 bg-red-500/5' : ''}`}
             />
           </div>
+          {/* Microphone Button - Starter+ only */}
+          {canUseVoiceInput && (
+            <Button
+              onClick={toggleListening}
+              disabled={loading}
+              size="icon"
+              variant={isListening ? "destructive" : "outline"}
+              className={`flex-shrink-0 h-12 w-12 rounded-xl transition-all duration-200 ${
+                isListening
+                  ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 animate-pulse-recording'
+                  : 'hover:bg-muted/80 hover:border-primary/50'
+              }`}
+              title={isListening ? "Stop recording" : "Start voice input"}
+            >
+              {isListening ? (
+                <MicOff className="h-5 w-5" />
+              ) : (
+                <Mic className="h-5 w-5" />
+              )}
+            </Button>
+          )}
+          {/* Send Button */}
           <Button
             onClick={() => handleSend()}
             disabled={!input.trim() || loading}
@@ -613,6 +757,19 @@ export function AIAssistant({ orgId, onClose }: AIAssistantProps) {
 
         .animate-ping-slow {
           animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes pulse-recording {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+          }
+        }
+
+        .animate-pulse-recording {
+          animation: pulse-recording 1.5s ease-in-out infinite;
         }
       `}</style>
     </div>

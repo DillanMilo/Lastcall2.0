@@ -178,7 +178,7 @@ export async function logAIRequest(
  */
 export function checkFeatureAccess(
   tier: PlanTier,
-  feature: 'ai_assistant' | 'integrations' | 'api_access' | 'smart_ordering',
+  feature: 'ai_assistant' | 'integrations' | 'api_access' | 'smart_ordering' | 'voice_input',
   billingExempt?: boolean
 ): TierLimitResult {
   // Billing exempt organizations have access to all features
@@ -189,6 +189,7 @@ export function checkFeatureAccess(
 
   const featureRequirements: Record<string, number> = {
     ai_assistant: 0,      // All tiers (but with limits)
+    voice_input: 1,       // Starter+ (index 1)
     integrations: 2,      // Growth+ (index 2)
     api_access: 3,        // Pro+ (index 3)
     smart_ordering: 2,    // Growth+ (index 2)
