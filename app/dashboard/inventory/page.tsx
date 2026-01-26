@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem, ItemType, OPERATIONAL_CATEGORIES } from "@/types";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -22,6 +22,7 @@ import {
   Plus,
   Search,
   AlertTriangle,
+  AlertCircle,
   Edit2,
   Package,
   Grid3x3,
@@ -30,16 +31,54 @@ import {
   ChevronRight,
   Boxes,
   ShoppingCart,
+  X,
+  Clock,
 } from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { BulkEditModal } from "@/components/inventory/BulkEditModal";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
+import { MarkOrderedModal } from "@/components/inventory/MarkOrderedModal";
+import { MarkReceivedModal } from "@/components/inventory/MarkReceivedModal";
 
 const PAGE_SIZE = 50;
 
 export default function InventoryPage() {
+  return (
+    <Suspense fallback={<InventoryPageSkeleton />}>
+      <InventoryPageContent />
+    </Suspense>
+  );
+}
+
+function InventoryPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-10 w-48 animate-shimmer rounded-lg" />
+      <div className="h-12 w-64 animate-shimmer rounded-xl" />
+      <Card className="animate-fade-up">
+        <CardHeader className="pb-4">
+          <div className="h-10 animate-shimmer rounded-lg" />
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-3 py-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="h-16 rounded-lg animate-shimmer"
+                style={{ animationDelay: `${i * 50}ms` }}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function InventoryPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, orgId, loading: authLoading } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +91,18 @@ export default function InventoryPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [activeTab, setActiveTab] = useState<ItemType>("stock");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [showPendingOrders, setShowPendingOrders] = useState(false);
+  const [markOrderedItems, setMarkOrderedItems] = useState<InventoryItem | InventoryItem[] | null>(null);
+  const [markReceivedItem, setMarkReceivedItem] = useState<InventoryItem | null>(null);
+
+  // Initialize low stock filter from URL params
+  useEffect(() => {
+    const filter = searchParams.get("filter");
+    if (filter === "lowStock") {
+      setShowLowStockOnly(true);
+    }
+  }, [searchParams]);
 
   const fetchInventory = useCallback(async () => {
     if (!orgId) return;
@@ -141,9 +192,39 @@ export default function InventoryPage() {
     }
   }, [orgId, authLoading, user, fetchInventory]);
 
+  // Low stock items exclude items that are already ordered
   const lowStockItems = items.filter(
-    (item) => item.quantity <= item.reorder_threshold
+    (item) => item.quantity <= item.reorder_threshold && item.order_status !== 'ordered'
   );
+
+  // Pending order items
+  const pendingItems = items.filter(
+    (item) => item.order_status === 'ordered'
+  );
+
+  // Filter items based on view toggle
+  const displayedItems = showPendingOrders
+    ? pendingItems
+    : showLowStockOnly
+      ? lowStockItems
+      : items;
+
+  const clearLowStockFilter = () => {
+    setShowLowStockOnly(false);
+    setShowPendingOrders(false);
+    // Update URL without the filter param
+    router.replace("/dashboard/inventory");
+  };
+
+  const showPendingOrdersView = () => {
+    setShowPendingOrders(true);
+    setShowLowStockOnly(false);
+  };
+
+  const showLowStockView = () => {
+    setShowLowStockOnly(true);
+    setShowPendingOrders(false);
+  };
 
   const invoiceCounts = items.reduce((acc, item) => {
     if (item.invoice) {
@@ -183,33 +264,127 @@ export default function InventoryPage() {
 
       {/* Inventory Type Tabs */}
       <div
-        className="flex gap-2 p-1 bg-muted rounded-xl w-fit animate-fade-up"
+        className="flex flex-wrap gap-2 p-1 bg-muted rounded-xl w-fit animate-fade-up"
         style={{ animationDelay: '50ms' }}
       >
         <Button
-          variant={activeTab === "stock" ? "default" : "ghost"}
+          variant={activeTab === "stock" && !showPendingOrders ? "default" : "ghost"}
           size="sm"
-          onClick={() => setActiveTab("stock")}
+          onClick={() => {
+            setActiveTab("stock");
+            setShowPendingOrders(false);
+            setShowLowStockOnly(false);
+          }}
           className="gap-2"
         >
           <ShoppingCart className="h-4 w-4" />
           Stock Items
         </Button>
         <Button
-          variant={activeTab === "operational" ? "default" : "ghost"}
+          variant={activeTab === "operational" && !showPendingOrders ? "default" : "ghost"}
           size="sm"
-          onClick={() => setActiveTab("operational")}
+          onClick={() => {
+            setActiveTab("operational");
+            setShowPendingOrders(false);
+            setShowLowStockOnly(false);
+          }}
           className="gap-2"
         >
           <Boxes className="h-4 w-4" />
           Operational
         </Button>
+        <Button
+          variant={showPendingOrders ? "default" : "ghost"}
+          size="sm"
+          onClick={showPendingOrdersView}
+          className="gap-2"
+        >
+          <Clock className="h-4 w-4" />
+          Pending Orders
+          {pendingItems.length > 0 && (
+            <Badge variant="secondary" size="sm" className="ml-1 bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              {pendingItems.length}
+            </Badge>
+          )}
+        </Button>
       </div>
 
-      {/* Low Stock Alert */}
-      {lowStockItems.length > 0 && (
+      {/* Pending Orders View Active */}
+      {showPendingOrders && (
         <div
-          className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/20 animate-fade-up"
+          className="flex items-center gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 animate-fade-up"
+          style={{ animationDelay: '150ms' }}
+        >
+          <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+            <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-blue-600 dark:text-blue-400">
+              Pending Orders
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''} awaiting delivery
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearLowStockFilter}
+            className="shrink-0"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Back to All
+          </Button>
+        </div>
+      )}
+
+      {/* Low Stock Filter Active */}
+      {showLowStockOnly && !showPendingOrders && (
+        <div
+          className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-xl bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/20 animate-fade-up"
+          style={{ animationDelay: '150ms' }}
+        >
+          <div className="w-10 h-10 rounded-lg bg-[hsl(var(--warning))]/20 flex items-center justify-center shrink-0">
+            <AlertCircle className="h-5 w-5 text-[hsl(var(--warning))]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-[hsl(var(--warning))]">
+              Showing Low Stock Items Only
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below reorder threshold
+            </p>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {lowStockItems.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMarkOrderedItems(lowStockItems)}
+                className="flex-1 sm:flex-none text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-950/50"
+              >
+                <ShoppingCart className="h-4 w-4 mr-1" />
+                Mark All as Ordered
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearLowStockFilter}
+              className="shrink-0"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Low Stock Alert (when not filtering) */}
+      {!showLowStockOnly && !showPendingOrders && lowStockItems.length > 0 && (
+        <button
+          onClick={showLowStockView}
+          className="w-full flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/20 animate-fade-up hover:bg-[hsl(var(--warning))]/15 transition-colors text-left"
           style={{ animationDelay: '150ms' }}
         >
           <div className="w-10 h-10 rounded-lg bg-[hsl(var(--warning))]/20 flex items-center justify-center shrink-0">
@@ -220,10 +395,10 @@ export default function InventoryPage() {
               Low Stock Alert
             </p>
             <p className="text-sm text-muted-foreground">
-              {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below reorder threshold
+              {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below reorder threshold — click to view
             </p>
           </div>
-        </div>
+        </button>
       )}
 
       {/* Main Card */}
@@ -283,10 +458,12 @@ export default function InventoryPage() {
                 />
               ))}
             </div>
-          ) : items.length === 0 ? (
+          ) : displayedItems.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                {activeTab === 'stock' ? (
+                {showPendingOrders ? (
+                  <Clock className="w-8 h-8 text-muted-foreground" />
+                ) : activeTab === 'stock' ? (
                   <ShoppingCart className="w-8 h-8 text-muted-foreground" />
                 ) : (
                   <Boxes className="w-8 h-8 text-muted-foreground" />
@@ -295,18 +472,26 @@ export default function InventoryPage() {
               <p className="text-lg font-medium mb-1">
                 {debouncedSearch
                   ? "No results found"
-                  : activeTab === 'stock'
-                    ? "No stock items yet"
-                    : "No operational items yet"}
+                  : showPendingOrders
+                    ? "No pending orders"
+                    : showLowStockOnly
+                      ? "No low stock items"
+                      : activeTab === 'stock'
+                        ? "No stock items yet"
+                        : "No operational items yet"}
               </p>
               <p className="text-sm text-muted-foreground mb-6">
                 {debouncedSearch
                   ? `No items match "${debouncedSearch}"`
-                  : activeTab === 'stock'
-                    ? "Start by importing your inventory or adding stock items manually"
-                    : "Add operational items like cleaning supplies, office materials, or tableware"}
+                  : showPendingOrders
+                    ? "Items marked as ordered will appear here until received"
+                    : showLowStockOnly
+                      ? "All items are above their reorder threshold"
+                      : activeTab === 'stock'
+                        ? "Start by importing your inventory or adding stock items manually"
+                        : "Add operational items like cleaning supplies, office materials, or tableware"}
               </p>
-              {!debouncedSearch && (
+              {!debouncedSearch && !showPendingOrders && !showLowStockOnly && (
                 <div className="flex gap-3 justify-center">
                   {activeTab === 'stock' && (
                     <Button onClick={() => router.push("/dashboard/import")}>
@@ -318,10 +503,15 @@ export default function InventoryPage() {
                   </Button>
                 </div>
               )}
+              {(showPendingOrders || showLowStockOnly) && (
+                <Button variant="outline" onClick={clearLowStockFilter}>
+                  Back to All Items
+                </Button>
+              )}
             </div>
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {items.map((item, index) => (
+              {displayedItems.map((item, index) => (
                 <InventoryCard
                   key={item.id}
                   item={item}
@@ -335,6 +525,9 @@ export default function InventoryPage() {
                   invoiceCount={
                     item.invoice ? invoiceCounts[item.invoice] : undefined
                   }
+                  showOrderActions={showLowStockOnly || showPendingOrders}
+                  onMarkOrdered={() => setMarkOrderedItems(item)}
+                  onMarkReceived={() => setMarkReceivedItem(item)}
                 />
               ))}
             </div>
@@ -355,7 +548,7 @@ export default function InventoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item, index) => (
+                    {displayedItems.map((item, index) => (
                       <TableRow
                         key={item.id}
                         className="animate-fade-up opacity-0"
@@ -420,13 +613,47 @@ export default function InventoryPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setEditingItem(item)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Show order status badge */}
+                            {item.order_status === 'ordered' && (
+                              <Badge variant="outline" size="sm" className="text-blue-600 border-blue-300 dark:border-blue-700 dark:text-blue-400 mr-2">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pending
+                              </Badge>
+                            )}
+                            {/* Order action buttons when in low stock or pending view */}
+                            {(showLowStockOnly || showPendingOrders) && (
+                              <>
+                                {item.quantity <= item.reorder_threshold && item.order_status !== 'ordered' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setMarkOrderedItems(item)}
+                                    className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                                  >
+                                    <ShoppingCart className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {item.order_status === 'ordered' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setMarkReceivedItem(item)}
+                                    className="h-8 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/50"
+                                  >
+                                    <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setEditingItem(item)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -496,6 +723,22 @@ export default function InventoryPage() {
           invoice={bulkEditInvoice}
           itemCount={invoiceCounts[bulkEditInvoice]}
           onClose={() => setBulkEditInvoice(null)}
+          onSuccess={fetchInventory}
+        />
+      )}
+
+      {markOrderedItems && (
+        <MarkOrderedModal
+          items={markOrderedItems}
+          onClose={() => setMarkOrderedItems(null)}
+          onSuccess={fetchInventory}
+        />
+      )}
+
+      {markReceivedItem && (
+        <MarkReceivedModal
+          item={markReceivedItem}
+          onClose={() => setMarkReceivedItem(null)}
           onSuccess={fetchInventory}
         />
       )}

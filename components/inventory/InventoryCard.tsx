@@ -4,25 +4,32 @@ import { InventoryItem, OPERATIONAL_CATEGORIES } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Package, Calendar, Tag, Boxes } from "lucide-react";
+import { Edit2, Package, Calendar, Tag, Boxes, ShoppingCart, PackageCheck, Clock } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 interface InventoryCardProps {
   item: InventoryItem;
   onEdit: () => void;
   onBulkEdit?: () => void;
+  onMarkOrdered?: () => void;
+  onMarkReceived?: () => void;
   invoiceCount?: number;
   index?: number;
+  showOrderActions?: boolean;
 }
 
 export function InventoryCard({
   item,
   onEdit,
   onBulkEdit,
+  onMarkOrdered,
+  onMarkReceived,
   invoiceCount,
   index = 0,
+  showOrderActions = false,
 }: InventoryCardProps) {
   const isLowStock = item.quantity <= item.reorder_threshold;
+  const isPendingOrder = item.order_status === 'ordered';
   const isOperational = item.item_type === 'operational';
   const operationalCategoryLabel = item.operational_category
     ? OPERATIONAL_CATEGORIES.find(c => c.value === item.operational_category)?.label
@@ -34,7 +41,8 @@ export function InventoryCard({
       hover
       className={cn(
         "animate-fade-up opacity-0 overflow-hidden",
-        isLowStock && "ring-1 ring-[hsl(var(--warning))]/30"
+        isLowStock && !isPendingOrder && "ring-1 ring-[hsl(var(--warning))]/30",
+        isPendingOrder && "ring-1 ring-blue-500/30"
       )}
       style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
     >
@@ -43,8 +51,14 @@ export function InventoryCard({
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-base line-clamp-2">{item.name}</h3>
+                {isPendingOrder && (
+                  <Badge variant="outline" size="sm" className="shrink-0 text-blue-600 border-blue-300 dark:border-blue-700 dark:text-blue-400">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Pending
+                  </Badge>
+                )}
                 {isOperational && (
                   <Badge variant="outline" size="sm" className="shrink-0 text-purple-600 border-purple-300 dark:border-purple-700 dark:text-purple-400">
                     <Boxes className="h-3 w-3 mr-1" />
@@ -140,10 +154,38 @@ export function InventoryCard({
           </div>
 
           {/* Low Stock Warning */}
-          {isLowStock && (
+          {isLowStock && !isPendingOrder && (
             <Badge variant="warning" className="w-full justify-center py-1.5">
               Below reorder point
             </Badge>
+          )}
+
+          {/* Order Action Buttons */}
+          {showOrderActions && (
+            <div className="pt-2">
+              {isLowStock && !isPendingOrder && onMarkOrdered && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onMarkOrdered}
+                  className="w-full text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-950/50"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Mark as Ordered
+                </Button>
+              )}
+              {isPendingOrder && onMarkReceived && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onMarkReceived}
+                  className="w-full text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/50"
+                >
+                  <PackageCheck className="h-4 w-4 mr-2" />
+                  Mark as Received
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </CardContent>

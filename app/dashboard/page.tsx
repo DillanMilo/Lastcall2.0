@@ -201,6 +201,7 @@ export default function DashboardPage() {
       icon: AlertCircle,
       color: "text-[hsl(var(--warning))]",
       bgColor: "bg-[hsl(var(--warning))]/10",
+      href: "/dashboard/inventory?filter=lowStock",
     },
     {
       title: "Expiring Soon",
@@ -338,11 +339,10 @@ export default function DashboardPage() {
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
-          return (
+          const cardContent = (
             <Card
-              key={stat.title}
               variant="elevated"
-              className="animate-fade-up opacity-0 overflow-hidden group"
+              className={`animate-fade-up opacity-0 overflow-hidden group ${stat.href ? 'cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all' : ''}`}
               style={{ animationDelay: `${(index + 1) * 100}ms`, animationFillMode: 'forwards' }}
             >
               <CardContent className="p-5">
@@ -350,6 +350,9 @@ export default function DashboardPage() {
                   <div className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center transition-transform group-hover:scale-110`}>
                     <Icon className={`h-5 w-5 ${stat.color}`} />
                   </div>
+                  {stat.href && (
+                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
                 </div>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold data-value tracking-tight">
@@ -364,6 +367,14 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+          );
+
+          return stat.href ? (
+            <Link key={stat.title} href={stat.href}>
+              {cardContent}
+            </Link>
+          ) : (
+            <div key={stat.title}>{cardContent}</div>
           );
         })}
       </div>

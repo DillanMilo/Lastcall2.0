@@ -38,6 +38,8 @@ export interface Organization {
 
 export type ItemType = 'stock' | 'operational';
 
+export type OrderStatus = 'ordered' | null;
+
 export type OperationalCategory =
   | 'cleaning'
   | 'office'
@@ -77,6 +79,7 @@ export interface InventoryItem {
   clover_item_id?: string;
   item_type: ItemType;
   operational_category?: OperationalCategory;
+  order_status?: OrderStatus;
   last_restock: string;
   created_at: string;
 }
