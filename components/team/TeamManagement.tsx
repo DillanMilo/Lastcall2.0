@@ -22,6 +22,7 @@ import {
   Check,
   AlertCircle,
   Clock,
+  UserMinus,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
@@ -61,6 +62,8 @@ export function TeamManagement() {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTeamData();
@@ -141,6 +144,39 @@ export function TeamManagement() {
       setTimeout(() => setCopiedUrl(null), 2000);
     } catch {
       setError("Failed to copy invite link");
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    // First click shows confirmation, second click removes
+    if (confirmRemove !== memberId) {
+      setConfirmRemove(memberId);
+      // Auto-reset confirmation after 3 seconds
+      setTimeout(() => setConfirmRemove(null), 3000);
+      return;
+    }
+
+    setRemovingMemberId(memberId);
+    setConfirmRemove(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/team/members?id=${memberId}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || result.message || "Failed to remove member");
+      }
+
+      setSuccess(result.message || "Team member removed successfully");
+      fetchTeamData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove team member");
+    } finally {
+      setRemovingMemberId(null);
     }
   };
 
@@ -313,23 +349,28 @@ export function TeamManagement() {
             <div className="space-y-2">
               {data.members.map((member) => {
                 const isCurrentUser = member.id === data.currentUser.id;
-                const isOwner = member.role === "owner";
+                const isMemberOwner = member.role === "owner";
                 const isAdmin = member.role === "admin";
-                const hasElevatedRole = isOwner || isAdmin;
+                const hasElevatedRole = isMemberOwner || isAdmin;
+                const currentUserIsOwner = data.currentUser.role === "owner";
+                const canRemove = currentUserIsOwner && !isCurrentUser && !isMemberOwner;
+                const isRemoving = removingMemberId === member.id;
+                const isConfirming = confirmRemove === member.id;
 
                 return (
                   <div
                     key={member.id}
                     className={cn(
                       "flex items-center justify-between p-3 rounded-lg border",
-                      isCurrentUser && "bg-primary/5 border-primary/20"
+                      isCurrentUser && "bg-primary/5 border-primary/20",
+                      isConfirming && "border-destructive/50 bg-destructive/5"
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-                          isOwner ? "bg-amber-500/10 text-amber-600" :
+                          isMemberOwner ? "bg-amber-500/10 text-amber-600" :
                           isAdmin ? "bg-primary/10 text-primary" : "bg-muted"
                         )}
                       >
@@ -347,13 +388,13 @@ export function TeamManagement() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isOwner && (
+                      {isMemberOwner && (
                         <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600">
                           <Crown className="h-3 w-3" />
                           Owner
                         </span>
                       )}
-                      {isAdmin && !isOwner && (
+                      {isAdmin && !isMemberOwner && (
                         <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
                           <Crown className="h-3 w-3" />
                           Admin
@@ -363,6 +404,27 @@ export function TeamManagement() {
                         <span className="text-xs px-2 py-1 rounded-full bg-muted capitalize">
                           Member
                         </span>
+                      )}
+                      {canRemove && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 w-8 p-0 text-muted-foreground",
+                            isConfirming
+                              ? "text-destructive hover:text-destructive hover:bg-destructive/10"
+                              : "hover:text-destructive"
+                          )}
+                          onClick={() => handleRemoveMember(member.id)}
+                          disabled={isRemoving}
+                          title={isConfirming ? "Click again to confirm removal" : "Remove from team"}
+                        >
+                          {isRemoving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserMinus className="h-4 w-4" />
+                          )}
+                        </Button>
                       )}
                     </div>
                   </div>
