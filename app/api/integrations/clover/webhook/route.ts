@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       // Find the organization with this Clover merchant ID
       const { data: org, error: orgError } = await adminClient
         .from('organizations')
-        .select('id, clover_access_token')
+        .select('id, clover_access_token, thrive_validation_mode')
         .eq('clover_merchant_id', merchantId)
         .single();
 
@@ -93,7 +93,9 @@ export async function POST(request: NextRequest) {
           );
 
           if (cloverItem) {
-            // Sync this single item
+            const isValidationMode = org.thrive_validation_mode === true;
+
+            // Sync this single item (always - we want to capture all data even in validation mode)
             await syncInventoryItems({
               orgId: org.id,
               source: 'clover',
@@ -101,7 +103,27 @@ export async function POST(request: NextRequest) {
               enableAiLabeling: false, // Don't run AI on webhook updates
             });
 
-            console.log(`Synced Clover item ${objectId} for org ${org.id}`);
+            // In validation mode, log extra detail for Thrive comparison auditing
+            if (isValidationMode) {
+              try {
+                await adminClient
+                  .from('inventory_history')
+                  .insert([{
+                    org_id: org.id,
+                    item_name: cloverItem.name,
+                    sku: cloverItem.sku ?? null,
+                    previous_quantity: 0,
+                    new_quantity: typeof cloverItem.quantity === 'number' ? cloverItem.quantity : 0,
+                    quantity_change: 0,
+                    change_type: 'thrive_validation',
+                    source: `clover_webhook_${type.toLowerCase()}`,
+                  }]);
+              } catch {
+                // Validation logging is non-critical
+              }
+            }
+
+            console.log(`Synced Clover item ${objectId} for org ${org.id}${isValidationMode ? ' [THRIVE VALIDATION]' : ''}`);
           }
         }
       }

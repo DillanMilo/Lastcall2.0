@@ -33,6 +33,10 @@ export interface Organization {
   clover_merchant_id?: string;
   clover_access_token?: string;
   clover_connected_at?: string;
+  // Thrive validation mode - parallel run to verify LastCallIQ captures all Thrive data
+  thrive_validation_mode?: boolean;
+  thrive_validation_started_at?: string;
+  thrive_validation_ended_at?: string;
   created_at: string;
 }
 

@@ -68,12 +68,21 @@ export async function POST(request: NextRequest) {
     // Get org and Clover credentials
     const { data: org, error: orgError } = await adminClient
       .from('organizations')
-      .select('subscription_tier, billing_exempt, clover_merchant_id, clover_access_token')
+      .select('subscription_tier, billing_exempt, clover_merchant_id, clover_access_token, thrive_validation_mode')
       .eq('id', orgId)
       .single();
 
     if (orgError || !org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    // Block writes when Thrive validation mode is active
+    // During parallel run, LastCallIQ is read-only to avoid interfering with Thrive
+    if (org.thrive_validation_mode === true) {
+      return NextResponse.json({
+        error: 'Clover push is disabled during Thrive validation mode. LastCallIQ is running in read-only mode to safely capture data alongside Thrive without interfering.',
+        validation_mode: true,
+      }, { status: 403 });
     }
 
     // Check tier access

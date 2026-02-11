@@ -23,6 +23,8 @@ import { UsageDashboard } from "@/components/billing/UsageDashboard";
 import { TeamManagement } from "@/components/team/TeamManagement";
 import { BigCommerceConnect } from "@/components/integrations/BigCommerceConnect";
 import { ShopifyConnect } from "@/components/integrations/ShopifyConnect";
+import { CloverConnect } from "@/components/integrations/CloverConnect";
+import { ThriveValidation } from "@/components/integrations/ThriveValidation";
 import { useAuth } from "@/lib/auth/AuthContext";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -927,6 +929,14 @@ export default function SettingsPage() {
             <ShopifyConnect
               organization={organization}
               onConnectionChange={fetchUserData}
+            />
+            <CloverConnect
+              organization={organization}
+              onConnectionChange={fetchUserData}
+            />
+            <ThriveValidation
+              organization={organization}
+              onStatusChange={fetchUserData}
             />
           </CardContent>
         </Card>
