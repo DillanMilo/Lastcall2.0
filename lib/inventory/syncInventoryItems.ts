@@ -34,6 +34,7 @@ export interface InventorySyncItem {
   shopify_product_id?: string | number | null;
   shopify_variant_id?: string | number | null;
   clover_item_id?: string | null;
+  clover_merchant_id?: string | null;
 }
 
 export interface InventorySyncResult {
@@ -189,6 +190,14 @@ export async function syncInventoryItems({
           expiration_date: item.expiration_date ?? null,
           item_type: 'stock', // Synced items are always stock (not operational)
         };
+
+        // Include Clover-specific fields when present
+        if (item.clover_item_id) {
+          itemData.clover_item_id = item.clover_item_id;
+        }
+        if (item.clover_merchant_id) {
+          itemData.clover_merchant_id = item.clover_merchant_id;
+        }
 
         const existing = await findExistingInventoryItem(supabase, orgId, item);
         const newQuantity = parseInteger(item.quantity);

@@ -934,10 +934,13 @@ export default function SettingsPage() {
               organization={organization}
               onConnectionChange={fetchUserData}
             />
-            <ThriveValidation
-              organization={organization}
-              onStatusChange={fetchUserData}
-            />
+            {/* Thrive Validation only shows when Clover is connected - used for parallel run validation */}
+            {organization?.clover_merchant_id && (
+              <ThriveValidation
+                organization={organization}
+                onStatusChange={fetchUserData}
+              />
+            )}
           </CardContent>
         </Card>
       ) : (

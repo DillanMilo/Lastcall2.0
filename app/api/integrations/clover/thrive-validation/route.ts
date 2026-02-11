@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     // Get org details
     const { data: org, error: orgError } = await adminClient
       .from('organizations')
-      .select('subscription_tier, billing_exempt, clover_merchant_id, clover_connected_at, thrive_validation_mode, thrive_validation_started_at, thrive_validation_ended_at')
+      .select('subscription_tier, billing_exempt, thrive_validation_mode, thrive_validation_started_at, thrive_validation_ended_at')
       .eq('id', orgId)
       .single();
 
@@ -92,10 +92,17 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
+    // Get all Clover connections for this org
+    const { data: connections } = await adminClient
+      .from('clover_connections')
+      .select('id, merchant_id, label, merchant_name, connected_at')
+      .eq('org_id', orgId)
+      .order('connected_at');
+
     // Get all Clover-linked inventory items with current quantities
     const { data: items, error: itemsError } = await adminClient
       .from('inventory_items')
-      .select('id, name, sku, quantity, clover_item_id, category, ai_label, last_restock, created_at')
+      .select('id, name, sku, quantity, clover_item_id, clover_merchant_id, category, ai_label, last_restock, created_at')
       .eq('org_id', orgId)
       .not('clover_item_id', 'is', null)
       .order('name');
@@ -136,8 +143,14 @@ export async function GET(request: NextRequest) {
         active: org.thrive_validation_mode === true,
         started_at: org.thrive_validation_started_at || null,
         ended_at: org.thrive_validation_ended_at || null,
-        clover_connected: !!org.clover_merchant_id,
-        clover_connected_at: org.clover_connected_at || null,
+        clover_connected: (connections?.length || 0) > 0,
+        merchants_connected: connections?.length || 0,
+        merchants: (connections || []).map(c => ({
+          merchant_id: c.merchant_id,
+          label: c.label,
+          merchant_name: c.merchant_name,
+          connected_at: c.connected_at,
+        })),
       },
       summary: {
         total_clover_items: items?.length || 0,
@@ -155,6 +168,7 @@ export async function GET(request: NextRequest) {
         sku: item.sku,
         current_quantity: item.quantity,
         clover_item_id: item.clover_item_id,
+        clover_merchant_id: item.clover_merchant_id,
         category: item.category,
         ai_label: item.ai_label,
         last_restock: item.last_restock,
@@ -247,7 +261,14 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    if (!org.clover_merchant_id) {
+    // Check for any Clover connections
+    const { data: connCheck } = await adminClient
+      .from('clover_connections')
+      .select('id')
+      .eq('org_id', orgId)
+      .limit(1);
+
+    if (!connCheck || connCheck.length === 0) {
       return NextResponse.json({
         error: 'Clover must be connected before enabling Thrive validation mode.'
       }, { status: 400 });

@@ -81,6 +81,7 @@ export interface InventoryItem {
   shopify_product_id?: string;
   shopify_variant_id?: string;
   clover_item_id?: string;
+  clover_merchant_id?: string;
   item_type: ItemType;
   operational_category?: OperationalCategory;
   order_status?: OrderStatus;
@@ -116,6 +117,17 @@ export interface ReorderPrediction {
   predicted_date?: string;
   confidence?: number;
   reason?: string;
+}
+
+export interface CloverConnection {
+  id: string;
+  org_id: string;
+  merchant_id: string;
+  access_token: string;
+  label: string;
+  environment: 'us' | 'eu';
+  merchant_name?: string;
+  connected_at: string;
 }
 
 export interface CSVRow {
