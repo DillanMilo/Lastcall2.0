@@ -1,5 +1,4 @@
 import { InventoryItem } from '@/types';
-import { StockMovement } from './inventoryAssistant';
 
 export type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
@@ -128,7 +127,6 @@ export function buildSalesReport(
     }));
 
   // Slow movers - items in inventory that had very low sales
-  const inventoryItemIds = new Set(inventory.map(i => i.id));
   const slowMovers: SalesReportData['slowMovers'] = [];
   const deadStock: SalesReportData['deadStock'] = [];
 
