@@ -17,6 +17,9 @@ The following columns have been added to your Supabase database:
 - [x] `clover_access_token` on `organizations` table
 - [x] `clover_connected_at` on `organizations` table
 - [x] `clover_item_id` on `inventory_items` table
+- [ ] `thrive_validation_mode` on `organizations` table (run `SQL files/THRIVE_VALIDATION_SCHEMA.sql`)
+- [ ] `thrive_validation_started_at` on `organizations` table
+- [ ] `thrive_validation_ended_at` on `organizations` table
 
 ### 2. Set Angus Biltong as Billing Exempt
 Run this SQL in Supabase (replace the ID with their actual org ID from the SELECT results):
@@ -79,6 +82,39 @@ These steps don't change anything for their daily operations.
    - Identify any products that exist in one but not the other
    - Set `clover_item_id` on inventory items that match
 
+### Phase 1.5: Thrive Validation (Parallel Run)
+Run LastCallIQ alongside Thrive for 1-2 months to verify data capture.
+
+1. **Enable Thrive Validation Mode**
+   - Go to Settings → Integrations → Thrive Validation Mode
+   - Or call `POST /api/integrations/clover/thrive-validation` with `{ "enable": true }`
+   - This puts LastCallIQ in **read-only mode** (no writes to Clover)
+   - Push to Clover endpoint is automatically blocked
+
+2. **Register Clover webhooks for LastCallIQ**
+   - Set up Clover webhook URL pointing to `/api/integrations/clover/webhook`
+   - Both Thrive and LastCallIQ will receive the same Clover events simultaneously
+   - LastCallIQ captures all item creates, updates, deletes, and sales
+
+3. **Run initial sync**
+   - Call `/api/integrations/clover/sync` to pull full Clover inventory snapshot
+   - This gives LastCallIQ the same starting point as Thrive
+
+4. **Monitor & Compare**
+   - Use the Thrive Validation dashboard (Settings → Integrations) to view:
+     - Total items tracked
+     - Webhook events received
+     - Sales decrements captured
+     - Restocks captured
+   - Or call `GET /api/integrations/clover/thrive-validation` for the full report
+   - Periodically compare LastCallIQ quantities with what Thrive shows
+   - Any discrepancies indicate gaps that need to be addressed
+
+5. **End Validation**
+   - Once satisfied (1-2 months), disable validation mode
+   - Call `POST /api/integrations/clover/thrive-validation` with `{ "enable": false }`
+   - This re-enables push to Clover for the next phase
+
 ### Phase 2: Test Bi-Directional Sync
 Before going live, test with a few items.
 
@@ -130,6 +166,8 @@ This is the actual migration - do this during low-traffic hours.
 | `/api/integrations/clover/sync` | POST | Pull inventory FROM Clover |
 | `/api/integrations/clover/push` | POST | Push inventory TO Clover |
 | `/api/integrations/clover/webhook` | POST | Receive Clover events |
+| `/api/integrations/clover/thrive-validation` | GET | Get validation report |
+| `/api/integrations/clover/thrive-validation` | POST | Toggle validation mode |
 
 ### Connect Clover (POST body)
 ```json
@@ -182,11 +220,12 @@ If something goes wrong:
 |-------|----------|
 | Research & Credentials | 1-2 days (depends on client) |
 | Phase 1: Initial Sync | 1 day |
+| Phase 1.5: Thrive Validation | 4-8 weeks (parallel run) |
 | Phase 2: Testing | 2-3 days |
 | Phase 3: Cut Over | 1 day (off-hours) |
 | Phase 4: Monitoring | 2-3 days |
 
-**Total:** ~1-2 weeks, mostly waiting on client for credentials and scheduling.
+**Total:** ~5-9 weeks, with the bulk being the Thrive parallel validation period.
 
 ---
 
