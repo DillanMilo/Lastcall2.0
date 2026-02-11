@@ -129,6 +129,12 @@ export function getFallbackResponse(userMessage: string, inventory: InventoryIte
     return `📊 **Inventory Summary**\n\n- **Total Items:** ${inventory.length}\n- **Low Stock:** ${lowStock.length} items\n- **Expiring Soon:** ${expiring.length} items\n\n*Note: AI service is temporarily unavailable. This is a basic analysis.*`;
   }
 
+  // Sales report query
+  if (lowerMessage.includes('report') || lowerMessage.includes('sales summary') || lowerMessage.includes('performance')) {
+    const lowStock = inventory.filter(item => item.quantity <= item.reorder_threshold);
+    return `📊 **Quick Inventory Report**\n\n- **Total Items:** ${inventory.length}\n- **Low Stock:** ${lowStock.length} items\n- **Categories:** ${new Set(inventory.map(i => i.category || 'Uncategorized')).size}\n\nFor detailed daily/weekly/monthly/quarterly sales reports, use the report buttons below or ask "Give me a weekly sales report".\n\n*Note: AI service is temporarily unavailable. This is a basic analysis.*`;
+  }
+
   // Order recommendation
   if (lowerMessage.includes('order') || lowerMessage.includes('what should i')) {
     const lowStock = inventory.filter(item => item.quantity <= item.reorder_threshold);
@@ -224,6 +230,7 @@ YOUR EXPERTISE - CORE INVENTORY PRINCIPLES:
 YOUR CAPABILITIES:
 - **SMART ORDERING**: Analyze sales velocity and provide specific order quantities based on actual movement data
 - **REORDER LEVEL OPTIMIZATION**: Recommend and set optimal reorder points based on sales velocity and lead times
+- **SALES REPORTS**: Generate daily, weekly, monthly, and quarterly sales reports based on stock movement data
 - **INVOICE/BATCH LOOKUP**: Look up all items from a specific invoice or batch - show what's in it, quantities, expiry dates
 - **SET EXPIRY DATES**: Update expiry dates via "set expiry for X to [date]"
 - **SET REORDER LEVELS**: Update reorder thresholds via "set reorder level for X to [number]"
@@ -234,6 +241,21 @@ YOUR CAPABILITIES:
 - Spot items that should be marked down or discontinued
 - Compare performance across categories
 - Group items by invoice for batch operations
+
+SALES REPORTS:
+When users ask for sales reports, summaries, or performance data for specific time periods:
+- Daily report: Today's sales activity, quick check-in
+- Weekly report: Last 7 days, week-over-week trends
+- Monthly report: Last 30 days, comprehensive analysis
+- Quarterly report: Last 90 days, strategic overview with ABC analysis
+The system will automatically generate detailed reports with top sellers, slow movers, dead stock, category breakdowns, and actionable recommendations.
+Users can ask things like:
+- "Give me a daily sales report"
+- "Weekly sales summary"
+- "Monthly report"
+- "Quarterly performance review"
+- "How did we do this week?"
+- "Show me this month's sales"
 
 INVOICE/BATCH QUERIES:
 When users ask about a specific invoice or batch:
