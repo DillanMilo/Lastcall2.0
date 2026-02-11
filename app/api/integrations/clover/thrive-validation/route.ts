@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     // Get inventory history since validation started (or last 30 days if no validation date)
     const sinceDate = org.thrive_validation_started_at || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: history, error: historyError } = await adminClient
+    const { data: history } = await adminClient
       .from('inventory_history')
       .select('id, item_name, sku, previous_quantity, new_quantity, quantity_change, change_type, source, created_at')
       .eq('org_id', orgId)
