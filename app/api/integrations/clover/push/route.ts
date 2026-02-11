@@ -13,14 +13,13 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
  * POST /api/integrations/clover/push
  * Push inventory updates FROM LastCall TO Clover
  *
- * This makes LastCall the source of truth.
+ * For multi-merchant, each item knows which merchant it belongs to via clover_merchant_id.
+ * The push looks up the correct credentials from clover_connections.
  *
  * Request body:
  * - item_id: string - The LastCall inventory item ID to push
+ * - item_ids: string[] - Array of item IDs to push (bulk)
  * - create_if_missing: boolean - Create the item in Clover if it doesn't exist
- *
- * Or for bulk push:
- * - item_ids: string[] - Array of item IDs to push
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,56 +27,34 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
+        get(name: string) { return request.cookies.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) { response.cookies.set({ name, value, ...options }); },
+        remove(name: string, options: CookieOptions) { response.cookies.set({ name, value: '', ...options }); },
       },
     });
 
-    // Authenticate user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Get user's org
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('org_id')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userData?.org_id) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-    }
+    const { data: userData } = await supabase.from('users').select('org_id').eq('id', user.id).single();
+    if (!userData?.org_id) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
 
     const orgId = userData.org_id;
 
-    // Use admin client
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Get org and Clover credentials
+    // Get org details
     const { data: org, error: orgError } = await adminClient
       .from('organizations')
-      .select('subscription_tier, billing_exempt, clover_merchant_id, clover_access_token, thrive_validation_mode')
+      .select('subscription_tier, billing_exempt, thrive_validation_mode')
       .eq('id', orgId)
       .single();
 
-    if (orgError || !org) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-    }
+    if (orgError || !org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
 
     // Block writes when Thrive validation mode is active
-    // During parallel run, LastCallIQ is read-only to avoid interfering with Thrive
     if (org.thrive_validation_mode === true) {
       return NextResponse.json({
         error: 'Clover push is disabled during Thrive validation mode. LastCallIQ is running in read-only mode to safely capture data alongside Thrive without interfering.',
@@ -96,27 +73,39 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Check if Clover is connected
-    if (!org.clover_merchant_id || !org.clover_access_token) {
+    // Get all Clover connections for this org
+    const { data: connections } = await adminClient
+      .from('clover_connections')
+      .select('merchant_id, access_token')
+      .eq('org_id', orgId);
+
+    if (!connections || connections.length === 0) {
       return NextResponse.json({
-        error: 'Clover is not connected. Please connect your Clover account first.'
+        error: 'No Clover merchants connected. Please connect your Clover account first.'
       }, { status: 400 });
+    }
+
+    // Build a lookup map: merchant_id -> credentials
+    const credentialsMap = new Map<string, { merchantId: string; accessToken: string }>();
+    for (const conn of connections) {
+      credentialsMap.set(conn.merchant_id, {
+        merchantId: conn.merchant_id,
+        accessToken: conn.access_token,
+      });
     }
 
     const body = await request.json();
     const { item_id, item_ids, create_if_missing = false } = body;
-
-    // Support single item or bulk
-    const itemIdsToProcess = item_ids || (item_id ? [item_id] : []);
+    const itemIdsToProcess: string[] = item_ids || (item_id ? [item_id] : []);
 
     if (itemIdsToProcess.length === 0) {
       return NextResponse.json({ error: 'No item IDs provided' }, { status: 400 });
     }
 
-    // Fetch items from our inventory
+    // Fetch items, including which merchant they belong to
     const { data: items, error: itemsError } = await adminClient
       .from('inventory_items')
-      .select('id, name, sku, quantity, clover_item_id')
+      .select('id, name, sku, quantity, clover_item_id, clover_merchant_id')
       .eq('org_id', orgId)
       .in('id', itemIdsToProcess);
 
@@ -129,27 +118,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No items found' }, { status: 404 });
     }
 
-    const results = {
-      updated: 0,
-      created: 0,
-      failed: 0,
-      errors: [] as string[],
-    };
-
-    const credentials = {
-      merchantId: org.clover_merchant_id,
-      accessToken: org.clover_access_token,
-    };
+    const results = { updated: 0, created: 0, failed: 0, errors: [] as string[] };
 
     for (const item of items) {
       try {
+        // Find the right credentials for this item's merchant
+        let credentials = item.clover_merchant_id
+          ? credentialsMap.get(item.clover_merchant_id)
+          : undefined;
+
+        // Fallback to first connection if item doesn't have a merchant ID
+        if (!credentials) {
+          credentials = credentialsMap.values().next().value;
+        }
+
+        if (!credentials) {
+          results.failed++;
+          results.errors.push(`${item.name}: No Clover credentials found`);
+          continue;
+        }
+
         if (item.clover_item_id) {
-          // Item exists in Clover - update inventory
-          const updateResult = await updateCloverInventory(
-            credentials,
-            item.clover_item_id,
-            item.quantity
-          );
+          const updateResult = await updateCloverInventory(credentials, item.clover_item_id, item.quantity);
 
           if (updateResult.success) {
             results.updated++;
@@ -158,7 +148,6 @@ export async function POST(request: NextRequest) {
             results.errors.push(`${item.name}: ${updateResult.error}`);
           }
         } else if (create_if_missing) {
-          // Create item in Clover
           const createResult = await createCloverItem(credentials, {
             name: item.name,
             sku: item.sku,
@@ -166,10 +155,12 @@ export async function POST(request: NextRequest) {
           });
 
           if (createResult.success && createResult.itemId) {
-            // Save Clover item ID back to our database
             await adminClient
               .from('inventory_items')
-              .update({ clover_item_id: createResult.itemId })
+              .update({
+                clover_item_id: createResult.itemId,
+                clover_merchant_id: credentials.merchantId,
+              })
               .eq('id', item.id);
 
             results.created++;
@@ -178,15 +169,12 @@ export async function POST(request: NextRequest) {
             results.errors.push(`${item.name}: ${createResult.error}`);
           }
         } else {
-          // Item doesn't exist in Clover and we're not creating
           results.failed++;
           results.errors.push(`${item.name}: No Clover item ID and create_if_missing is false`);
         }
       } catch (error) {
         results.failed++;
-        results.errors.push(
-          `${item.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
+        results.errors.push(`${item.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 

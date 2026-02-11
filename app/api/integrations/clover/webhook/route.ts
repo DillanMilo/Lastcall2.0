@@ -15,19 +15,8 @@ const webhookSecret = process.env.CLOVER_WEBHOOK_SECRET || '';
  * POST /api/integrations/clover/webhook
  * Handle incoming webhooks from Clover for inventory updates
  *
- * Clover sends webhooks for:
- * - Item CREATE/UPDATE/DELETE
- * - Order CREATE (for sales tracking)
- * - Inventory UPDATE
- *
- * Webhook payload format:
- * {
- *   "merchants": {
- *     "MERCHANT_ID": [
- *       { "objectId": "ITEM_ID", "type": "UPDATE", "ts": 1234567890 }
- *     ]
- *   }
- * }
+ * Supports multi-merchant: looks up org via clover_connections table.
+ * Both physical and online store webhooks are processed through this endpoint.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -55,52 +44,60 @@ export async function POST(request: NextRequest) {
 
     // Process events for each merchant
     for (const [merchantId, events] of Object.entries(payload.merchants)) {
-      // Find the organization with this Clover merchant ID
-      const { data: org, error: orgError } = await adminClient
-        .from('organizations')
-        .select('id, clover_access_token, thrive_validation_mode')
-        .eq('clover_merchant_id', merchantId)
+      // Look up the connection from clover_connections table
+      const { data: connection } = await adminClient
+        .from('clover_connections')
+        .select('id, org_id, access_token, label')
+        .eq('merchant_id', merchantId)
         .single();
 
-      if (orgError || !org || !org.clover_access_token) {
-        console.warn(`No organization found for Clover merchant: ${merchantId}`);
+      if (!connection || !connection.access_token) {
+        console.warn(`No Clover connection found for merchant: ${merchantId}`);
         continue;
       }
+
+      // Get org-level settings (thrive validation mode)
+      const { data: org } = await adminClient
+        .from('organizations')
+        .select('thrive_validation_mode')
+        .eq('id', connection.org_id)
+        .single();
+
+      const isValidationMode = org?.thrive_validation_mode === true;
 
       // Process each event
       for (const event of events) {
         const { objectId, type } = event;
 
-        // We're mainly interested in item updates for inventory tracking
-        // objectId could be an item ID for inventory events
         if (!objectId) continue;
 
         if (type === 'DELETE') {
-          // Item was deleted in Clover - we might want to mark it or delete it
-          // For now, log it but don't delete from our system
-          console.log(`Clover item deleted: ${objectId} for merchant ${merchantId}`);
+          console.log(`Clover item deleted: ${objectId} for merchant ${merchantId} (${connection.label})`);
           continue;
         }
 
         if (type === 'CREATE' || type === 'UPDATE') {
-          // Fetch the updated item from Clover
           const cloverItem = await fetchCloverItem(
             {
               merchantId,
-              accessToken: org.clover_access_token,
+              accessToken: connection.access_token,
             },
             objectId
           );
 
           if (cloverItem) {
-            const isValidationMode = org.thrive_validation_mode === true;
+            // Tag the item with which merchant it came from
+            const taggedItem = {
+              ...cloverItem,
+              clover_merchant_id: merchantId,
+            };
 
             // Sync this single item (always - we want to capture all data even in validation mode)
             await syncInventoryItems({
-              orgId: org.id,
+              orgId: connection.org_id,
               source: 'clover',
-              items: [cloverItem],
-              enableAiLabeling: false, // Don't run AI on webhook updates
+              items: [taggedItem],
+              enableAiLabeling: false,
             });
 
             // In validation mode, log extra detail for Thrive comparison auditing
@@ -109,32 +106,29 @@ export async function POST(request: NextRequest) {
                 await adminClient
                   .from('inventory_history')
                   .insert([{
-                    org_id: org.id,
+                    org_id: connection.org_id,
                     item_name: cloverItem.name,
                     sku: cloverItem.sku ?? null,
                     previous_quantity: 0,
                     new_quantity: typeof cloverItem.quantity === 'number' ? cloverItem.quantity : 0,
                     quantity_change: 0,
                     change_type: 'thrive_validation',
-                    source: `clover_webhook_${type.toLowerCase()}`,
+                    source: `clover_webhook_${type.toLowerCase()}_${merchantId}`,
                   }]);
               } catch {
                 // Validation logging is non-critical
               }
             }
 
-            console.log(`Synced Clover item ${objectId} for org ${org.id}${isValidationMode ? ' [THRIVE VALIDATION]' : ''}`);
+            console.log(`Synced Clover item ${objectId} from ${connection.label} (${merchantId}) for org ${connection.org_id}${isValidationMode ? ' [THRIVE VALIDATION]' : ''}`);
           }
         }
       }
     }
 
-    // Clover expects a 200 response to acknowledge receipt
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Clover webhook error:', error);
-    // Still return 200 to avoid Clover retrying failed webhooks
-    // Log the error for investigation
     return NextResponse.json({ success: true, note: 'Processed with errors' });
   }
 }
