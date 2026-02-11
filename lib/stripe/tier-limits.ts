@@ -159,7 +159,7 @@ export async function checkAIRequestLimit(
 export async function logAIRequest(
   supabase: SupabaseClient,
   orgId: string,
-  requestType: 'assistant' | 'label' | 'action'
+  requestType: 'assistant' | 'label' | 'action' | 'report'
 ): Promise<void> {
   try {
     await supabase.from('ai_requests').insert({

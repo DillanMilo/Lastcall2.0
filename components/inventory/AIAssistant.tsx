@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, X, Sparkles, RotateCcw, Zap, Mic, MicOff } from "lucide-react";
+import { Send, Loader2, X, Sparkles, RotateCcw, Zap, Mic, MicOff, BarChart3 } from "lucide-react";
 import { checkFeatureAccess } from "@/lib/stripe/tier-limits";
 import type { PlanTier } from "@/lib/stripe/config";
 
@@ -78,8 +78,38 @@ const SUGGESTED_QUESTIONS = [
   { text: "Optimize reorder levels", icon: "reorder" },
   { text: "What's expiring soon?", icon: "expire" },
   { text: "Low stock alerts", icon: "alert" },
-  { text: "Daily summary", icon: "summary" },
 ];
+
+type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly';
+
+const REPORT_OPTIONS: { label: string; period: ReportPeriod }[] = [
+  { label: "Daily", period: "daily" },
+  { label: "Weekly", period: "weekly" },
+  { label: "Monthly", period: "monthly" },
+  { label: "Quarterly", period: "quarterly" },
+];
+
+// Keywords that indicate a sales report request
+const REPORT_KEYWORDS = [
+  'daily report', 'weekly report', 'monthly report', 'quarterly report',
+  'daily sales', 'weekly sales', 'monthly sales', 'quarterly sales',
+  'sales report', 'sales summary', 'performance report',
+  'how did we do this week', 'how did we do this month',
+  'this week sales', 'this month sales', 'today sales',
+  'show me this week', 'show me this month',
+  'give me a daily', 'give me a weekly', 'give me a monthly', 'give me a quarterly',
+];
+
+function detectReportPeriod(message: string): ReportPeriod | null {
+  const lower = message.toLowerCase();
+  if (!REPORT_KEYWORDS.some(kw => lower.includes(kw))) return null;
+  if (lower.includes('quarterly') || lower.includes('quarter') || lower.includes('90 day')) return 'quarterly';
+  if (lower.includes('monthly') || lower.includes('month') || lower.includes('30 day')) return 'monthly';
+  if (lower.includes('weekly') || lower.includes('week') || lower.includes('7 day')) return 'weekly';
+  if (lower.includes('daily') || lower.includes('today') || lower.includes('day report')) return 'daily';
+  // Default to weekly if they just say "sales report" without a period
+  return 'weekly';
+}
 
 // Error types for better UX
 type ErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
@@ -251,6 +281,9 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [showReportOptions, setShowReportOptions] = useState(false);
+  const [mobileQuickActions, setMobileQuickActions] = useState(false);
+  const [mobileReportActions, setMobileReportActions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -362,6 +395,96 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
     }
   }, [isListening]);
 
+  const generateReport = useCallback(async (period: ReportPeriod) => {
+    if (loading) return;
+
+    const periodLabels: Record<ReportPeriod, string> = {
+      daily: 'daily',
+      weekly: 'weekly',
+      monthly: 'monthly',
+      quarterly: 'quarterly',
+    };
+
+    const userMessage: Message = {
+      role: "user",
+      content: `Generate a ${periodLabels[period]} sales report`,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setLoading(true);
+    setShowReportOptions(false);
+
+    // Create placeholder for response
+    const streamingMessage: Message = {
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+    setMessages((prev) => [...prev, streamingMessage]);
+
+    try {
+      const response = await fetch("/api/ai/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, period }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const parsed = parseError(new Error(data.error || 'Request failed'), data);
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          if (updated[lastIndex]?.isStreaming) {
+            updated[lastIndex] = {
+              role: "assistant",
+              content: `⚠️ **${parsed.message}**${parsed.action ? `\n\n${parsed.action}` : ''}`,
+              timestamp: new Date(),
+              isStreaming: false,
+            };
+          }
+          return updated;
+        });
+        return;
+      }
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex]?.isStreaming) {
+          updated[lastIndex] = {
+            role: "assistant",
+            content: data.report || "Unable to generate report. Please try again.",
+            timestamp: new Date(),
+            isStreaming: false,
+          };
+        }
+        return updated;
+      });
+    } catch (error) {
+      console.error("Error generating report:", error);
+      const parsed = parseError(error);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex]?.isStreaming) {
+          updated[lastIndex] = {
+            role: "assistant",
+            content: `⚠️ **${parsed.message}**${parsed.action ? `\n\n${parsed.action}` : ''}`,
+            timestamp: new Date(),
+            isStreaming: false,
+          };
+        }
+        return updated;
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, orgId]);
+
   const handleSend = useCallback(async (messageText?: string) => {
     const userMessage = messageText || input.trim();
     if (!userMessage || loading) return;
@@ -374,6 +497,83 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
 
     setMessages((prev) => [...prev, newUserMessage]);
     setInput("");
+
+    // Check if this is a report request - route to report endpoint
+    const detectedPeriod = detectReportPeriod(userMessage);
+    if (detectedPeriod) {
+      setLoading(true);
+      // Create placeholder for response
+      const reportPlaceholder: Message = {
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+        isStreaming: true,
+      };
+      setMessages((prev) => [...prev, reportPlaceholder]);
+
+      try {
+        const response = await fetch("/api/ai/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orgId, period: detectedPeriod }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const parsed = parseError(new Error(data.error || 'Request failed'), data);
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIndex = updated.length - 1;
+            if (updated[lastIndex]?.isStreaming) {
+              updated[lastIndex] = {
+                role: "assistant",
+                content: `⚠️ **${parsed.message}**${parsed.action ? `\n\n${parsed.action}` : ''}`,
+                timestamp: new Date(),
+                isStreaming: false,
+              };
+            }
+            return updated;
+          });
+          return;
+        }
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          if (updated[lastIndex]?.isStreaming) {
+            updated[lastIndex] = {
+              role: "assistant",
+              content: data.report || "Unable to generate report. Please try again.",
+              timestamp: new Date(),
+              isStreaming: false,
+            };
+          }
+          return updated;
+        });
+        return;
+      } catch (error) {
+        console.error("Error generating report:", error);
+        const parsed = parseError(error);
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          if (updated[lastIndex]?.isStreaming) {
+            updated[lastIndex] = {
+              role: "assistant",
+              content: `⚠️ **${parsed.message}**${parsed.action ? `\n\n${parsed.action}` : ''}`,
+              timestamp: new Date(),
+              isStreaming: false,
+            };
+          }
+          return updated;
+        });
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
     setLoading(true);
 
     // Create placeholder for streaming response
@@ -638,9 +838,9 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Actions */}
+      {/* ===== DESKTOP: Quick Actions (hidden on mobile) ===== */}
       {showSuggestions && (
-        <div className="relative px-5 py-4 border-t border-border/50 bg-muted/30 backdrop-blur-sm">
+        <div className="relative px-5 py-4 border-t border-border/50 bg-muted/30 backdrop-blur-sm hidden sm:block">
           <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
             Quick Actions
           </p>
@@ -657,11 +857,146 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
               </button>
             ))}
           </div>
+
+          {/* Sales Reports Section */}
+          <p className="text-xs font-medium text-muted-foreground mb-3 mt-4 uppercase tracking-wider flex items-center gap-1.5">
+            <BarChart3 className="h-3 w-3" />
+            Sales Reports
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {REPORT_OPTIONS.map((opt, index) => (
+              <button
+                key={opt.period}
+                onClick={() => generateReport(opt.period)}
+                disabled={loading}
+                className="group relative px-4 py-2 text-sm font-medium rounded-full border border-border/50 bg-card/50 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 hover:shadow-md hover:shadow-emerald-500/10 disabled:opacity-50 disabled:pointer-events-none"
+                style={{ animationDelay: `${(index + SUGGESTED_QUESTIONS.length) * 50}ms` }}
+              >
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <BarChart3 className="h-3 w-3" />
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===== DESKTOP: Floating Report Bar (hidden on mobile) ===== */}
+      {!showSuggestions && !loading && (
+        <div className="relative px-5 py-2 border-t border-border/30 bg-muted/20 backdrop-blur-sm hidden sm:block">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowReportOptions(!showReportOptions)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-border/50 bg-card/50 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200"
+            >
+              <BarChart3 className="h-3 w-3" />
+              Sales Reports
+            </button>
+            {showReportOptions && (
+              <div className="flex gap-1.5 animate-message-in">
+                {REPORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.period}
+                    onClick={() => generateReport(opt.period)}
+                    disabled={loading}
+                    className="px-3 py-1.5 text-xs font-medium rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 disabled:opacity-50"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== MOBILE: Expanded panels (above input, shown on toggle) ===== */}
+      {mobileQuickActions && (
+        <div className="relative px-4 py-3 border-t border-amber-200/30 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-950/20 backdrop-blur-sm sm:hidden animate-message-in">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Zap className="h-3 w-3" />
+              Quick Actions
+            </p>
+            <button onClick={() => setMobileQuickActions(false)} className="p-1 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-800/30 transition-colors">
+              <X className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SUGGESTED_QUESTIONS.map((q, index) => (
+              <button
+                key={index}
+                onClick={() => { handleSend(q.text); setMobileQuickActions(false); }}
+                disabled={loading}
+                className="px-3 py-1.5 text-xs font-medium rounded-full border border-amber-200 dark:border-amber-800 bg-white/80 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all duration-200 disabled:opacity-50"
+              >
+                {q.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mobileReportActions && (
+        <div className="relative px-4 py-3 border-t border-emerald-200/30 dark:border-emerald-800/30 bg-emerald-50/50 dark:bg-emerald-950/20 backdrop-blur-sm sm:hidden animate-message-in">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+              <BarChart3 className="h-3 w-3" />
+              Sales Reports
+            </p>
+            <button onClick={() => setMobileReportActions(false)} className="p-1 rounded-full hover:bg-emerald-200/50 dark:hover:bg-emerald-800/30 transition-colors">
+              <X className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {REPORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.period}
+                onClick={() => { generateReport(opt.period); setMobileReportActions(false); }}
+                disabled={loading}
+                className="px-3 py-1.5 text-xs font-medium rounded-full border border-emerald-200 dark:border-emerald-800 bg-white/80 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-200 disabled:opacity-50"
+              >
+                <span className="flex items-center gap-1">
+                  <BarChart3 className="h-3 w-3" />
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Input Area */}
       <div className="relative p-4 border-t border-border/50 bg-card/80 backdrop-blur-md safe-bottom">
+        {/* Mobile toggle buttons - only visible on small screens */}
+        <div className="flex gap-2 mb-2.5 sm:hidden">
+          <button
+            onClick={() => { setMobileQuickActions(!mobileQuickActions); setMobileReportActions(false); }}
+            disabled={loading}
+            className={`mobile-glow-gold relative flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-full transition-all duration-300 disabled:opacity-50 ${
+              mobileQuickActions
+                ? 'bg-amber-500 text-white border border-amber-400 shadow-lg shadow-amber-500/30'
+                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Quick Actions
+          </button>
+          <button
+            onClick={() => { setMobileReportActions(!mobileReportActions); setMobileQuickActions(false); }}
+            disabled={loading}
+            className={`mobile-glow-green relative flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-full transition-all duration-300 disabled:opacity-50 ${
+              mobileReportActions
+                ? 'bg-emerald-500 text-white border border-emerald-400 shadow-lg shadow-emerald-500/30'
+                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+            }`}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Sales Reports
+          </button>
+        </div>
+
         <div className="flex gap-2 items-center">
           <div className="relative flex-1">
             <Input
@@ -770,6 +1105,34 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
 
         .animate-pulse-recording {
           animation: pulse-recording 1.5s ease-in-out infinite;
+        }
+
+        /* Mobile glow animations - soft pulsating */
+        @keyframes glow-gold {
+          0%, 100% {
+            box-shadow: 0 0 4px 0 rgba(245, 158, 11, 0.2), 0 0 12px 0 rgba(245, 158, 11, 0.1);
+          }
+          50% {
+            box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.35), 0 0 20px 4px rgba(245, 158, 11, 0.15);
+          }
+        }
+
+        @keyframes glow-green {
+          0%, 100% {
+            box-shadow: 0 0 4px 0 rgba(16, 185, 129, 0.2), 0 0 12px 0 rgba(16, 185, 129, 0.1);
+          }
+          50% {
+            box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.35), 0 0 20px 4px rgba(16, 185, 129, 0.15);
+          }
+        }
+
+        @media (max-width: 639px) {
+          .mobile-glow-gold {
+            animation: glow-gold 2.5s ease-in-out infinite;
+          }
+          .mobile-glow-green {
+            animation: glow-green 2.5s ease-in-out infinite;
+          }
         }
       `}</style>
     </div>
