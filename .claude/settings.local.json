@@ -11,7 +11,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "WebSearch",
-      "WebFetch(domain:doc.toasttab.com)"
+      "WebFetch(domain:doc.toasttab.com)",
+      "WebFetch(domain:docs.clover.com)",
+      "WebFetch(domain:www.thrivepos.com)"
     ]
   }
 }
