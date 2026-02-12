@@ -41,6 +41,7 @@ interface AuthContextType {
   userWithOrg: UserWithOrg | null;
   orgId: string | null;
   loading: boolean;
+  serviceError: boolean; // True when auth service is unreachable
   // Role checks - hierarchical permissions
   isOwner: boolean;    // Only owners
   isAdmin: boolean;    // Owners + Admins
@@ -65,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userWithOrg, setUserWithOrg] = useState<UserWithOrg | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serviceError, setServiceError] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<OrgMembership[]>([]);
 
@@ -268,23 +270,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
-      // Failsafe timeout - if auth takes longer than 20 seconds, something is wrong
-      // Increased from 10s to 20s to accommodate slower mobile connections
+      // Failsafe timeout - if auth takes longer than 15 seconds, service is likely down
       timeoutId = setTimeout(() => {
         if (isMounted) {
-          console.warn('Auth initialization timed out - clearing stale state');
+          console.warn('Auth initialization timed out - service may be unavailable');
           setLoading((currentLoading) => {
             if (currentLoading) {
-              // Only clear if still loading - don't sign out, just stop loading
               setUser(null);
               setUserWithOrg(null);
               setOrgId(null);
+              setServiceError(true);
               return false;
             }
             return currentLoading;
           });
         }
-      }, 20000);
+      }, 15000);
 
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -330,9 +331,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setLoading(false);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error getting initial session:', error);
         if (isMounted) {
+          const message = error instanceof Error ? error.message : '';
+          if (message.includes('Failed to fetch') || message.includes('NetworkError') || message.includes('fetch')) {
+            setServiceError(true);
+          }
           setLoading(false);
         }
       }
@@ -463,6 +468,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userWithOrg,
       orgId,
       loading,
+      serviceError,
       isOwner,
       isAdmin,
       isMember,

@@ -176,6 +176,12 @@ function SignInContent() {
       });
 
       if (error) {
+        // Detect service outage (fetch failures, timeouts, CORS from downtime)
+        if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError") || error.message.includes("fetch")) {
+          setError("Our authentication service is temporarily unavailable. Please try again in a few minutes.");
+          setLoading(false);
+          return;
+        }
         if (error.message.includes("Email not confirmed")) {
           setError("Please confirm your email before signing in.");
         } else if (error.message.includes("Invalid login credentials")) {
@@ -200,8 +206,12 @@ function SignInContent() {
       setMessage("Signing you in...");
       handleSuccessfulAuth();
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unable to sign in right now.";
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("fetch")) {
+        setError("Our authentication service is temporarily unavailable. Please try again in a few minutes.");
+      } else {
+        setError(message || "Unable to sign in right now.");
+      }
       setLoading(false);
     }
   };
@@ -226,10 +236,11 @@ function SignInContent() {
 
       if (error) {
         setDemoLoading(false);
-        setError(
-          error.message ||
-            "Unable to sign in to the demo account. Please confirm the credentials exist in Supabase."
-        );
+        if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError") || error.message.includes("fetch")) {
+          setError("Our authentication service is temporarily unavailable. Please try again in a few minutes.");
+        } else {
+          setError(error.message || "Unable to sign in to the demo account.");
+        }
         return;
       }
 
@@ -240,8 +251,12 @@ function SignInContent() {
       handleSuccessfulAuth();
     } catch (err: unknown) {
       setDemoLoading(false);
-      const errorMessage = err instanceof Error ? err.message : "Unable to sign in to the demo account.";
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("fetch")) {
+        setError("Our authentication service is temporarily unavailable. Please try again in a few minutes.");
+      } else {
+        setError(message || "Unable to sign in to the demo account.");
+      }
     }
   };
 

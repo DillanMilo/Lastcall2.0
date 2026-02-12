@@ -30,7 +30,7 @@ import { UsageDashboard } from "@/components/billing/UsageDashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, orgId, loading: authLoading, signOut } = useAuth();
+  const { user, orgId, loading: authLoading, signOut, serviceError } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [stuckState, setStuckState] = useState(false);
@@ -274,6 +274,34 @@ export default function DashboardPage() {
   const handleRefresh = () => {
     window.location.reload();
   };
+
+  // Show service outage UI when auth backend is unreachable
+  if (serviceError) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <CardTitle>Service Temporarily Unavailable</CardTitle>
+            <CardDescription>
+              We&apos;re having trouble connecting to our servers. This is usually resolved within a few minutes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
+              <p>This may be caused by a temporary outage with our infrastructure provider. Your data is safe.</p>
+            </div>
+            <Button onClick={() => window.location.reload()} className="w-full">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Show stuck state recovery UI
   if (stuckState) {
