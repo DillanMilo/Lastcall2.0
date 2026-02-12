@@ -154,6 +154,8 @@ export async function fetchCloverInventoryItems(
       hasMore = false;
     } else {
       offset += limit;
+      // Throttle pagination requests to avoid Clover API rate limits
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
 

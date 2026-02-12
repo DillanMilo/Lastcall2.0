@@ -143,9 +143,9 @@ export async function syncInventoryItems({
     ? normalizedSource
     : source;
 
-  // Process items in batches for better performance
-  const BATCH_SIZE = 50;
-  
+  // Process items in batches with throttling to avoid API rate limits
+  const BATCH_SIZE = 25;
+
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
     
@@ -294,6 +294,11 @@ export async function syncInventoryItems({
           results.errors.push(result.error);
         }
       }
+    }
+
+    // Throttle between batches to avoid API rate limits
+    if (i + BATCH_SIZE < items.length) {
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
 
