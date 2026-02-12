@@ -99,10 +99,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/signin', request.url))
   }
 
-  // Redirect authenticated users away from auth pages
-  if (request.nextUrl.pathname.startsWith('/auth') && session) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  // NOTE: We intentionally do NOT redirect authenticated users away from /auth pages
+  // in middleware. The client-side auth flow (signin page, AuthContext) handles this.
+  // Doing it here causes a race condition: middleware detects the session before the
+  // client-side redirect completes, creating a redirect loop.
 
   return response
 }

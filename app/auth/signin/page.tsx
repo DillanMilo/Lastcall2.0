@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL || "";
 const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
 
 function SignInContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const prefilledEmail = searchParams.get("email") ?? "";
   const verifyReminder = searchParams.get("verify");
@@ -62,9 +61,9 @@ function SignInContent() {
       window.location.href = redirectUrl;
       return;
     }
-    // Default to dashboard
-    router.replace("/dashboard");
-  }, [redirectUrl, router]);
+    // Default to dashboard - use hard navigation to ensure clean auth state
+    window.location.href = "/dashboard";
+  }, [redirectUrl]);
 
   useEffect(() => {
     if (verifyReminder) {
