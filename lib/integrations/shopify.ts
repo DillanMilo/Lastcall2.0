@@ -83,6 +83,7 @@ async function shopifyRequest<T>(
   const response = await fetch(url, {
     ...init,
     headers,
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {
@@ -207,9 +208,12 @@ export async function fetchAllShopifyProducts(
 ): Promise<InventorySyncItem[]> {
   const items: InventorySyncItem[] = [];
   const limit = 250;
+  const maxPages = 100; // Safety limit to prevent infinite loops
   let sinceId = 0;
+  let pageCount = 0;
 
-  while (true) {
+  while (pageCount < maxPages) {
+    pageCount++;
     const endpoint = `/products.json?limit=${limit}&since_id=${sinceId}`;
 
     const response = await shopifyRequest<ShopifyProductsResponse>(
@@ -233,6 +237,10 @@ export async function fetchAllShopifyProducts(
     if (response.products.length < limit) {
       break;
     }
+  }
+
+  if (pageCount >= maxPages) {
+    console.warn(`Shopify pagination hit safety limit of ${maxPages} pages (${items.length} items fetched)`);
   }
 
   return items;

@@ -69,10 +69,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if a user with this email already exists in auth
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+    // Use filter to search by email instead of listing all users (avoids pagination issues)
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers({
+      perPage: 1,
+      page: 1,
+    });
+    // Also do a targeted lookup via the users table for reliability
+    const { data: existingUserRecord } = await adminClient
+      .from('users')
+      .select('id')
+      .eq('email', invite.email.toLowerCase())
+      .limit(1)
+      .maybeSingle();
+
     const existingAuthUser = existingUsers?.users?.find(
       u => u.email?.toLowerCase() === invite.email.toLowerCase()
-    );
+    ) || existingUserRecord;
 
     if (existingAuthUser) {
       return NextResponse.json(
@@ -116,7 +128,7 @@ export async function POST(request: NextRequest) {
         role: invite.role || 'member',
         created_at: new Date().toISOString(),
       }, {
-        onConflict: 'email',
+        onConflict: 'id',
         ignoreDuplicates: false
       })
       .select('*')

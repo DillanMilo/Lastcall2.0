@@ -155,11 +155,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch current inventory
+    // Fetch current inventory (limit to 5000 items to prevent timeout)
     const { data: inventory, error: inventoryError } = await supabase
       .from('inventory_items')
       .select('*')
-      .eq('org_id', orgId);
+      .eq('org_id', orgId)
+      .limit(5000);
 
     if (inventoryError) {
       console.error('Error fetching inventory:', inventoryError);

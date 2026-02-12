@@ -14,7 +14,8 @@
       "WebFetch(domain:doc.toasttab.com)",
       "WebFetch(domain:docs.clover.com)",
       "WebFetch(domain:www.thrivepos.com)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(npx next build:*)"
     ]
   }
 }

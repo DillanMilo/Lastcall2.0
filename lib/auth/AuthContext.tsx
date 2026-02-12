@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
+        signal: AbortSignal.timeout(15000),
       });
 
       const payload = await response.json().catch(() => null);
@@ -267,24 +268,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
-      // Failsafe timeout - if auth takes longer than 10 seconds, something is wrong
+      // Failsafe timeout - if auth takes longer than 20 seconds, something is wrong
+      // Increased from 10s to 20s to accommodate slower mobile connections
       timeoutId = setTimeout(() => {
         if (isMounted) {
           console.warn('Auth initialization timed out - clearing stale state');
           setLoading((currentLoading) => {
             if (currentLoading) {
-              // Only clear if still loading
+              // Only clear if still loading - don't sign out, just stop loading
               setUser(null);
               setUserWithOrg(null);
               setOrgId(null);
-              // Clear potentially corrupted auth state
-              supabase.auth.signOut().catch(() => {});
               return false;
             }
             return currentLoading;
           });
         }
-      }, 10000);
+      }, 20000);
 
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();

@@ -67,6 +67,7 @@ async function bigCommerceRequest<T>(endpoint: string, init: RequestInit = {}): 
   const response = await fetch(url, {
     ...init,
     headers,
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {
@@ -134,6 +135,7 @@ async function bigCommerceRequestWithCredentials<T>(
   const response = await fetch(url, {
     ...init,
     headers,
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {
@@ -152,8 +154,9 @@ export async function fetchBigCommerceCatalogItemsWithCredentials(
   const items: InventorySyncItem[] = [];
   let page = 1;
   const limit = 250;
+  const maxPages = 100; // Safety limit to prevent infinite loops
 
-  while (true) {
+  while (page <= maxPages) {
     const response = await bigCommerceRequestWithCredentials<PaginatedResponse<BigCommerceProduct>>(
       `/catalog/products?include=variants&limit=${limit}&page=${page}`,
       credentials
@@ -177,6 +180,10 @@ export async function fetchBigCommerceCatalogItemsWithCredentials(
     }
 
     page += 1;
+  }
+
+  if (page > maxPages) {
+    console.warn(`BigCommerce pagination hit safety limit of ${maxPages} pages (${items.length} items fetched)`);
   }
 
   return items;

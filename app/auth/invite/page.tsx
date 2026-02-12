@@ -163,10 +163,9 @@ function InviteContent() {
 
     // If user is logged in as wrong email, sign them out first
     if (isAuthenticated) {
-      // Clear all local storage except the invite token
-      const inviteToken = localStorage.getItem("pendingInviteToken");
-      localStorage.clear();
-      if (inviteToken) localStorage.setItem("pendingInviteToken", inviteToken);
+      // Selectively clear auth-related keys instead of wiping all localStorage
+      localStorage.removeItem("rememberMe");
+      sessionStorage.removeItem("activeSession");
 
       await supabase.auth.signOut();
       // Small delay to ensure sign-out propagates
@@ -183,10 +182,9 @@ function InviteContent() {
 
     // If user is logged in as wrong email, sign them out first
     if (isAuthenticated) {
-      // Clear all local storage except the invite token
-      const inviteToken = localStorage.getItem("pendingInviteToken");
-      localStorage.clear();
-      if (inviteToken) localStorage.setItem("pendingInviteToken", inviteToken);
+      // Selectively clear auth-related keys instead of wiping all localStorage
+      localStorage.removeItem("rememberMe");
+      sessionStorage.removeItem("activeSession");
 
       await supabase.auth.signOut();
       // Small delay to ensure sign-out propagates

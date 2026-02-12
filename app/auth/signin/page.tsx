@@ -188,14 +188,15 @@ function SignInContent() {
         return;
       }
 
-      // Store remember me preference
+      // Store remember me preference and session state
       if (rememberMe) {
         localStorage.setItem("rememberMe", "true");
+        sessionStorage.setItem("activeSession", "true");
       } else {
         localStorage.removeItem("rememberMe");
+        // Only set activeSession for this tab - session will end when tab closes
+        sessionStorage.setItem("activeSession", "true");
       }
-      // Mark this as an active session
-      sessionStorage.setItem("activeSession", "true");
 
       setMessage("Signing you in...");
       handleSuccessfulAuth();

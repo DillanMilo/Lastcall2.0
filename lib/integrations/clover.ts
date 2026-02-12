@@ -78,6 +78,7 @@ async function cloverRequest<T>(
   const response = await fetch(url, {
     ...init,
     headers,
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {
@@ -105,6 +106,7 @@ export async function testCloverConnection(
         'Accept': 'application/json',
         'Authorization': `Bearer ${credentials.accessToken}`,
       },
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {
@@ -131,10 +133,13 @@ export async function fetchCloverInventoryItems(
 ): Promise<InventorySyncItem[]> {
   const items: InventorySyncItem[] = [];
   const limit = 100;
+  const maxPages = 100; // Safety limit to prevent infinite loops
   let offset = 0;
   let hasMore = true;
+  let pageCount = 0;
 
-  while (hasMore) {
+  while (hasMore && pageCount < maxPages) {
+    pageCount++;
     // Fetch items with their stock counts
     // expand=itemStock gets the inventory levels
     const response = await cloverRequest<CloverItemsResponse>(
@@ -157,6 +162,10 @@ export async function fetchCloverInventoryItems(
       // Throttle pagination requests to avoid Clover API rate limits
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+  }
+
+  if (pageCount >= maxPages) {
+    console.warn(`Clover pagination hit safety limit of ${maxPages} pages (${items.length} items fetched)`);
   }
 
   return items;

@@ -22,14 +22,16 @@ export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
 
-    // Verify webhook signature if secret is configured
-    if (webhookSecret) {
-      const signature = request.headers.get('x-clover-signature') || '';
+    // Verify webhook signature - reject if secret is not configured
+    if (!webhookSecret) {
+      console.error('CLOVER_WEBHOOK_SECRET is not configured - rejecting webhook');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+    }
 
-      if (!verifyCloverWebhookSignature(rawBody, signature, webhookSecret)) {
-        console.error('Clover webhook signature verification failed');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    const signature = request.headers.get('x-clover-signature') || '';
+    if (!verifyCloverWebhookSignature(rawBody, signature, webhookSecret)) {
+      console.error('Clover webhook signature verification failed');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     const payload = parseCloverWebhookPayload(rawBody);
@@ -44,6 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Process events for each merchant
     for (const [merchantId, events] of Object.entries(payload.merchants)) {
+      if (!Array.isArray(events)) continue;
       // Look up the connection from clover_connections table
       const { data: connection } = await adminClient
         .from('clover_connections')
@@ -103,15 +106,27 @@ export async function POST(request: NextRequest) {
             // In validation mode, log extra detail for Thrive comparison auditing
             if (isValidationMode) {
               try {
+                // Look up current quantity to record accurate previous_quantity
+                const { data: currentItem } = await adminClient
+                  .from('inventory_items')
+                  .select('quantity')
+                  .eq('org_id', connection.org_id)
+                  .eq('clover_item_id', objectId)
+                  .limit(1)
+                  .maybeSingle();
+
+                const previousQty = currentItem?.quantity ?? 0;
+                const newQty = typeof cloverItem.quantity === 'number' ? cloverItem.quantity : 0;
+
                 await adminClient
                   .from('inventory_history')
                   .insert([{
                     org_id: connection.org_id,
                     item_name: cloverItem.name,
                     sku: cloverItem.sku ?? null,
-                    previous_quantity: 0,
-                    new_quantity: typeof cloverItem.quantity === 'number' ? cloverItem.quantity : 0,
-                    quantity_change: 0,
+                    previous_quantity: previousQty,
+                    new_quantity: newQty,
+                    quantity_change: newQty - previousQty,
                     change_type: 'thrive_validation',
                     source: `clover_webhook_${type.toLowerCase()}_${merchantId}`,
                   }]);

@@ -139,11 +139,15 @@ export default function DashboardPage() {
     }
 
     // Also check the database for pending invites for this user
+    let cancelled = false;
+
     const checkPendingInvite = async () => {
       if (!user?.email) return null;
 
       try {
-        const response = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(user.email)}`);
+        const response = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(user.email)}`, {
+          signal: AbortSignal.timeout(10000),
+        });
         if (response.ok) {
           const data = await response.json();
           if (data.token) {
@@ -158,6 +162,7 @@ export default function DashboardPage() {
 
     // Check for pending invite and redirect if found
     checkPendingInvite().then((token) => {
+      if (cancelled) return; // Prevent state update on unmounted component
       if (token) {
         window.location.href = `/auth/invite?token=${token}`;
       }
@@ -165,13 +170,17 @@ export default function DashboardPage() {
 
     // Set a timeout - if no orgId after 5 seconds, show stuck state
     const timeout = setTimeout(() => {
+      if (cancelled) return;
       if (!orgId && user) {
         console.warn('User authenticated but no orgId found after timeout.');
         setStuckState(true);
         setLoading(false);
       }
     }, 5000);
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [authLoading, user, orgId, router, fetchInventory]);
 
   const totalItems = items.length;

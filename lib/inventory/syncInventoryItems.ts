@@ -78,10 +78,11 @@ async function findExistingInventoryItem(
   item: InventorySyncItem
 ) {
   // Match by SKU first (most reliable)
+  // Include quantity in select to avoid a separate N+1 query for history tracking
   if (item.sku) {
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('id')
+      .select('id, quantity')
       .eq('org_id', orgId)
       .eq('sku', item.sku)
       .limit(1);
@@ -96,7 +97,7 @@ async function findExistingInventoryItem(
   if (item.name) {
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('id')
+      .select('id, quantity')
       .eq('org_id', orgId)
       .eq('name', item.name)
       .limit(1);
@@ -203,14 +204,8 @@ export async function syncInventoryItems({
         const newQuantity = parseInteger(item.quantity);
 
         if (existing) {
-          // Get current quantity for history tracking
-          const { data: currentItem } = await supabase
-            .from('inventory_items')
-            .select('quantity')
-            .eq('id', existing.id)
-            .single();
-
-          const previousQuantity = currentItem?.quantity ?? 0;
+          // Use quantity from findExistingInventoryItem (already fetched)
+          const previousQuantity = existing.quantity ?? 0;
           const quantityChange = newQuantity - previousQuantity;
 
           const { error: updateError } = await supabase

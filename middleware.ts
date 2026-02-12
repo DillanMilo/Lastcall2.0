@@ -54,17 +54,26 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Try to get session, but handle errors gracefully
+  // Try to get session, but handle errors gracefully with a timeout
+  // to prevent 504 Gateway Timeout on slow connections (especially mobile)
   let session = null
   try {
-    const { data, error } = await supabase.auth.getSession()
-    
+    const sessionPromise = supabase.auth.getSession()
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Auth session timeout')), 5000)
+    )
+
+    const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<typeof sessionPromise>
+
     // If there's a refresh token error, clear the session and continue
     if (error) {
       // Check if it's a refresh token error
       if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Invalid Refresh Token')) {
-        // Clear invalid tokens by signing out (this properly clears all auth cookies)
-        await supabase.auth.signOut()
+        // Clear invalid tokens by signing out with timeout (this properly clears all auth cookies)
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise<void>((resolve) => setTimeout(resolve, 3000))
+        ])
         // Continue without session (user will need to sign in again)
         session = null
       } else {
@@ -76,9 +85,10 @@ export async function middleware(request: NextRequest) {
       session = data?.session ?? null
     }
   } catch (error: any) {
-    // Catch any unexpected errors and continue
-    // If it's a refresh token error, clear it
-    if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token')) {
+    // Catch any unexpected errors (including timeouts) and continue
+    if (error?.message === 'Auth session timeout') {
+      console.warn('Middleware auth check timed out - proceeding without session')
+    } else if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token')) {
       await supabase.auth.signOut().catch(() => {})
     }
     session = null
