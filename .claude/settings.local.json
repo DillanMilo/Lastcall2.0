@@ -15,7 +15,9 @@
       "WebFetch(domain:docs.clover.com)",
       "WebFetch(domain:www.thrivepos.com)",
       "Bash(git log:*)",
-      "Bash(npx next build:*)"
+      "Bash(npx next build:*)",
+      "Bash(vercel --version:*)",
+      "Bash(git -C /Users/dillanmilosevich/Desktop/Lastcall2.0-3 status)"
     ]
   }
 }
