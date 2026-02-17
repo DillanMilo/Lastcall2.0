@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 interface HistoryRecord {
@@ -33,26 +32,12 @@ interface HistoryRecord {
  */
 export async function GET(request: NextRequest) {
   try {
-    const response = NextResponse.next();
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    });
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data: userData, error: userError } = await supabase
@@ -62,7 +47,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (userError || !userData?.org_id) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const orgId = userData.org_id;
@@ -79,7 +64,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (orgError || !org) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const tier = (org.subscription_tier || 'free') as PlanTier;
@@ -87,7 +72,7 @@ export async function GET(request: NextRequest) {
     const integrationCheck = checkIntegrationAccess(tier, 'clover', billingExempt);
 
     if (!integrationCheck.allowed) {
-      return NextResponse.json({
+      return jsonResponse({
         error: integrationCheck.message || 'Clover integration requires Growth plan or higher'
       }, { status: 403 });
     }
@@ -109,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     if (itemsError) {
       console.error('Failed to fetch inventory items:', itemsError);
-      return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 });
+      return jsonResponse({ error: 'Failed to fetch items' }, { status: 500 });
     }
 
     // Get inventory history since validation started (or last 30 days if no validation date)
@@ -138,7 +123,7 @@ export async function GET(request: NextRequest) {
       .filter(h => h.quantity_change > 0)
       .reduce((sum: number, h) => sum + h.quantity_change, 0);
 
-    return NextResponse.json({
+    return jsonResponse({
       validation_status: {
         active: org.thrive_validation_mode === true,
         started_at: org.thrive_validation_started_at || null,
@@ -202,26 +187,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const response = NextResponse.next();
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    });
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data: userData, error: userError } = await supabase
@@ -231,7 +202,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !userData?.org_id) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const orgId = userData.org_id;
@@ -248,7 +219,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !org) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const tier = (org.subscription_tier || 'free') as PlanTier;
@@ -256,7 +227,7 @@ export async function POST(request: NextRequest) {
     const integrationCheck = checkIntegrationAccess(tier, 'clover', billingExempt);
 
     if (!integrationCheck.allowed) {
-      return NextResponse.json({
+      return jsonResponse({
         error: integrationCheck.message || 'Clover integration requires Growth plan or higher'
       }, { status: 403 });
     }
@@ -269,7 +240,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!connCheck || connCheck.length === 0) {
-      return NextResponse.json({
+      return jsonResponse({
         error: 'Clover must be connected before enabling Thrive validation mode.'
       }, { status: 400 });
     }
@@ -278,7 +249,7 @@ export async function POST(request: NextRequest) {
     const { enable } = body;
 
     if (typeof enable !== 'boolean') {
-      return NextResponse.json({ error: 'Missing required field: enable (boolean)' }, { status: 400 });
+      return jsonResponse({ error: 'Missing required field: enable (boolean)' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
@@ -296,10 +267,10 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error('Failed to enable validation mode:', updateError);
-        return NextResponse.json({ error: 'Failed to enable validation mode' }, { status: 500 });
+        return jsonResponse({ error: 'Failed to enable validation mode' }, { status: 500 });
       }
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         message: 'Thrive validation mode enabled. LastCallIQ will now capture all Clover data in read-only mode alongside Thrive. Push to Clover is disabled.',
         validation_started_at: now,
@@ -316,10 +287,10 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error('Failed to disable validation mode:', updateError);
-        return NextResponse.json({ error: 'Failed to disable validation mode' }, { status: 500 });
+        return jsonResponse({ error: 'Failed to disable validation mode' }, { status: 500 });
       }
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         message: 'Thrive validation mode ended. LastCallIQ push to Clover is re-enabled. Review the validation report to compare data.',
         validation_ended_at: now,

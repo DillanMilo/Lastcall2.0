@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { generateWelcomeEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
@@ -91,27 +90,13 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const response = NextResponse.next();
-
     // Get authenticated user
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    });
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'You must be signed in to accept an invite' },
         { status: 401 }
       );
@@ -120,7 +105,7 @@ export async function POST(request: NextRequest) {
     const { token } = await request.json();
 
     if (!token) {
-      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
+      return jsonResponse({ error: 'Token is required' }, { status: 400 });
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -135,7 +120,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (inviteError || !invite) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Invalid or expired invite' },
         { status: 404 }
       );
@@ -143,14 +128,14 @@ export async function POST(request: NextRequest) {
 
     // Validate invite
     if (invite.accepted_at) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'This invite has already been used' },
         { status: 400 }
       );
     }
 
     if (new Date(invite.expires_at) < new Date()) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'This invite has expired' },
         { status: 400 }
       );
@@ -158,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     // Check email matches (case-insensitive)
     if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Email mismatch',
           message: `This invite was sent to ${invite.email}. Please sign in with that email address.`,
@@ -170,7 +155,7 @@ export async function POST(request: NextRequest) {
     // Validate the invite has a proper org_id
     if (!invite.org_id || invite.org_id === '00000000-0000-0000-0000-000000000000') {
       console.error('Invalid invite org_id:', invite.org_id);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Invalid invite - organization not found' },
         { status: 400 }
       );
@@ -192,7 +177,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingMembership) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Already a member',
           message: 'You are already a member of this organization.',
@@ -250,7 +235,7 @@ export async function POST(request: NextRequest) {
 
     if (userError) {
       console.error('Error updating user:', userError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to join organization' },
         { status: 500 }
       );
@@ -313,7 +298,7 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to send welcome email:', emailResult.error);
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: `Welcome to ${organizationName}!`,
       organizationId: invite.org_id,

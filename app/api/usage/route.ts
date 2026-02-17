@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { getTierLimits } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
@@ -13,28 +13,13 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
  * Returns usage statistics for the authenticated user's organization
  */
 export async function GET(request: NextRequest) {
+  const { supabase, jsonResponse } = createRouteHandlerClient(request);
   try {
-    const response = NextResponse.next();
-
-    // Authenticate user
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get user's org
@@ -45,7 +30,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (userError || !userData?.org_id) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const orgId = userData.org_id;
@@ -63,7 +48,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const tier = (orgData.subscription_tier || 'free') as PlanTier;
@@ -120,7 +105,7 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       organization: {
         id: orgId,
@@ -133,6 +118,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching usage:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
   }
 }

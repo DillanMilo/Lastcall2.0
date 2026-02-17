@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { stripe } from '@/lib/stripe';
 import { getPlanByTier, type PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 export async function POST(request: NextRequest) {
@@ -36,23 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get authenticated user
-    const response = NextResponse.next({
-      request: { headers: request.headers },
-    });
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    });
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
 
     const {
       data: { user },
@@ -60,7 +43,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get user's organization and role
@@ -75,7 +58,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !userData?.org_id) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Organization not found' },
         { status: 404 }
       );
@@ -83,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     // Only owners can manage billing
     if (userData.role !== 'owner') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Forbidden', message: 'Only organization owners can manage billing' },
         { status: 403 }
       );
@@ -96,7 +79,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Organization not found' },
         { status: 404 }
       );
@@ -154,7 +137,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ sessionId: session.id, url: session.url });
+    return jsonResponse({ sessionId: session.id, url: session.url });
   } catch (error) {
     console.error('Stripe checkout error:', error);
     return NextResponse.json(

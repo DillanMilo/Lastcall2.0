@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -14,25 +14,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase, jsonResponse } = createRouteHandlerClient(request);
 
   const {
     data: { user },
@@ -40,7 +22,7 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -100,7 +82,7 @@ export async function POST(request: NextRequest) {
       organization = orgData || null;
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       user: userRecord,
       organization,
@@ -125,7 +107,7 @@ export async function POST(request: NextRequest) {
 
   if (existingError) {
     console.error('Error checking existing user:', existingError);
-    return NextResponse.json(
+    return jsonResponse(
       { error: existingError.message || 'Failed to check user' },
       { status: 500 }
     );
@@ -144,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (emailError) {
       console.error('Error checking user by email:', emailError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: emailError.message || 'Failed to check user by email' },
         { status: 500 }
       );
@@ -164,7 +146,7 @@ export async function POST(request: NextRequest) {
 
         if (migrateError) {
           console.error('Error migrating user record to auth UID:', migrateError);
-          return NextResponse.json(
+          return jsonResponse(
             { error: migrateError.message || 'Failed to migrate existing user' },
             { status: 500 }
           );
@@ -228,7 +210,7 @@ export async function POST(request: NextRequest) {
 
         if (userError) {
           console.error('Error creating user record for invited user:', userError);
-          return NextResponse.json(
+          return jsonResponse(
             { error: userError.message || 'Failed to create user' },
             { status: 500 }
           );
@@ -260,7 +242,7 @@ export async function POST(request: NextRequest) {
           .eq('id', fullInvite.org_id)
           .single();
 
-        return NextResponse.json({
+        return jsonResponse({
           success: true,
           user: newUser,
           organization: orgData,
@@ -284,13 +266,13 @@ export async function POST(request: NextRequest) {
 
         if (userError) {
           console.error('Error creating user record for invited user:', userError);
-          return NextResponse.json(
+          return jsonResponse(
             { error: userError.message || 'Failed to create user' },
             { status: 500 }
           );
         }
 
-        return NextResponse.json({
+        return jsonResponse({
           success: true,
           user: newUser,
           organization: null,
@@ -298,7 +280,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         user: existingUser,
         organization: null,
@@ -353,7 +335,7 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error updating user record:', updateError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: updateError.message || 'Failed to update user' },
         { status: 500 }
       );
@@ -392,7 +374,7 @@ export async function POST(request: NextRequest) {
 
     if (userError) {
       console.error('Error creating user record:', userError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: userError.message || 'Failed to create user' },
         { status: 500 }
       );
@@ -412,7 +394,7 @@ export async function POST(request: NextRequest) {
   }
 
   const latestUser = (await getUserById()).data;
-  return latestUser ? buildResponse(latestUser) : NextResponse.json(
+  return latestUser ? buildResponse(latestUser) : jsonResponse(
     { error: 'Unable to resolve user record' },
     { status: 500 }
   );

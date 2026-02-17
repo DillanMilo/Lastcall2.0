@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import { testShopifyConnection, getShopifyProductCount, normalizeStoreDomain } from '@/lib/integrations/shopify';
 import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 interface ConnectRequest {
@@ -19,21 +18,7 @@ interface ConnectRequest {
  * Verify user is authenticated, belongs to the specified organization, and is an admin
  */
 async function verifyUserOrgAdmin(request: NextRequest, orgId: string): Promise<{ valid: boolean; error?: string; status?: number }> {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -69,13 +54,14 @@ async function verifyUserOrgAdmin(request: NextRequest, orgId: string): Promise<
  */
 export async function POST(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const body: ConnectRequest = await request.json();
 
     const { org_id, store_domain, access_token } = body;
 
     // Validate required fields
     if (!org_id || !store_domain || !access_token) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'All fields are required: org_id, store_domain, access_token' },
         { status: 400 }
       );
@@ -84,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Verify user belongs to this organization
     const authCheck = await verifyUserOrgAdmin(request, org_id);
     if (!authCheck.valid) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: authCheck.error },
         { status: 403 }
       );
@@ -92,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Check organization tier for Shopify integration access
     if (!serviceRoleKey) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY not set' },
         { status: 500 }
       );
@@ -109,7 +95,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Organization not found' },
         { status: 404 }
       );
@@ -119,7 +105,7 @@ export async function POST(request: NextRequest) {
     const integrationCheck = checkIntegrationAccess(tier, 'shopify');
 
     if (!integrationCheck.allowed) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Upgrade required',
           message: integrationCheck.message,
@@ -139,7 +125,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!connectionTest.success) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: 'Connection test failed',
@@ -172,13 +158,13 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error saving Shopify credentials:', updateError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to save credentials', details: updateError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       store_info: {
         name: connectionTest.shopName || normalizedDomain,
@@ -205,11 +191,12 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const { searchParams } = new URL(request.url);
     const org_id = searchParams.get('org_id');
 
     if (!org_id) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'org_id is required' },
         { status: 400 }
       );
@@ -218,14 +205,14 @@ export async function DELETE(request: NextRequest) {
     // Verify user belongs to this organization
     const authCheck = await verifyUserOrgAdmin(request, org_id);
     if (!authCheck.valid) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: authCheck.error },
         { status: 403 }
       );
     }
 
     if (!serviceRoleKey) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Server configuration error' },
         { status: 500 }
       );
@@ -248,13 +235,13 @@ export async function DELETE(request: NextRequest) {
       .eq('id', org_id);
 
     if (updateError) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to disconnect', details: updateError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: 'Shopify disconnected successfully',
     });

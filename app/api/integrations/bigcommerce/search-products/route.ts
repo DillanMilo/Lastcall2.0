@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 interface BigCommerceProduct {
@@ -18,21 +17,7 @@ interface BigCommerceProduct {
  * Verify user is authenticated and belongs to the specified organization
  */
 async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ valid: boolean; error?: string }> {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -64,26 +49,27 @@ async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ val
  */
 export async function GET(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get('org_id');
     const query = searchParams.get('q');
 
     if (!orgId) {
-      return NextResponse.json({ error: 'org_id is required' }, { status: 400 });
+      return jsonResponse({ error: 'org_id is required' }, { status: 400 });
     }
 
     if (!query || query.length < 2) {
-      return NextResponse.json({ products: [] });
+      return jsonResponse({ products: [] });
     }
 
     // Verify user belongs to this organization
     const authCheck = await verifyUserOrg(request, orgId);
     if (!authCheck.valid) {
-      return NextResponse.json({ error: authCheck.error }, { status: 403 });
+      return jsonResponse({ error: authCheck.error }, { status: 403 });
     }
 
     if (!serviceRoleKey) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return jsonResponse({ error: 'Server configuration error' }, { status: 500 });
     }
 
     // Get organization's BigCommerce credentials
@@ -98,11 +84,11 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (orgError || !org) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     if (!org.bigcommerce_store_hash || !org.bigcommerce_access_token) {
-      return NextResponse.json({ products: [], message: 'BigCommerce not connected' });
+      return jsonResponse({ products: [], message: 'BigCommerce not connected' });
     }
 
     const { bigcommerce_store_hash, bigcommerce_client_id, bigcommerce_access_token } = org;
@@ -121,13 +107,13 @@ export async function GET(request: NextRequest) {
 
     if (!searchResponse.ok) {
       console.error('BigCommerce search error:', await searchResponse.text());
-      return NextResponse.json({ products: [], error: 'Search failed' });
+      return jsonResponse({ products: [], error: 'Search failed' });
     }
 
     const data = await searchResponse.json();
     const products: BigCommerceProduct[] = data.data || [];
 
-    return NextResponse.json({
+    return jsonResponse({
       products: products.map((p) => ({
         id: p.id,
         name: p.name,

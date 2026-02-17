@@ -1,43 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-
-/**
- * Create authenticated Supabase client for API routes
- */
-function createAuthenticatedClient(request: NextRequest, response: NextResponse) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
-  )
-}
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 
 /**
  * Get the authenticated user's organization ID
  */
-async function getUserOrgId(request: NextRequest, response: NextResponse): Promise<string | null> {
+async function getUserOrgId(request: NextRequest): Promise<string | null> {
   try {
-    const supabase = createAuthenticatedClient(request, response);
+    const { supabase } = createRouteHandlerClient(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -64,7 +33,7 @@ async function getUserOrgId(request: NextRequest, response: NextResponse): Promi
 /**
  * Check if an item belongs to the user's organization
  */
-async function validateItemOwnership(itemId: string, userOrgId: string, supabase: ReturnType<typeof createAuthenticatedClient>): Promise<boolean> {
+async function validateItemOwnership(itemId: string, userOrgId: string, supabase: ReturnType<typeof createRouteHandlerClient>['supabase']): Promise<boolean> {
   try {
     const { data, error } = await supabase
       .from('inventory_items')
@@ -92,24 +61,22 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = NextResponse.next();
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { id } = await params;
 
     // Authenticate user and get their org
-    const userOrgId = await getUserOrgId(request, response);
+    const userOrgId = await getUserOrgId(request);
     if (!userOrgId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const supabase = createAuthenticatedClient(request, response);
-
     // Validate item ownership
     const isOwner = await validateItemOwnership(id, userOrgId, supabase);
     if (!isOwner) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Access denied' },
         { status: 403 }
       );
@@ -122,13 +89,13 @@ export async function GET(
       .single();
 
     if (error || !data) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Item not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       item: data,
     });
@@ -150,24 +117,22 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = NextResponse.next();
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { id } = await params;
 
     // Authenticate user and get their org
-    const userOrgId = await getUserOrgId(request, response);
+    const userOrgId = await getUserOrgId(request);
     if (!userOrgId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const supabase = createAuthenticatedClient(request, response);
-
     // Validate item ownership
     const isOwner = await validateItemOwnership(id, userOrgId, supabase);
     if (!isOwner) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Access denied' },
         { status: 403 }
       );
@@ -189,13 +154,13 @@ export async function PUT(
 
     if (error) {
       console.error('Error updating inventory:', error);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to update item', details: error.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       item: data,
     });
@@ -218,24 +183,22 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = NextResponse.next();
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { id } = await params;
 
     // Authenticate user and get their org
-    const userOrgId = await getUserOrgId(request, response);
+    const userOrgId = await getUserOrgId(request);
     if (!userOrgId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const supabase = createAuthenticatedClient(request, response);
-
     // Validate item ownership
     const isOwner = await validateItemOwnership(id, userOrgId, supabase);
     if (!isOwner) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Access denied' },
         { status: 403 }
       );
@@ -257,13 +220,13 @@ export async function PATCH(
 
     if (error) {
       console.error('Error patching inventory:', error);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to update item', details: error.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       item: data,
     });
@@ -286,24 +249,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = NextResponse.next();
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { id } = await params;
 
     // Authenticate user and get their org
-    const userOrgId = await getUserOrgId(request, response);
+    const userOrgId = await getUserOrgId(request);
     if (!userOrgId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const supabase = createAuthenticatedClient(request, response);
-
     // Validate item ownership
     const isOwner = await validateItemOwnership(id, userOrgId, supabase);
     if (!isOwner) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Access denied' },
         { status: 403 }
       );
@@ -316,13 +277,13 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting inventory:', error);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to delete item', details: error.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: 'Item deleted successfully',
     });
@@ -335,4 +296,3 @@ export async function DELETE(
     );
   }
 }
-

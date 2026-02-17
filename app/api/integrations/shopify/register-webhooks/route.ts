@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { normalizeStoreDomain } from '@/lib/integrations/shopify';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const SHOPIFY_API_VERSION = '2024-01';
@@ -32,21 +31,7 @@ interface WebhooksResponse {
  * Verify user is authenticated and get their org
  */
 async function getAuthenticatedOrg(request: NextRequest) {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -168,14 +153,15 @@ async function registerWebhook(
  */
 export async function POST(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const org = await getAuthenticatedOrg(request);
 
     if (!org) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (!org.shopify_store_domain || !org.shopify_access_token) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Shopify is not connected. Please configure your credentials first.' },
         { status: 400 }
       );
@@ -226,7 +212,7 @@ export async function POST(request: NextRequest) {
     const existing = results.filter((r) => r.status === 'already_exists').length;
     const failed = results.filter((r) => r.status === 'failed').length;
 
-    return NextResponse.json({
+    return jsonResponse({
       success: failed === 0,
       message: `Webhooks registered: ${created} created, ${existing} already existed, ${failed} failed`,
       destination,
@@ -247,14 +233,15 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const org = await getAuthenticatedOrg(request);
 
     if (!org) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (!org.shopify_store_domain || !org.shopify_access_token) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Shopify is not connected' },
         { status: 400 }
       );
@@ -265,7 +252,7 @@ export async function GET(request: NextRequest) {
       org.shopify_access_token
     );
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       webhooks: webhooks.map((w) => ({
         id: w.id,
@@ -289,14 +276,15 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const org = await getAuthenticatedOrg(request);
 
     if (!org) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (!org.shopify_store_domain || !org.shopify_access_token) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Shopify is not connected' },
         { status: 400 }
       );
@@ -322,7 +310,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: `Deleted ${deleted} webhooks`,
     });

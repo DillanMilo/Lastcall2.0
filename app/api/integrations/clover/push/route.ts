@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { updateCloverInventory, createCloverItem } from '@/lib/integrations/clover';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
@@ -23,21 +22,13 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
  */
 export async function POST(request: NextRequest) {
   try {
-    const response = NextResponse.next();
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) { return request.cookies.get(name)?.value; },
-        set(name: string, value: string, options: CookieOptions) { response.cookies.set({ name, value, ...options }); },
-        remove(name: string, options: CookieOptions) { response.cookies.set({ name, value: '', ...options }); },
-      },
-    });
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('org_id').eq('id', user.id).single();
-    if (!userData?.org_id) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    if (!userData?.org_id) return jsonResponse({ error: 'Organization not found' }, { status: 404 });
 
     const orgId = userData.org_id;
 
@@ -52,11 +43,11 @@ export async function POST(request: NextRequest) {
       .eq('id', orgId)
       .single();
 
-    if (orgError || !org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    if (orgError || !org) return jsonResponse({ error: 'Organization not found' }, { status: 404 });
 
     // Block writes when Thrive validation mode is active
     if (org.thrive_validation_mode === true) {
-      return NextResponse.json({
+      return jsonResponse({
         error: 'Clover push is disabled during Thrive validation mode. LastCallIQ is running in read-only mode to safely capture data alongside Thrive without interfering.',
         validation_mode: true,
       }, { status: 403 });
@@ -68,7 +59,7 @@ export async function POST(request: NextRequest) {
     const integrationCheck = checkIntegrationAccess(tier, 'clover', billingExempt);
 
     if (!integrationCheck.allowed) {
-      return NextResponse.json({
+      return jsonResponse({
         error: integrationCheck.message || 'Clover integration requires Growth plan or higher'
       }, { status: 403 });
     }
@@ -80,7 +71,7 @@ export async function POST(request: NextRequest) {
       .eq('org_id', orgId);
 
     if (!connections || connections.length === 0) {
-      return NextResponse.json({
+      return jsonResponse({
         error: 'No Clover merchants connected. Please connect your Clover account first.'
       }, { status: 400 });
     }
@@ -99,7 +90,7 @@ export async function POST(request: NextRequest) {
     const itemIdsToProcess: string[] = item_ids || (item_id ? [item_id] : []);
 
     if (itemIdsToProcess.length === 0) {
-      return NextResponse.json({ error: 'No item IDs provided' }, { status: 400 });
+      return jsonResponse({ error: 'No item IDs provided' }, { status: 400 });
     }
 
     // Fetch items, including which merchant they belong to
@@ -111,11 +102,11 @@ export async function POST(request: NextRequest) {
 
     if (itemsError) {
       console.error('Failed to fetch inventory items:', itemsError);
-      return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 });
+      return jsonResponse({ error: 'Failed to fetch items' }, { status: 500 });
     }
 
     if (!items || items.length === 0) {
-      return NextResponse.json({ error: 'No items found' }, { status: 404 });
+      return jsonResponse({ error: 'No items found' }, { status: 404 });
     }
 
     const results = { updated: 0, created: 0, failed: 0, errors: [] as string[] };
@@ -178,7 +169,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: results.failed === 0,
       message: `Updated: ${results.updated}, Created: ${results.created}, Failed: ${results.failed}`,
       results,

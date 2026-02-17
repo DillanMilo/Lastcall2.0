@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import OpenAI from 'openai';
 import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const openai = new OpenAI({
@@ -25,21 +24,7 @@ interface ActionResult {
  * Verify user belongs to the organization
  */
 async function verifyUserOrg(request: NextRequest, orgId: string): Promise<boolean> {
-  const response = NextResponse.next();
-  
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
@@ -337,10 +322,11 @@ async function executeAction(
  */
 export async function POST(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const { message, orgId } = await request.json();
 
     if (!message || !orgId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Message and orgId are required' },
         { status: 400 }
       );
@@ -349,7 +335,7 @@ export async function POST(request: NextRequest) {
     // Verify user authorization
     const isAuthorized = await verifyUserOrg(request, orgId);
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get inventory context for parsing
@@ -365,7 +351,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Organization not found' },
         { status: 404 }
       );
@@ -376,7 +362,7 @@ export async function POST(request: NextRequest) {
     // Check AI request limit
     const limitCheck = await checkAIRequestLimit(supabase, orgId, tier);
     if (!limitCheck.allowed) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'AI request limit reached',
           message: limitCheck.message,
@@ -402,14 +388,14 @@ export async function POST(request: NextRequest) {
     const intent = await parseActionIntent(message, inventoryContext);
 
     if (!intent || intent.action === 'none' || intent.confidence < 0.7) {
-      return NextResponse.json({
+      return jsonResponse({
         isAction: false,
         message: 'This appears to be a question, not an action request.',
       });
     }
 
     if (!intent.value) {
-      return NextResponse.json({
+      return jsonResponse({
         isAction: true,
         needsConfirmation: true,
         action: intent.action,
@@ -424,7 +410,7 @@ export async function POST(request: NextRequest) {
     // Log the AI request
     await logAIRequest(supabase, orgId, 'action');
 
-    return NextResponse.json({
+    return jsonResponse({
       isAction: true,
       ...result,
     });
@@ -436,4 +422,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

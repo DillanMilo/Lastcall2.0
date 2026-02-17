@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 interface ConnectRequest {
@@ -19,21 +18,7 @@ interface ConnectRequest {
  * Verify user is authenticated, belongs to the specified organization, and is an admin
  */
 async function verifyUserOrgAdmin(request: NextRequest, orgId: string): Promise<{ valid: boolean; error?: string; status?: number }> {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -62,20 +47,21 @@ async function verifyUserOrgAdmin(request: NextRequest, orgId: string): Promise<
 
 /**
  * POST /api/integrations/bigcommerce/connect
- * 
+ *
  * Test and save BigCommerce credentials for an organization.
  * Tests the connection before saving to ensure credentials are valid.
  * Verifies user belongs to the organization before allowing changes.
  */
 export async function POST(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const body: ConnectRequest = await request.json();
-    
+
     const { org_id, store_hash, client_id, access_token } = body;
-    
+
     // Validate required fields
     if (!org_id || !store_hash || !client_id || !access_token) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'All fields are required: org_id, store_hash, client_id, access_token' },
         { status: 400 }
       );
@@ -84,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Verify user belongs to this organization
     const authCheck = await verifyUserOrgAdmin(request, org_id);
     if (!authCheck.valid) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: authCheck.error },
         { status: 403 }
       );
@@ -92,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Check organization tier for BigCommerce integration access
     if (!serviceRoleKey) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY not set' },
         { status: 500 }
       );
@@ -109,7 +95,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Organization not found' },
         { status: 404 }
       );
@@ -119,7 +105,7 @@ export async function POST(request: NextRequest) {
     const integrationCheck = checkIntegrationAccess(tier, 'bigcommerce');
 
     if (!integrationCheck.allowed) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Upgrade required',
           message: integrationCheck.message,
@@ -139,10 +125,10 @@ export async function POST(request: NextRequest) {
         'X-Auth-Client': client_id,
       },
     });
-    
+
     if (!testResponse.ok) {
       const errorText = await testResponse.text();
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: 'Connection test failed',
@@ -151,7 +137,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     const catalogData = await testResponse.json();
     const productCount = catalogData?.meta?.pagination?.total || 0;
 
@@ -165,16 +151,16 @@ export async function POST(request: NextRequest) {
         bigcommerce_connected_at: new Date().toISOString(),
       })
       .eq('id', org_id);
-    
+
     if (updateError) {
       console.error('Error saving BigCommerce credentials:', updateError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to save credentials', details: updateError.message },
         { status: 500 }
       );
     }
-    
-    return NextResponse.json({
+
+    return jsonResponse({
       success: true,
       store_info: {
         name: `Store ${store_hash}`,
@@ -194,17 +180,18 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/integrations/bigcommerce/connect
- * 
+ *
  * Disconnect BigCommerce from an organization.
  * Verifies user belongs to the organization before allowing changes.
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const { searchParams } = new URL(request.url);
     const org_id = searchParams.get('org_id');
-    
+
     if (!org_id) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'org_id is required' },
         { status: 400 }
       );
@@ -213,26 +200,26 @@ export async function DELETE(request: NextRequest) {
     // Verify user belongs to this organization
     const authCheck = await verifyUserOrgAdmin(request, org_id);
     if (!authCheck.valid) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: authCheck.error },
         { status: 403 }
       );
     }
-    
+
     if (!serviceRoleKey) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Server configuration error' },
         { status: 500 }
       );
     }
-    
+
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
     });
-    
+
     const { error: updateError } = await adminClient
       .from('organizations')
       .update({
@@ -242,15 +229,15 @@ export async function DELETE(request: NextRequest) {
         bigcommerce_connected_at: null,
       })
       .eq('id', org_id);
-    
+
     if (updateError) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to disconnect', details: updateError.message },
         { status: 500 }
       );
     }
-    
-    return NextResponse.json({
+
+    return jsonResponse({
       success: true,
       message: 'BigCommerce disconnected successfully',
     });
@@ -262,4 +249,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

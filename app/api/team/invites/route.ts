@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { checkUserLimit } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
@@ -8,28 +8,13 @@ import { sendEmail } from '@/lib/email';
 import { generateTeamInviteEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * Get authenticated user and their org info
  */
 async function getAuthenticatedUserOrg(request: NextRequest) {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -61,9 +46,10 @@ async function getAuthenticatedUserOrg(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -105,7 +91,7 @@ export async function GET(request: NextRequest) {
     const tier = (orgData?.subscription_tier || 'free') as PlanTier;
     const limitCheck = await checkUserLimit(adminClient, userOrg.orgId, tier);
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       organization: {
         name: orgData?.name,
@@ -135,14 +121,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Only owners and admins can invite team members
     if (userOrg.role !== 'owner' && userOrg.role !== 'admin') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Forbidden', message: 'Only owners and admins can invite team members' },
         { status: 403 }
       );
@@ -151,7 +138,7 @@ export async function POST(request: NextRequest) {
     const { email, role = 'member' } = await request.json();
 
     if (!email || typeof email !== 'string') {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      return jsonResponse({ error: 'Email is required' }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -159,7 +146,7 @@ export async function POST(request: NextRequest) {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(normalizedEmail)) {
-      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+      return jsonResponse({ error: 'Invalid email address' }, { status: 400 });
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -174,7 +161,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !orgData) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return jsonResponse({ error: 'Organization not found' }, { status: 404 });
     }
 
     const tier = (orgData.subscription_tier || 'free') as PlanTier;
@@ -196,7 +183,7 @@ export async function POST(request: NextRequest) {
     const limitCheck = await checkUserLimit(adminClient, userOrg.orgId, tier);
 
     if (!limitCheck.allowed || (limitCheck.limit !== -1 && totalUsers >= limitCheck.limit!)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'User limit reached',
           message: `Your ${tier} plan allows ${limitCheck.limit} team members. Upgrade to add more.`,
@@ -215,7 +202,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingUser) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'This user is already a team member' },
         { status: 400 }
       );
@@ -232,7 +219,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingInvite) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'An invite has already been sent to this email' },
         { status: 400 }
       );
@@ -259,7 +246,7 @@ export async function POST(request: NextRequest) {
 
     if (createError) {
       console.error('Error creating invite:', createError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to create invite' },
         { status: 500 }
       );
@@ -301,7 +288,7 @@ export async function POST(request: NextRequest) {
       console.log('Invite email sent successfully to:', normalizedEmail, 'Message ID:', emailResult.messageId);
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       invite,
       inviteUrl,
@@ -324,14 +311,15 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Only owners and admins can cancel invites
     if (userOrg.role !== 'owner' && userOrg.role !== 'admin') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Forbidden', message: 'Only owners and admins can cancel invites' },
         { status: 403 }
       );
@@ -341,7 +329,7 @@ export async function DELETE(request: NextRequest) {
     const inviteId = searchParams.get('id');
 
     if (!inviteId) {
-      return NextResponse.json({ error: 'Invite ID is required' }, { status: 400 });
+      return jsonResponse({ error: 'Invite ID is required' }, { status: 400 });
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -357,7 +345,7 @@ export async function DELETE(request: NextRequest) {
       .single();
 
     if (!invite) {
-      return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+      return jsonResponse({ error: 'Invite not found' }, { status: 404 });
     }
 
     // Delete invite
@@ -368,10 +356,10 @@ export async function DELETE(request: NextRequest) {
 
     if (deleteError) {
       console.error('Error deleting invite:', deleteError);
-      return NextResponse.json({ error: 'Failed to cancel invite' }, { status: 500 });
+      return jsonResponse({ error: 'Failed to cancel invite' }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: 'Invite cancelled',
     });

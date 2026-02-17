@@ -1,30 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * Get authenticated user and their org info
  */
 async function getAuthenticatedUserOrg(request: NextRequest) {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -56,14 +41,15 @@ async function getAuthenticatedUserOrg(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const userOrg = await getAuthenticatedUserOrg(request);
     if (!userOrg) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Only owners can remove team members
     if (userOrg.role !== 'owner') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Forbidden', message: 'Only owners can remove team members' },
         { status: 403 }
       );
@@ -73,7 +59,7 @@ export async function DELETE(request: NextRequest) {
     const memberId = searchParams.get('id');
 
     if (!memberId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Member ID is required' },
         { status: 400 }
       );
@@ -81,7 +67,7 @@ export async function DELETE(request: NextRequest) {
 
     // Prevent owner from removing themselves
     if (memberId === userOrg.userId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'You cannot remove yourself from the organization' },
         { status: 400 }
       );
@@ -100,7 +86,7 @@ export async function DELETE(request: NextRequest) {
       .single();
 
     if (memberError || !member) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Team member not found' },
         { status: 404 }
       );
@@ -108,7 +94,7 @@ export async function DELETE(request: NextRequest) {
 
     // Prevent removing other owners
     if (member.role === 'owner') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Cannot remove an owner from the organization' },
         { status: 400 }
       );
@@ -137,13 +123,13 @@ export async function DELETE(request: NextRequest) {
 
     if (updateError) {
       console.error('Error removing team member:', updateError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to remove team member' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: `${member.full_name || member.email} has been removed from the team`,
       removedMember: {

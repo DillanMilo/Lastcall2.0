@@ -1,35 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { fetchBigCommerceCatalogItemsWithCredentials } from '@/lib/integrations/bigcommerce';
 import { syncInventoryItems } from '@/lib/inventory/syncInventoryItems';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * Verify user is authenticated and belongs to the specified organization
  */
 async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ valid: boolean; error?: string }> {
-  const response = NextResponse.next();
-  
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
-      },
-    },
-  });
+  const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
+
   if (authError || !user) {
     return { valid: false, error: 'Unauthorized' };
   }
@@ -61,11 +46,12 @@ async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ val
  */
 export async function POST(request: NextRequest) {
   try {
+    const { jsonResponse } = createRouteHandlerClient(request);
     const body = await request.json();
     const { org_id, enable_ai_labeling = false } = body;
 
     if (!org_id) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'org_id is required' },
         { status: 400 }
       );
@@ -74,14 +60,14 @@ export async function POST(request: NextRequest) {
     // Verify user belongs to this organization
     const authCheck = await verifyUserOrg(request, org_id);
     if (!authCheck.valid) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: authCheck.error },
         { status: 403 }
       );
     }
 
     if (!serviceRoleKey) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Server configuration error' },
         { status: 500 }
       );
@@ -102,14 +88,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orgError || !org) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Organization not found' },
         { status: 404 }
       );
     }
 
     if (!org.bigcommerce_store_hash || !org.bigcommerce_client_id || !org.bigcommerce_access_token) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'BigCommerce is not connected. Please configure your credentials in Settings.' },
         { status: 400 }
       );
@@ -122,7 +108,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (items.length === 0) {
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         results: { created: 0, updated: 0, failed: 0, errors: [] },
         summary: 'No items returned from BigCommerce',
@@ -136,7 +122,7 @@ export async function POST(request: NextRequest) {
       enableAiLabeling: enable_ai_labeling,
     });
 
-    return NextResponse.json({
+    return jsonResponse({
       success,
       results,
       summary,

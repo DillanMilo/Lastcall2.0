@@ -268,12 +268,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
+    // Prevent onAuthStateChange from racing with initializeAuth.
+    // Supabase fires an INITIAL_SESSION event immediately when the listener
+    // is set up, which would trigger fetchUserWithOrg → bootstrap BEFORE the
+    // "Remember Me" check can sign out stale sessions — causing 401 errors
+    // and timeout cascades.
+    let isInitializing = true;
 
     const initializeAuth = async () => {
       // Failsafe timeout - if auth takes longer than 15 seconds, service is likely down
       timeoutId = setTimeout(() => {
         if (isMounted) {
           console.warn('Auth initialization timed out - service may be unavailable');
+          isInitializing = false;
           setLoading((currentLoading) => {
             if (currentLoading) {
               setUser(null);
@@ -340,6 +347,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           setLoading(false);
         }
+      } finally {
+        isInitializing = false;
       }
     };
 
@@ -349,6 +358,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (!isMounted) return;
+        // Skip events during initialization — initializeAuth handles the
+        // initial session including the "Remember Me" check.
+        if (isInitializing) return;
 
         if (session?.user) {
           setUser(session.user);

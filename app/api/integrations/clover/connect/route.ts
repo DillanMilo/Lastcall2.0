@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { testCloverConnection } from '@/lib/integrations/clover';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-function createAuthClient(request: NextRequest) {
-  const response = NextResponse.next();
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) { return request.cookies.get(name)?.value; },
-      set(name: string, value: string, options: CookieOptions) { response.cookies.set({ name, value, ...options }); },
-      remove(name: string, options: CookieOptions) { response.cookies.set({ name, value: '', ...options }); },
-    },
-  });
-  return supabase;
-}
 
 /**
  * GET /api/integrations/clover/connect
@@ -27,12 +14,12 @@ function createAuthClient(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createAuthClient(request);
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('org_id').eq('id', user.id).single();
-    if (!userData?.org_id) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    if (!userData?.org_id) return jsonResponse({ error: 'Organization not found' }, { status: 404 });
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -46,10 +33,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Failed to fetch Clover connections:', error);
-      return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 });
+      return jsonResponse({ error: 'Failed to fetch connections' }, { status: 500 });
     }
 
-    return NextResponse.json({ connections: connections || [] });
+    return jsonResponse({ connections: connections || [] });
   } catch (error) {
     console.error('Clover list connections error:', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
@@ -68,12 +55,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAuthClient(request);
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('org_id').eq('id', user.id).single();
-    if (!userData?.org_id) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    if (!userData?.org_id) return jsonResponse({ error: 'Organization not found' }, { status: 404 });
 
     const orgId = userData.org_id;
 
@@ -88,14 +75,14 @@ export async function POST(request: NextRequest) {
       .eq('id', orgId)
       .single();
 
-    if (orgError || !org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    if (orgError || !org) return jsonResponse({ error: 'Organization not found' }, { status: 404 });
 
     const tier = (org.subscription_tier || 'free') as PlanTier;
     const billingExempt = org.billing_exempt === true;
     const integrationCheck = checkIntegrationAccess(tier, 'clover', billingExempt);
 
     if (!integrationCheck.allowed) {
-      return NextResponse.json({
+      return jsonResponse({
         error: integrationCheck.message || 'Clover integration requires Growth plan or higher'
       }, { status: 403 });
     }
@@ -104,7 +91,7 @@ export async function POST(request: NextRequest) {
     const { merchant_id, access_token, label = 'Store', environment = 'us' } = body;
 
     if (!merchant_id || !access_token) {
-      return NextResponse.json({ error: 'Missing required fields: merchant_id, access_token' }, { status: 400 });
+      return jsonResponse({ error: 'Missing required fields: merchant_id, access_token' }, { status: 400 });
     }
 
     // Check if this merchant is already connected
@@ -116,7 +103,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existing) {
-      return NextResponse.json({ error: 'This Clover merchant is already connected.' }, { status: 409 });
+      return jsonResponse({ error: 'This Clover merchant is already connected.' }, { status: 409 });
     }
 
     // Test the connection
@@ -127,7 +114,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!connectionTest.success) {
-      return NextResponse.json({
+      return jsonResponse({
         error: connectionTest.error || 'Failed to connect to Clover'
       }, { status: 400 });
     }
@@ -147,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('Failed to save Clover connection:', insertError);
-      return NextResponse.json({ error: 'Failed to save connection settings' }, { status: 500 });
+      return jsonResponse({ error: 'Failed to save connection settings' }, { status: 500 });
     }
 
     // Also update legacy org columns with the first/latest connection for backward compat
@@ -160,7 +147,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', orgId);
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: `Connected to Clover merchant: ${connectionTest.merchantName}`,
       merchantName: connectionTest.merchantName,
@@ -181,12 +168,12 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createAuthClient(request);
+    const { supabase, jsonResponse } = createRouteHandlerClient(request);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('org_id').eq('id', user.id).single();
-    if (!userData?.org_id) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    if (!userData?.org_id) return jsonResponse({ error: 'Organization not found' }, { status: 404 });
 
     const orgId = userData.org_id;
     const connectionId = request.nextUrl.searchParams.get('connection_id');
@@ -205,7 +192,7 @@ export async function DELETE(request: NextRequest) {
 
       if (error) {
         console.error('Failed to disconnect Clover merchant:', error);
-        return NextResponse.json({ error: 'Failed to disconnect' }, { status: 500 });
+        return jsonResponse({ error: 'Failed to disconnect' }, { status: 500 });
       }
     } else {
       // Delete all connections
@@ -216,7 +203,7 @@ export async function DELETE(request: NextRequest) {
 
       if (error) {
         console.error('Failed to disconnect all Clover merchants:', error);
-        return NextResponse.json({ error: 'Failed to disconnect' }, { status: 500 });
+        return jsonResponse({ error: 'Failed to disconnect' }, { status: 500 });
       }
     }
 
@@ -248,7 +235,7 @@ export async function DELETE(request: NextRequest) {
         .eq('id', orgId);
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: connectionId ? 'Clover merchant disconnected' : 'All Clover connections disconnected',
     });

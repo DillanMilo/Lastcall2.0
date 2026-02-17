@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@/lib/supabaseServer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -11,35 +11,22 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
  * Switch the user's active organization
  */
 export async function POST(request: NextRequest) {
+  const { supabase, jsonResponse } = createRouteHandlerClient(request);
+
   try {
     if (!serviceRoleKey) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Server configuration error' },
         { status: 500 }
       );
     }
 
-    const response = NextResponse.next();
-
     // Get authenticated user
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Unauthorized' },
         { status: 401 }
       );
@@ -48,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { org_id } = await request.json();
 
     if (!org_id) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'org_id is required' },
         { status: 400 }
       );
@@ -67,7 +54,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (membershipError || !membership) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'You do not belong to this organization' },
         { status: 403 }
       );
@@ -97,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     if (userUpdateError) {
       console.error('Error updating user org:', userUpdateError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to switch organization' },
         { status: 500 }
       );
@@ -112,13 +99,13 @@ export async function POST(request: NextRequest) {
 
     if (orgError) {
       console.error('Error fetching organization:', orgError);
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Failed to fetch organization data' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message: `Switched to ${organization.name}`,
       organization,
@@ -126,7 +113,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error switching organization:', error);
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Internal server error' },
       { status: 500 }
     );
