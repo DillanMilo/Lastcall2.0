@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UserCircle, Upload, Save, Loader2, CheckCircle, Lock, Shield, Users } from "lucide-react";
+import { UserCircle, Upload, Save, Loader2, CheckCircle, Lock, Shield, Users, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
 import { UsageDashboard } from "@/components/billing/UsageDashboard";
@@ -28,6 +28,17 @@ import { ThriveValidation } from "@/components/integrations/ThriveValidation";
 import { useAuth } from "@/lib/auth/AuthContext";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
+
+const US_TIMEZONES = [
+  { value: "America/New_York", label: "Eastern Time (ET)" },
+  { value: "America/Chicago", label: "Central Time (CT)" },
+  { value: "America/Denver", label: "Mountain Time (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "America/Anchorage", label: "Alaska Time (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii Time (HT)" },
+  { value: "America/Phoenix", label: "Arizona (no DST)" },
+  { value: "America/Puerto_Rico", label: "Atlantic Time (AST)" },
+];
 
 export default function SettingsPage() {
   const { isOwner, isAdmin, userWithOrg, canManageBilling, canInviteMembers, canManageSettings } = useAuth();
@@ -53,6 +64,7 @@ export default function SettingsPage() {
   });
   const [orgForm, setOrgForm] = useState({
     name: "",
+    timezone: "America/Chicago",
   });
   const [orgSaving, setOrgSaving] = useState(false);
 
@@ -160,6 +172,7 @@ export default function SettingsPage() {
         });
         setOrgForm({
           name: profile.organization?.name || "",
+          timezone: profile.organization?.timezone || "America/Chicago",
         });
         return;
       }
@@ -181,7 +194,7 @@ export default function SettingsPage() {
         email: fallbackUser.email || "",
         phone: fallbackUser.phone || "",
       });
-      setOrgForm({ name: "" });
+      setOrgForm({ name: "", timezone: "America/Chicago" });
     } catch (error) {
       console.error("Error fetching user data:", error);
       const {
@@ -205,7 +218,7 @@ export default function SettingsPage() {
           email: fallbackUser.email,
           phone: "",
         });
-        setOrgForm({ name: "" });
+        setOrgForm({ name: "", timezone: "America/Chicago" });
       }
     } finally {
       setLoading(false);
@@ -458,6 +471,7 @@ export default function SettingsPage() {
           .from("organizations")
           .update({
             name: desiredName,
+            timezone: orgForm.timezone,
           })
           .eq("id", organization.id)
           .select("*")
@@ -467,7 +481,7 @@ export default function SettingsPage() {
 
         if (updatedOrg) {
           setOrganization(updatedOrg as Organization);
-          setOrgForm({ name: updatedOrg.name || "" });
+          setOrgForm({ name: updatedOrg.name || "", timezone: updatedOrg.timezone || "America/Chicago" });
         }
       } else {
         const { data: newOrg, error: createError } = await supabase
@@ -475,6 +489,7 @@ export default function SettingsPage() {
           .insert({
             name: desiredName,
             subscription_tier: "growth",
+            timezone: orgForm.timezone,
           })
           .select("*")
           .single();
@@ -493,7 +508,7 @@ export default function SettingsPage() {
         if (userUpdateError) throw userUpdateError;
 
         setOrganization(newOrg as Organization);
-        setOrgForm({ name: newOrg.name || "" });
+        setOrgForm({ name: newOrg.name || "", timezone: newOrg.timezone || "America/Chicago" });
         setUser({
           ...(updatedUser as User),
         });
@@ -780,6 +795,30 @@ export default function SettingsPage() {
                 }
                 disabled={orgSaving}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timezone" className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                Business Timezone
+              </Label>
+              <select
+                id="timezone"
+                value={orgForm.timezone}
+                onChange={(e) =>
+                  setOrgForm({ ...orgForm, timezone: e.target.value })
+                }
+                disabled={orgSaving}
+                className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 text-base sm:text-sm transition-all duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation [font-size:max(16px,1rem)] sm:[font-size:0.875rem]"
+              >
+                {US_TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Used for daily sales reports so &quot;today&quot; matches your local business day
+              </p>
             </div>
             {organization && (
               <div className="text-xs text-muted-foreground">

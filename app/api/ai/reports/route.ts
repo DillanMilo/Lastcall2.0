@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Get organization tier for limit checking
+    // Get organization tier and timezone for limit checking and accurate date ranges
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
-      .select('subscription_tier, billing_exempt')
+      .select('subscription_tier, billing_exempt, timezone')
       .eq('id', orgId)
       .single();
 
@@ -75,14 +75,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get date range for the requested period
-    const { start, end, daysInPeriod, label: periodLabel } = getDateRange(period as ReportPeriod);
+    // Get date range for the requested period, using the org's timezone if set
+    const orgTimezone = orgData.timezone || undefined;
+    const { start, end, daysInPeriod, label: periodLabel } = getDateRange(period as ReportPeriod, orgTimezone);
 
-    // Fetch inventory history for the period
+    // Fetch inventory history for the period.
+    // Only include change types that represent real inventory movement (sync, webhook, sale, restock).
+    // Exclude 'thrive_validation' (audit duplicates) and 'manual'/'adjustment' (user corrections)
+    // to prevent double-counting and phantom sales.
+    const SALES_CHANGE_TYPES = ['sync', 'webhook', 'sale', 'restock'];
+
     const { data: history, error: historyError } = await supabase
       .from('inventory_history')
       .select('item_id, item_name, sku, quantity_change, change_type, created_at')
       .eq('org_id', orgId)
+      .in('change_type', SALES_CHANGE_TYPES)
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
       .order('created_at', { ascending: true });

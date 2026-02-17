@@ -59,6 +59,34 @@ export interface SyncInventoryResponse {
 
 const KNOWN_SOURCES = new Set(['shopify', 'square', 'custom', 'bigcommerce', 'clover']);
 
+/**
+ * Check if a duplicate history entry was already written recently (within 60s).
+ * This prevents webhook retries from creating duplicate inventory_history entries.
+ */
+async function isDuplicateHistoryEntry(
+  supabase: AdminClient,
+  orgId: string,
+  itemId: string,
+  newQuantity: number,
+  source: string,
+): Promise<boolean> {
+  try {
+    const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+    const { data } = await supabase
+      .from('inventory_history')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('item_id', itemId)
+      .eq('new_quantity', newQuantity)
+      .eq('source', source)
+      .gte('created_at', sixtySecondsAgo)
+      .limit(1);
+    return (data && data.length > 0) || false;
+  } catch {
+    return false; // On error, allow the insert (fail open)
+  }
+}
+
 function parseInteger(value: InventorySyncItem['quantity']): number {
   if (value === null || value === undefined) {
     return 0;
@@ -215,24 +243,27 @@ export async function syncInventoryItems({
 
           if (updateError) throw updateError;
 
-          // Log quantity change to history (only if quantity changed)
+          // Log quantity change to history (only if quantity changed and not a duplicate)
           if (quantityChange !== 0) {
-            try {
-              await supabase
-                .from('inventory_history')
-                .insert([{
-                  org_id: orgId,
-                  item_id: existing.id,
-                  item_name: item.name,
-                  sku: item.sku ?? null,
-                  previous_quantity: previousQuantity,
-                  new_quantity: newQuantity,
-                  quantity_change: quantityChange,
-                  change_type: 'sync',
-                  source: sourceLabel,
-                }]);
-            } catch {
-              // History table might not exist yet - ignore error
+            const isDupe = await isDuplicateHistoryEntry(supabase, orgId, existing.id, newQuantity, sourceLabel);
+            if (!isDupe) {
+              try {
+                await supabase
+                  .from('inventory_history')
+                  .insert([{
+                    org_id: orgId,
+                    item_id: existing.id,
+                    item_name: item.name,
+                    sku: item.sku ?? null,
+                    previous_quantity: previousQuantity,
+                    new_quantity: newQuantity,
+                    quantity_change: quantityChange,
+                    change_type: 'sync',
+                    source: sourceLabel,
+                  }]);
+              } catch {
+                // History table might not exist yet - ignore error
+              }
             }
           }
 

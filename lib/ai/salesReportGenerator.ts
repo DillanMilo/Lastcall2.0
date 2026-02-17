@@ -23,26 +23,49 @@ export interface SalesReportData {
 }
 
 /**
- * Get the date range for a given report period
+ * Get the current time in a specific timezone as a Date object.
+ * Returns a Date whose UTC value represents the local wall-clock time in that timezone.
  */
-export function getDateRange(period: ReportPeriod): { start: Date; end: Date; daysInPeriod: number; label: string } {
-  const end = new Date();
-  const start = new Date();
+function nowInTimezone(tz: string): Date {
+  const formatted = new Date().toLocaleString('en-US', { timeZone: tz });
+  return new Date(formatted);
+}
+
+/**
+ * Format a date for display in the given timezone.
+ */
+function formatDateInTz(date: Date, tz?: string): string {
+  if (!tz) return date.toLocaleDateString();
+  return date.toLocaleDateString('en-US', { timeZone: tz });
+}
+
+/**
+ * Get the date range for a given report period.
+ * Accepts an optional IANA timezone (e.g. 'America/Chicago') so that
+ * "daily" means midnight-to-midnight in the business's local time,
+ * not in the server's timezone (UTC on Vercel).
+ */
+export function getDateRange(period: ReportPeriod, timezone?: string): { start: Date; end: Date; daysInPeriod: number; label: string } {
+  // If a timezone is provided, compute "now" in that timezone.
+  // Otherwise fall back to server-local time (backward-compatible).
+  const now = timezone ? nowInTimezone(timezone) : new Date();
+  const start = new Date(now);
+  const end = new Date(now);
 
   switch (period) {
     case 'daily':
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
-      return { start, end, daysInPeriod: 1, label: `Today (${start.toLocaleDateString()})` };
+      return { start, end, daysInPeriod: 1, label: `Today (${formatDateInTz(start, timezone)})` };
     case 'weekly':
       start.setDate(start.getDate() - 7);
-      return { start, end, daysInPeriod: 7, label: `Last 7 Days (${start.toLocaleDateString()} - ${end.toLocaleDateString()})` };
+      return { start, end, daysInPeriod: 7, label: `Last 7 Days (${formatDateInTz(start, timezone)} - ${formatDateInTz(end, timezone)})` };
     case 'monthly':
       start.setDate(start.getDate() - 30);
-      return { start, end, daysInPeriod: 30, label: `Last 30 Days (${start.toLocaleDateString()} - ${end.toLocaleDateString()})` };
+      return { start, end, daysInPeriod: 30, label: `Last 30 Days (${formatDateInTz(start, timezone)} - ${formatDateInTz(end, timezone)})` };
     case 'quarterly':
       start.setDate(start.getDate() - 90);
-      return { start, end, daysInPeriod: 90, label: `Last 90 Days (${start.toLocaleDateString()} - ${end.toLocaleDateString()})` };
+      return { start, end, daysInPeriod: 90, label: `Last 90 Days (${formatDateInTz(start, timezone)} - ${formatDateInTz(end, timezone)})` };
   }
 }
 

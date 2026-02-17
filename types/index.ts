@@ -37,6 +37,8 @@ export interface Organization {
   thrive_validation_mode?: boolean;
   thrive_validation_started_at?: string;
   thrive_validation_ended_at?: string;
+  // Timezone for accurate daily sales reports (IANA timezone, e.g. 'America/Chicago')
+  timezone?: string;
   created_at: string;
 }
 

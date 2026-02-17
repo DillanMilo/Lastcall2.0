@@ -6,6 +6,35 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
+ * Check if a duplicate history entry was already written recently (within 60s).
+ * Prevents webhook retries from creating duplicate inventory_history entries.
+ */
+async function isDuplicateHistoryEntry(
+  orgId: string,
+  itemId: string,
+  newQuantity: number,
+): Promise<boolean> {
+  try {
+    const db = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+    const { data } = await db
+      .from('inventory_history')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('item_id', itemId)
+      .eq('new_quantity', newQuantity)
+      .eq('source', 'bigcommerce')
+      .gte('created_at', sixtySecondsAgo)
+      .limit(1);
+    return (data && data.length > 0) || false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Verify BigCommerce webhook signature
  */
 function verifyWebhookSignature(payload: string, signature: string | null): boolean {
@@ -138,23 +167,27 @@ async function syncProductFromBigCommerce(
         .eq('id', existing.id);
 
       // Log quantity change to history (ignore errors if table doesn't exist)
+      // Also check for duplicates to prevent webhook retries from double-counting
       if (quantityChange !== 0) {
-        try {
-          await supabase
-            .from('inventory_history')
-            .insert([{
-              org_id: orgId,
-              item_id: existing.id,
-              item_name: item.name,
-              sku: item.sku,
-              previous_quantity: previousQuantity,
-              new_quantity: item.quantity,
-              quantity_change: quantityChange,
-              change_type: 'webhook',
-              source: 'bigcommerce',
-            }]);
-        } catch {
-          // History table might not exist yet - ignore
+        const isDupe = await isDuplicateHistoryEntry(orgId, existing.id, item.quantity);
+        if (!isDupe) {
+          try {
+            await supabase
+              .from('inventory_history')
+              .insert([{
+                org_id: orgId,
+                item_id: existing.id,
+                item_name: item.name,
+                sku: item.sku,
+                previous_quantity: previousQuantity,
+                new_quantity: item.quantity,
+                quantity_change: quantityChange,
+                change_type: 'webhook',
+                source: 'bigcommerce',
+              }]);
+          } catch {
+            // History table might not exist yet - ignore
+          }
         }
       }
 

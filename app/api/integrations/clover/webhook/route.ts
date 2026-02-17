@@ -95,6 +95,24 @@ export async function POST(request: NextRequest) {
               clover_merchant_id: merchantId,
             };
 
+            // In validation mode, capture the BEFORE quantity so we can log an accurate delta.
+            // This must happen BEFORE syncInventoryItems() updates the row.
+            let validationPreviousQty: number | null = null;
+            if (isValidationMode) {
+              try {
+                const { data: currentItem } = await adminClient
+                  .from('inventory_items')
+                  .select('quantity')
+                  .eq('org_id', connection.org_id)
+                  .eq('clover_item_id', objectId)
+                  .limit(1)
+                  .maybeSingle();
+                validationPreviousQty = currentItem?.quantity ?? 0;
+              } catch {
+                // Non-critical
+              }
+            }
+
             // Sync this single item (always - we want to capture all data even in validation mode)
             await syncInventoryItems({
               orgId: connection.org_id,
@@ -103,19 +121,12 @@ export async function POST(request: NextRequest) {
               enableAiLabeling: false,
             });
 
-            // In validation mode, log extra detail for Thrive comparison auditing
-            if (isValidationMode) {
+            // In validation mode, log extra detail for Thrive comparison auditing.
+            // Uses the pre-sync quantity captured above for an accurate delta.
+            // This entry uses change_type 'thrive_validation' which is excluded from
+            // sales reports to prevent double-counting.
+            if (isValidationMode && validationPreviousQty !== null) {
               try {
-                // Look up current quantity to record accurate previous_quantity
-                const { data: currentItem } = await adminClient
-                  .from('inventory_items')
-                  .select('quantity')
-                  .eq('org_id', connection.org_id)
-                  .eq('clover_item_id', objectId)
-                  .limit(1)
-                  .maybeSingle();
-
-                const previousQty = currentItem?.quantity ?? 0;
                 const newQty = typeof cloverItem.quantity === 'number' ? cloverItem.quantity : 0;
 
                 await adminClient
@@ -124,9 +135,9 @@ export async function POST(request: NextRequest) {
                     org_id: connection.org_id,
                     item_name: cloverItem.name,
                     sku: cloverItem.sku ?? null,
-                    previous_quantity: previousQty,
+                    previous_quantity: validationPreviousQty,
                     new_quantity: newQty,
-                    quantity_change: newQty - previousQty,
+                    quantity_change: newQty - validationPreviousQty,
                     change_type: 'thrive_validation',
                     source: `clover_webhook_${type.toLowerCase()}_${merchantId}`,
                   }]);
