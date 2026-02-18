@@ -1,6 +1,18 @@
 import { InventoryItem } from '@/types';
 
-export type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly';
+export type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'custom';
+
+export interface OrderDataSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrderValue: number;
+  itemBreakdown: {
+    name: string;
+    unitsSold: number;
+    revenue: number;
+  }[];
+  source: 'clover' | 'bigcommerce' | 'combined';
+}
 
 export interface SalesReportData {
   period: ReportPeriod;
@@ -20,6 +32,7 @@ export interface SalesReportData {
   avgDailySales: number;
   restockEvents: number;
   expiringItems: { name: string; daysUntilExpiry: number; currentQty: number }[];
+  orderData?: OrderDataSummary;
 }
 
 /**
@@ -45,7 +58,12 @@ function formatDateInTz(date: Date, tz?: string): string {
  * "daily" means midnight-to-midnight in the business's local time,
  * not in the server's timezone (UTC on Vercel).
  */
-export function getDateRange(period: ReportPeriod, timezone?: string): { start: Date; end: Date; daysInPeriod: number; label: string } {
+export function getDateRange(period: ReportPeriod, timezone?: string, customStart?: string, customEnd?: string): { start: Date; end: Date; daysInPeriod: number; label: string } {
+  // Handle custom date range
+  if (period === 'custom' && customStart && customEnd) {
+    return getCustomDateRange(customStart, customEnd, timezone);
+  }
+
   // If a timezone is provided, compute "now" in that timezone.
   // Otherwise fall back to server-local time (backward-compatible).
   const now = timezone ? nowInTimezone(timezone) : new Date();
@@ -66,7 +84,31 @@ export function getDateRange(period: ReportPeriod, timezone?: string): { start: 
     case 'quarterly':
       start.setDate(start.getDate() - 90);
       return { start, end, daysInPeriod: 90, label: `Last 90 Days (${formatDateInTz(start, timezone)} - ${formatDateInTz(end, timezone)})` };
+    default:
+      // Fallback to weekly for unknown periods
+      start.setDate(start.getDate() - 7);
+      return { start, end, daysInPeriod: 7, label: `Last 7 Days (${formatDateInTz(start, timezone)} - ${formatDateInTz(end, timezone)})` };
   }
+}
+
+/**
+ * Get a custom date range from explicit start/end dates.
+ */
+export function getCustomDateRange(startStr: string, endStr: string, timezone?: string): { start: Date; end: Date; daysInPeriod: number; label: string } {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+
+  // Set start to beginning of day, end to end of day
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  const daysInPeriod = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+
+  const label = daysInPeriod === 1
+    ? `${formatDateInTz(start, timezone)}`
+    : `${formatDateInTz(start, timezone)} - ${formatDateInTz(end, timezone)}`;
+
+  return { start, end, daysInPeriod, label };
 }
 
 /**
@@ -320,6 +362,31 @@ ${report.expiringItems.map(item =>
 `;
   }
 
+  // Include real POS order data when available (units only, no dollar values)
+  if (report.orderData) {
+    const od = report.orderData;
+    context += `
+ACTUAL POS SALES DATA (from ${od.source.toUpperCase()}):
+${'='.repeat(50)}
+- Total Orders: ${od.totalOrders}
+`;
+
+    if (od.itemBreakdown.length > 0) {
+      context += `
+TOP ITEMS BY UNITS SOLD (POS Data):
+${od.itemBreakdown.slice(0, 15).map((item, i) =>
+  `${i + 1}. ${item.name}: ${item.unitsSold} units sold`
+).join('\n')}
+`;
+    }
+
+    context += `
+NOTE: The POS data above reflects actual completed sales transactions and is more accurate than inventory movement estimates.
+The "Units Sold" in the OVERVIEW section is based on stock changes. When both are available, prioritize POS data for unit counts.
+Do NOT mention or estimate any dollar amounts, revenue, or pricing — only report on units moved.
+`;
+  }
+
   return context;
 }
 
@@ -355,6 +422,13 @@ Keep it brief and actionable - this is a quick daily check-in.`,
 - Dead stock that should be discontinued
 - Category performance comparison
 - Long-term ordering strategy suggestions`,
+    custom: `This is a CUSTOM DATE RANGE report. Focus on:
+- Sales performance for the specific requested period
+- Compare daily averages to see if the period was above or below normal
+- Top performers and underperformers
+- Any notable patterns or spikes during this window
+- If revenue data is available from POS, include financial insights
+- Actionable takeaways relevant to this time period`,
   };
 
   return `You are a senior inventory analytics expert generating a ${period} sales report for a business using LastCallIQ. Your job is to turn raw data into actionable business insights.
@@ -378,5 +452,6 @@ RULES:
 - Lead with the most important insights
 - If data is limited (few transactions), acknowledge it and provide what insights you can
 - Compare to implied averages where possible (e.g., "selling 5/day vs your 3/day average")
-- Always end with clear action items`;
+- Always end with clear action items
+- NEVER mention dollar amounts, revenue, pricing, or monetary values. Only report on units sold and moved.`;
 }

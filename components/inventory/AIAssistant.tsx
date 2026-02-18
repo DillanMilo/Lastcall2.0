@@ -100,16 +100,194 @@ const REPORT_KEYWORDS = [
   'give me a daily', 'give me a weekly', 'give me a monthly', 'give me a quarterly',
 ];
 
-function detectReportPeriod(message: string): ReportPeriod | null {
-  const lower = message.toLowerCase();
-  if (!REPORT_KEYWORDS.some(kw => lower.includes(kw))) return null;
-  if (lower.includes('quarterly') || lower.includes('quarter') || lower.includes('90 day')) return 'quarterly';
-  if (lower.includes('monthly') || lower.includes('month') || lower.includes('30 day')) return 'monthly';
-  if (lower.includes('weekly') || lower.includes('week') || lower.includes('7 day')) return 'weekly';
-  if (lower.includes('daily') || lower.includes('today') || lower.includes('day report')) return 'daily';
-  // Default to weekly if they just say "sales report" without a period
-  return 'weekly';
+// Keywords that indicate a custom date sales query
+const DATE_SALES_KEYWORDS = [
+  'sales on', 'sales for', 'sales from', 'revenue on', 'revenue for',
+  'how did we do on', 'how were sales on', 'orders on', 'orders for',
+  'what sold on', 'what were sales', 'show me sales for',
+  'sales data for', 'report for',
+];
+
+const MONTH_NAMES: Record<string, number> = {
+  january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2,
+  april: 3, apr: 3, may: 4, june: 5, jun: 5,
+  july: 6, jul: 6, august: 7, aug: 7, september: 8, sep: 8, sept: 8,
+  october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11,
+};
+
+const DAY_NAMES: Record<string, number> = {
+  sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2,
+  wednesday: 3, wed: 3, thursday: 4, thu: 4, thurs: 4,
+  friday: 5, fri: 5, saturday: 6, sat: 6,
+};
+
+interface CustomDateRange {
+  startDate: string; // ISO
+  endDate: string; // ISO
 }
+
+/**
+ * Parse natural language date references from user messages.
+ * Returns ISO date strings for start/end, or null if no date detected.
+ */
+function parseCustomDateRange(message: string): CustomDateRange | null {
+  const lower = message.toLowerCase().trim();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  // "yesterday" / "yesterday's sales"
+  if (lower.includes('yesterday')) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 1);
+    const iso = d.toISOString().split('T')[0];
+    return { startDate: iso, endDate: iso };
+  }
+
+  // "X days ago"
+  const daysAgoMatch = lower.match(/(\d+)\s*days?\s*ago/);
+  if (daysAgoMatch) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - parseInt(daysAgoMatch[1]));
+    const iso = d.toISOString().split('T')[0];
+    return { startDate: iso, endDate: iso };
+  }
+
+  // "last [day of week]" e.g., "last Monday"
+  for (const [dayName, dayNum] of Object.entries(DAY_NAMES)) {
+    if (lower.includes(`last ${dayName}`)) {
+      const d = new Date(now);
+      const currentDay = d.getDay();
+      let diff = currentDay - dayNum;
+      if (diff <= 0) diff += 7;
+      d.setDate(d.getDate() - diff);
+      const iso = d.toISOString().split('T')[0];
+      return { startDate: iso, endDate: iso };
+    }
+  }
+
+  // "last X days" / "past X days"
+  const lastDaysMatch = lower.match(/(?:last|past)\s+(\d+)\s*days?/);
+  if (lastDaysMatch) {
+    const days = parseInt(lastDaysMatch[1]);
+    const start = new Date(now);
+    start.setDate(start.getDate() - days);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: now.toISOString().split('T')[0],
+    };
+  }
+
+  // "[Month] [day] to [Month] [day]" range - e.g., "February 1 to February 15"
+  const rangePattern = /(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?\s*(?:to|-|through)\s*(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?/i;
+  const rangeMatch = lower.match(rangePattern);
+  if (rangeMatch) {
+    const startMonth = MONTH_NAMES[rangeMatch[1].toLowerCase()];
+    const endMonth = MONTH_NAMES[rangeMatch[3].toLowerCase()];
+    if (startMonth !== undefined && endMonth !== undefined) {
+      const startDay = parseInt(rangeMatch[2]);
+      const endDay = parseInt(rangeMatch[4]);
+      const startYear = startMonth > now.getMonth() ? currentYear - 1 : currentYear;
+      const endYear = endMonth > now.getMonth() ? currentYear - 1 : currentYear;
+      return {
+        startDate: `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`,
+        endDate: `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`,
+      };
+    }
+  }
+
+  // "[Month] [day]" single date - e.g., "February 10" or "Feb 10th"
+  const singleDatePattern = /(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/i;
+  const singleMatch = lower.match(singleDatePattern);
+  if (singleMatch) {
+    const month = MONTH_NAMES[singleMatch[1].toLowerCase()];
+    if (month !== undefined) {
+      const day = parseInt(singleMatch[2]);
+      const year = singleMatch[3] ? parseInt(singleMatch[3]) : (month > now.getMonth() ? currentYear - 1 : currentYear);
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return { startDate: iso, endDate: iso };
+    }
+  }
+
+  // MM/DD or MM/DD/YYYY format
+  const slashDatePattern = /(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/;
+  const slashMatch = lower.match(slashDatePattern);
+  if (slashMatch) {
+    const month = parseInt(slashMatch[1]);
+    const day = parseInt(slashMatch[2]);
+    let year = slashMatch[3] ? parseInt(slashMatch[3]) : currentYear;
+    if (year < 100) year += 2000;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return { startDate: iso, endDate: iso };
+    }
+  }
+
+  // "first/last [X] days of [month]" - e.g., "first two weeks of January"
+  const partOfMonthPattern = /(?:first|last)\s+(?:(\d+)\s+(?:days?|weeks?))\s+(?:of\s+)?(\w+)/i;
+  const partMatch = lower.match(partOfMonthPattern);
+  if (partMatch) {
+    const monthName = MONTH_NAMES[partMatch[2].toLowerCase()];
+    if (monthName !== undefined) {
+      let days = parseInt(partMatch[1]) || 7;
+      if (lower.includes('week')) days *= 7;
+      const year = monthName > now.getMonth() ? currentYear - 1 : currentYear;
+
+      if (lower.includes('first')) {
+        const start = new Date(year, monthName, 1);
+        const end = new Date(year, monthName, days);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: end.toISOString().split('T')[0],
+        };
+      } else {
+        const lastDay = new Date(year, monthName + 1, 0).getDate();
+        const start = new Date(year, monthName, Math.max(1, lastDay - days + 1));
+        const end = new Date(year, monthName, lastDay);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: end.toISOString().split('T')[0],
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+type DetectedReport = {
+  period: ReportPeriod;
+  startDate?: string;
+  endDate?: string;
+} | null;
+
+function detectReportRequest(message: string): DetectedReport {
+  const lower = message.toLowerCase();
+
+  // First check for custom date patterns with sales context
+  const hasDateSalesContext = DATE_SALES_KEYWORDS.some(kw => lower.includes(kw))
+    || REPORT_KEYWORDS.some(kw => lower.includes(kw));
+
+  if (hasDateSalesContext) {
+    const customRange = parseCustomDateRange(message);
+    if (customRange) {
+      return {
+        period: 'custom' as ReportPeriod,
+        startDate: customRange.startDate,
+        endDate: customRange.endDate,
+      };
+    }
+  }
+
+  // Fall back to standard period detection
+  if (!REPORT_KEYWORDS.some(kw => lower.includes(kw))) return null;
+  if (lower.includes('quarterly') || lower.includes('quarter') || lower.includes('90 day')) return { period: 'quarterly' };
+  if (lower.includes('monthly') || lower.includes('month') || lower.includes('30 day')) return { period: 'monthly' };
+  if (lower.includes('weekly') || lower.includes('week') || lower.includes('7 day')) return { period: 'weekly' };
+  if (lower.includes('daily') || lower.includes('today') || lower.includes('day report')) return { period: 'daily' };
+  // Default to weekly if they just say "sales report" without a period
+  return { period: 'weekly' };
+}
+
 
 // Error types for better UX
 type ErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
@@ -499,8 +677,8 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
     setInput("");
 
     // Check if this is a report request - route to report endpoint
-    const detectedPeriod = detectReportPeriod(userMessage);
-    if (detectedPeriod) {
+    const detectedReport = detectReportRequest(userMessage);
+    if (detectedReport) {
       setLoading(true);
       // Create placeholder for response
       const reportPlaceholder: Message = {
@@ -512,10 +690,14 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
       setMessages((prev) => [...prev, reportPlaceholder]);
 
       try {
+        const reportBody: Record<string, string> = { orgId, period: detectedReport.period };
+        if (detectedReport.startDate) reportBody.startDate = detectedReport.startDate;
+        if (detectedReport.endDate) reportBody.endDate = detectedReport.endDate;
+
         const response = await fetch("/api/ai/reports", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orgId, period: detectedPeriod }),
+          body: JSON.stringify(reportBody),
         });
 
         const data = await response.json();

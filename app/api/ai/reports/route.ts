@@ -5,11 +5,15 @@ import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 import {
   ReportPeriod,
+  OrderDataSummary,
   getDateRange,
   buildSalesReport,
   formatSalesReportContext,
   buildReportSystemPrompt,
 } from '@/lib/ai/salesReportGenerator';
+import { fetchCloverOrders, CloverOrderSummary } from '@/lib/integrations/clover';
+import { fetchBigCommerceOrders, BigCommerceOrderSummary } from '@/lib/integrations/bigcommerce';
+import { decryptToken } from '@/lib/utils/encryption';
 import OpenAI from 'openai';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -21,7 +25,8 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { orgId, period } = await request.json();
+    const body = await request.json();
+    const { orgId, period, startDate, endDate } = body;
 
     if (!orgId) {
       return NextResponse.json(
@@ -30,10 +35,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validPeriods: ReportPeriod[] = ['daily', 'weekly', 'monthly', 'quarterly'];
-    if (!period || !validPeriods.includes(period)) {
+    // Validate period - support custom with startDate/endDate
+    const validPeriods: ReportPeriod[] = ['daily', 'weekly', 'monthly', 'quarterly', 'custom'];
+    const reportPeriod: ReportPeriod = (period === 'custom' || (startDate && endDate)) ? 'custom' : period;
+
+    if (!reportPeriod || !validPeriods.includes(reportPeriod)) {
       return NextResponse.json(
-        { error: 'Valid period is required (daily, weekly, monthly, quarterly)' },
+        { error: 'Valid period is required (daily, weekly, monthly, quarterly, or custom with startDate/endDate)' },
+        { status: 400 }
+      );
+    }
+
+    if (reportPeriod === 'custom' && (!startDate || !endDate)) {
+      return NextResponse.json(
+        { error: 'startDate and endDate are required for custom period' },
         { status: 400 }
       );
     }
@@ -42,10 +57,10 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Get organization tier and timezone for limit checking and accurate date ranges
+    // Get organization data including integration credentials
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
-      .select('subscription_tier, billing_exempt, timezone')
+      .select('subscription_tier, billing_exempt, timezone, bigcommerce_store_hash, bigcommerce_client_id, bigcommerce_access_token')
       .eq('id', orgId)
       .single();
 
@@ -77,12 +92,14 @@ export async function POST(request: NextRequest) {
 
     // Get date range for the requested period, using the org's timezone if set
     const orgTimezone = orgData.timezone || undefined;
-    const { start, end, daysInPeriod, label: periodLabel } = getDateRange(period as ReportPeriod, orgTimezone);
+    const { start, end, daysInPeriod, label: periodLabel } = getDateRange(
+      reportPeriod,
+      orgTimezone,
+      startDate,
+      endDate,
+    );
 
     // Fetch inventory history for the period.
-    // Only include change types that represent real inventory movement (sync, webhook, sale, restock).
-    // Exclude 'thrive_validation' (audit duplicates) and 'manual'/'adjustment' (user corrections)
-    // to prevent double-counting and phantom sales.
     const SALES_CHANGE_TYPES = ['sync', 'webhook', 'sale', 'restock'];
 
     const { data: history, error: historyError } = await supabase
@@ -116,9 +133,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch real order data from connected POS integrations (read-only)
+    let orderData: OrderDataSummary | undefined;
+    try {
+      orderData = await fetchOrderDataFromIntegrations(orgId, orgData, start, end);
+    } catch (err) {
+      console.warn('Failed to fetch order data from integrations (non-fatal):', err);
+    }
+
     // Build the report data
     const reportData = buildSalesReport(
-      period as ReportPeriod,
+      reportPeriod,
       history || [],
       (inventory || []) as InventoryItem[],
       daysInPeriod,
@@ -126,14 +151,21 @@ export async function POST(request: NextRequest) {
       periodLabel,
     );
 
-    // If no data at all, return a helpful message without using AI tokens
-    if (!history || history.length === 0) {
-      const noDataReport = generateNoDataReport(period as ReportPeriod, periodLabel, (inventory || []) as InventoryItem[]);
+    // Attach order data if available
+    if (orderData) {
+      reportData.orderData = orderData;
+    }
+
+    // If no data at all (no history and no order data), return a helpful message
+    const hasAnyData = (history && history.length > 0) || (orderData && orderData.totalOrders > 0);
+
+    if (!hasAnyData) {
+      const noDataReport = generateNoDataReport(reportPeriod, periodLabel, (inventory || []) as InventoryItem[]);
       return NextResponse.json({
         success: true,
         report: noDataReport,
         reportData,
-        period,
+        period: reportPeriod,
         periodLabel,
         timestamp: new Date().toISOString(),
         hasData: false,
@@ -142,19 +174,18 @@ export async function POST(request: NextRequest) {
 
     // Format report context for AI
     const reportContext = formatSalesReportContext(reportData);
-    const systemPrompt = buildReportSystemPrompt(reportContext, period as ReportPeriod);
+    const systemPrompt = buildReportSystemPrompt(reportContext, reportPeriod);
 
     // Log the AI request
     await logAIRequest(supabase, orgId, 'report');
 
     // Generate AI report
     if (!process.env.OPENAI_API_KEY) {
-      // Return raw data report without AI analysis
       return NextResponse.json({
         success: true,
         report: generateFallbackReport(reportData),
         reportData,
-        period,
+        period: reportPeriod,
         periodLabel,
         timestamp: new Date().toISOString(),
         hasData: true,
@@ -162,11 +193,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const userPrompt = reportPeriod === 'custom'
+      ? `Generate a sales report for the period ${periodLabel} based on the data provided. Make it insightful and actionable.`
+      : `Generate a ${reportPeriod} sales report based on the data provided. Make it insightful and actionable.`;
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Generate a ${period} sales report based on the data provided. Make it insightful and actionable.` },
+        { role: 'user', content: userPrompt },
       ],
       temperature: 0.3,
       max_tokens: 1500,
@@ -179,7 +214,7 @@ export async function POST(request: NextRequest) {
         success: true,
         report: generateFallbackReport(reportData),
         reportData,
-        period,
+        period: reportPeriod,
         periodLabel,
         timestamp: new Date().toISOString(),
         hasData: true,
@@ -191,10 +226,11 @@ export async function POST(request: NextRequest) {
       success: true,
       report: aiReport,
       reportData,
-      period,
+      period: reportPeriod,
       periodLabel,
       timestamp: new Date().toISOString(),
       hasData: true,
+      hasOrderData: !!orderData,
     });
   } catch (error: unknown) {
     console.error('Error generating sales report:', error);
@@ -210,14 +246,174 @@ export async function POST(request: NextRequest) {
   }
 }
 
+interface CloverConnectionRow {
+  merchant_id: string;
+  access_token: string;
+  environment: string;
+}
+
+/**
+ * Fetch real order/sales data from connected POS integrations.
+ * Tries Clover and BigCommerce, combines results if both are connected.
+ * This is entirely read-only - no modifications to external systems.
+ */
+async function fetchOrderDataFromIntegrations(
+  orgId: string,
+  orgData: {
+    bigcommerce_store_hash?: string;
+    bigcommerce_client_id?: string;
+    bigcommerce_access_token?: string;
+  },
+  start: Date,
+  end: Date,
+): Promise<OrderDataSummary | undefined> {
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  let cloverSummary: CloverOrderSummary | undefined;
+  let bigcommerceSummary: BigCommerceOrderSummary | undefined;
+
+  // Try Clover
+  try {
+    const { data: connections } = await adminClient
+      .from('clover_connections')
+      .select('merchant_id, access_token, environment')
+      .eq('org_id', orgId);
+
+    if (connections && connections.length > 0) {
+      let totalRevenue = 0;
+      let totalOrders = 0;
+      const itemMap = new Map<string, { name: string; unitsSold: number; revenue: number }>();
+
+      for (const conn of connections as unknown as CloverConnectionRow[]) {
+        try {
+          const result = await fetchCloverOrders(
+            {
+              merchantId: conn.merchant_id,
+              accessToken: decryptToken(conn.access_token),
+              environment: conn.environment as 'us' | 'eu',
+            },
+            start,
+            end,
+          );
+          totalRevenue += result.totalRevenue;
+          totalOrders += result.totalOrders;
+
+          for (const item of result.itemBreakdown) {
+            const key = item.cloverItemId || item.name;
+            const existing = itemMap.get(key);
+            if (existing) {
+              existing.unitsSold += item.unitsSold;
+              existing.revenue += item.revenue;
+            } else {
+              itemMap.set(key, { name: item.name, unitsSold: item.unitsSold, revenue: item.revenue });
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch Clover orders for merchant ${conn.merchant_id}:`, err);
+        }
+      }
+
+      if (totalOrders > 0) {
+        cloverSummary = {
+          totalRevenue,
+          totalOrders,
+          avgOrderValue: Math.round((totalRevenue / totalOrders) * 100) / 100,
+          itemBreakdown: Array.from(itemMap.values()).sort((a, b) => b.revenue - a.revenue),
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to check Clover connections:', err);
+  }
+
+  // Try BigCommerce
+  try {
+    if (orgData.bigcommerce_store_hash && orgData.bigcommerce_client_id && orgData.bigcommerce_access_token) {
+      const result = await fetchBigCommerceOrders(
+        {
+          storeHash: orgData.bigcommerce_store_hash,
+          clientId: orgData.bigcommerce_client_id,
+          accessToken: decryptToken(orgData.bigcommerce_access_token),
+        },
+        start,
+        end,
+      );
+
+      if (result.totalOrders > 0) {
+        bigcommerceSummary = result;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch BigCommerce orders:', err);
+  }
+
+  // Combine results
+  if (cloverSummary && bigcommerceSummary) {
+    const combinedItems = new Map<string, { name: string; unitsSold: number; revenue: number }>();
+
+    for (const item of cloverSummary.itemBreakdown) {
+      combinedItems.set(item.name, { ...item });
+    }
+    for (const item of bigcommerceSummary.itemBreakdown) {
+      const existing = combinedItems.get(item.name);
+      if (existing) {
+        existing.unitsSold += item.unitsSold;
+        existing.revenue += item.revenue;
+      } else {
+        combinedItems.set(item.name, { name: item.name, unitsSold: item.unitsSold, revenue: item.revenue });
+      }
+    }
+
+    const totalRevenue = cloverSummary.totalRevenue + bigcommerceSummary.totalRevenue;
+    const totalOrders = cloverSummary.totalOrders + bigcommerceSummary.totalOrders;
+
+    return {
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalOrders,
+      avgOrderValue: totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0,
+      itemBreakdown: Array.from(combinedItems.values()).sort((a, b) => b.revenue - a.revenue),
+      source: 'combined',
+    };
+  }
+
+  if (cloverSummary) {
+    return {
+      totalRevenue: cloverSummary.totalRevenue,
+      totalOrders: cloverSummary.totalOrders,
+      avgOrderValue: cloverSummary.avgOrderValue,
+      itemBreakdown: cloverSummary.itemBreakdown,
+      source: 'clover',
+    };
+  }
+
+  if (bigcommerceSummary) {
+    return {
+      totalRevenue: bigcommerceSummary.totalRevenue,
+      totalOrders: bigcommerceSummary.totalOrders,
+      avgOrderValue: bigcommerceSummary.avgOrderValue,
+      itemBreakdown: bigcommerceSummary.itemBreakdown.map(i => ({
+        name: i.name,
+        unitsSold: i.unitsSold,
+        revenue: i.revenue,
+      })),
+      source: 'bigcommerce',
+    };
+  }
+
+  return undefined;
+}
+
 /**
  * Generate a report when there's no history data
  */
 function generateNoDataReport(period: ReportPeriod, periodLabel: string, inventory: InventoryItem[]): string {
   const lowStock = inventory.filter(i => i.quantity <= i.reorder_threshold);
   const totalItems = inventory.length;
+  const periodName = period === 'custom' ? 'Custom Range' : period.charAt(0).toUpperCase() + period.slice(1);
 
-  return `📊 **${period.charAt(0).toUpperCase() + period.slice(1)} Sales Report - ${periodLabel}**
+  return `📊 **${periodName} Sales Report - ${periodLabel}**
 
 ⚠️ **No stock movement data available for this period.**
 
@@ -241,7 +437,9 @@ ${lowStock.length > 0 ? `\n🚨 **Items Needing Attention:**\n${lowStock.slice(0
  * Generate a fallback report from raw data (when AI is unavailable)
  */
 function generateFallbackReport(data: import('@/lib/ai/salesReportGenerator').SalesReportData): string {
-  let report = `📊 **${data.period.charAt(0).toUpperCase() + data.period.slice(1)} Sales Report - ${data.periodLabel}**
+  const periodName = data.period === 'custom' ? 'Custom Range' : data.period.charAt(0).toUpperCase() + data.period.slice(1);
+
+  let report = `📊 **${periodName} Sales Report - ${data.periodLabel}**
 
 **Key Metrics:**
 - Units Sold: ${data.totalUnitsSold}
@@ -250,6 +448,13 @@ function generateFallbackReport(data: import('@/lib/ai/salesReportGenerator').Sa
 - Avg Daily Sales: ${data.avgDailySales} units/day
 - Turnover Rate: ${data.turnoverRate}x
 `;
+
+  if (data.orderData) {
+    report += `
+**POS Sales Data (from ${data.orderData.source}):**
+- Total Orders: ${data.orderData.totalOrders}
+`;
+  }
 
   if (data.topSellers.length > 0) {
     report += `\n**Top Sellers:**\n${data.topSellers.slice(0, 5).map((item, i) =>

@@ -194,6 +194,183 @@ export async function fetchBigCommerceCatalogItems(): Promise<InventorySyncItem[
   return fetchBigCommerceCatalogItemsWithCredentials(credentials);
 }
 
+// ===== Order / Sales Data (Read-Only, V2 API) =====
+
+interface BigCommerceOrder {
+  id: number;
+  status_id: number;
+  status: string;
+  date_created: string; // RFC 2822
+  total_inc_tax: string; // String decimal
+  total_ex_tax: string;
+  items_total: number;
+  currency_code?: string;
+}
+
+interface BigCommerceOrderProduct {
+  id: number;
+  order_id: number;
+  product_id: number;
+  variant_id: number;
+  name: string;
+  sku?: string;
+  quantity: number;
+  price_inc_tax: string; // String decimal
+  price_ex_tax: string;
+  total_inc_tax: string;
+}
+
+export interface BigCommerceOrderSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrderValue: number;
+  itemBreakdown: {
+    name: string;
+    sku?: string;
+    productId: number;
+    variantId: number;
+    unitsSold: number;
+    revenue: number;
+  }[];
+}
+
+/**
+ * Make a request to BigCommerce V2 API (used for orders).
+ * V2 returns arrays directly (no { data } wrapper).
+ */
+async function bigCommerceV2RequestWithCredentials<T>(
+  endpoint: string,
+  credentials: { storeHash: string; clientId: string; accessToken: string },
+): Promise<T> {
+  const url = `https://api.bigcommerce.com/stores/${credentials.storeHash}/v2${endpoint}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Auth-Token': credentials.accessToken,
+      'X-Auth-Client': credentials.clientId,
+    },
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!response.ok) {
+    // BigCommerce V2 returns 204 for empty results
+    if (response.status === 204) {
+      return [] as unknown as T;
+    }
+    const message = await response.text();
+    throw new Error(
+      `BigCommerce V2 request failed (${response.status}): ${message || response.statusText}`
+    );
+  }
+
+  return (await response.json()) as T;
+}
+
+/**
+ * Fetch completed orders from BigCommerce for a date range (read-only).
+ * Uses V2 Orders API with date filters.
+ * Completed status IDs: 2 (Shipped), 10 (Completed), 11 (Awaiting Fulfillment), 3 (Partially Shipped)
+ */
+export async function fetchBigCommerceOrders(
+  credentials: { storeHash: string; clientId: string; accessToken: string },
+  startDate: Date,
+  endDate: Date,
+): Promise<BigCommerceOrderSummary> {
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+  const limit = 250;
+  const maxPages = 20;
+  let page = 1;
+
+  const allOrders: BigCommerceOrder[] = [];
+
+  // Fetch orders in date range
+  while (page <= maxPages) {
+    const orders = await bigCommerceV2RequestWithCredentials<BigCommerceOrder[]>(
+      `/orders?min_date_created=${encodeURIComponent(startIso)}&max_date_created=${encodeURIComponent(endIso)}&limit=${limit}&page=${page}&sort=date_created:asc`,
+      credentials,
+    );
+
+    if (!orders || orders.length === 0) break;
+
+    // Filter to completed/shipped orders (exclude cancelled=5, declined=6, refunded=4, etc.)
+    const completedStatuses = [2, 3, 10, 11];
+    for (const order of orders) {
+      if (completedStatuses.includes(order.status_id)) {
+        allOrders.push(order);
+      }
+    }
+
+    if (orders.length < limit) break;
+    page++;
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  // Fetch line items for each order (batched with throttle)
+  const itemMap = new Map<string, {
+    name: string;
+    sku?: string;
+    productId: number;
+    variantId: number;
+    unitsSold: number;
+    revenue: number;
+  }>();
+
+  let totalRevenue = 0;
+
+  for (const order of allOrders) {
+    totalRevenue += parseFloat(order.total_inc_tax) || 0;
+
+    try {
+      const products = await bigCommerceV2RequestWithCredentials<BigCommerceOrderProduct[]>(
+        `/orders/${order.id}/products`,
+        credentials,
+      );
+
+      if (products && Array.isArray(products)) {
+        for (const product of products) {
+          const key = `${product.product_id}-${product.variant_id}`;
+          const existing = itemMap.get(key);
+          const revenue = parseFloat(product.total_inc_tax) || 0;
+
+          if (existing) {
+            existing.unitsSold += product.quantity;
+            existing.revenue += revenue;
+          } else {
+            itemMap.set(key, {
+              name: product.name,
+              sku: product.sku,
+              productId: product.product_id,
+              variantId: product.variant_id,
+              unitsSold: product.quantity,
+              revenue,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch products for order ${order.id}:`, err);
+    }
+
+    // Throttle to respect rate limits
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
+  const itemBreakdown = Array.from(itemMap.values())
+    .sort((a, b) => b.revenue - a.revenue);
+
+  return {
+    totalRevenue: Math.round(totalRevenue * 100) / 100,
+    totalOrders: allOrders.length,
+    avgOrderValue: allOrders.length > 0
+      ? Math.round((totalRevenue / allOrders.length) * 100) / 100
+      : 0,
+    itemBreakdown,
+  };
+}
+
 export async function fetchBigCommerceVariantInventory(
   productId: number,
   variantId?: number

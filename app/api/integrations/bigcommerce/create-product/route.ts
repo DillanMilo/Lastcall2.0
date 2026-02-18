@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@/lib/supabaseServer';
+import { decryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -114,7 +115,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { bigcommerce_store_hash, bigcommerce_client_id, bigcommerce_access_token } = org;
+    const bigcommerce_store_hash = org.bigcommerce_store_hash;
+    const bigcommerce_client_id = org.bigcommerce_client_id;
+    const bigcommerce_access_token = decryptToken(org.bigcommerce_access_token);
 
     // If a BigCommerce product ID is provided, update that product directly
     if (bigcommerce_product_id) {

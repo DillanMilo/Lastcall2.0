@@ -309,3 +309,129 @@ export interface CloverWebhookEvent {
 export function parseCloverWebhookPayload(payload: string): CloverWebhookEvent {
   return JSON.parse(payload);
 }
+
+// ===== Order / Sales Data (Read-Only) =====
+
+interface CloverLineItem {
+  id: string;
+  name: string;
+  price: number; // cents
+  unitQty?: number;
+  refunded?: boolean;
+  item?: { id: string };
+}
+
+interface CloverOrder {
+  id: string;
+  total: number; // cents
+  state: string; // 'open' | 'locked' | 'paid'
+  createdTime: number; // Unix ms
+  modifiedTime?: number;
+  lineItems?: { elements: CloverLineItem[] };
+}
+
+interface CloverOrdersResponse {
+  elements: CloverOrder[];
+  href?: string;
+}
+
+export interface CloverOrderSummary {
+  totalRevenue: number; // dollars
+  totalOrders: number;
+  avgOrderValue: number;
+  itemBreakdown: {
+    name: string;
+    cloverItemId?: string;
+    unitsSold: number;
+    revenue: number; // dollars
+  }[];
+}
+
+/**
+ * Fetch paid orders from Clover for a date range (read-only).
+ * Uses GET /v3/merchants/{mId}/orders with createdTime filters.
+ * Only returns completed (paid) orders.
+ */
+export async function fetchCloverOrders(
+  credentials: CloverCredentials,
+  startDate: Date,
+  endDate: Date
+): Promise<CloverOrderSummary> {
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+  const limit = 100;
+  const maxPages = 50;
+  let offset = 0;
+  let pageCount = 0;
+
+  const allOrders: CloverOrder[] = [];
+
+  while (pageCount < maxPages) {
+    pageCount++;
+
+    const endpoint = `/orders?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=lineItems&limit=${limit}&offset=${offset}&orderBy=createdTime+ASC`;
+
+    const response = await cloverRequest<CloverOrdersResponse>(
+      endpoint,
+      credentials
+    );
+
+    if (!response.elements || response.elements.length === 0) break;
+
+    // Only include paid orders
+    for (const order of response.elements) {
+      if (order.state === 'paid') {
+        allOrders.push(order);
+      }
+    }
+
+    if (response.elements.length < limit) break;
+
+    offset += limit;
+    // Throttle to respect rate limits
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  // Build summary
+  let totalRevenue = 0;
+  const itemMap = new Map<string, { name: string; cloverItemId?: string; unitsSold: number; revenue: number }>();
+
+  for (const order of allOrders) {
+    totalRevenue += (order.total || 0) / 100; // cents to dollars
+
+    if (order.lineItems?.elements) {
+      for (const lineItem of order.lineItems.elements) {
+        if (lineItem.refunded) continue;
+
+        const key = lineItem.item?.id || lineItem.name;
+        const existing = itemMap.get(key);
+        const qty = lineItem.unitQty || 1;
+        const revenue = (lineItem.price || 0) / 100 * qty;
+
+        if (existing) {
+          existing.unitsSold += qty;
+          existing.revenue += revenue;
+        } else {
+          itemMap.set(key, {
+            name: lineItem.name,
+            cloverItemId: lineItem.item?.id,
+            unitsSold: qty,
+            revenue,
+          });
+        }
+      }
+    }
+  }
+
+  const itemBreakdown = Array.from(itemMap.values())
+    .sort((a, b) => b.revenue - a.revenue);
+
+  return {
+    totalRevenue: Math.round(totalRevenue * 100) / 100,
+    totalOrders: allOrders.length,
+    avgOrderValue: allOrders.length > 0
+      ? Math.round((totalRevenue / allOrders.length) * 100) / 100
+      : 0,
+    itemBreakdown,
+  };
+}
