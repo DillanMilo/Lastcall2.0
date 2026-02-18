@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import { testShopifyConnection, getShopifyProductCount, normalizeStoreDomain } from '@/lib/integrations/shopify';
 import type { PlanTier } from '@/lib/stripe/config';
+import { encryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -146,12 +147,12 @@ export async function POST(request: NextRequest) {
       // Non-critical, continue without count
     }
 
-    // Save credentials to organization
+    // Save credentials to organization (encrypt access token)
     const { error: updateError } = await adminClient
       .from('organizations')
       .update({
         shopify_store_domain: normalizedDomain,
-        shopify_access_token: access_token,
+        shopify_access_token: encryptToken(access_token),
         shopify_connected_at: new Date().toISOString(),
       })
       .eq('id', org_id);

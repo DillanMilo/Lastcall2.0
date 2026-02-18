@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { createClient } from '@supabase/supabase-js';
 import { fetchCloverInventoryItems } from '@/lib/integrations/clover';
 import { syncInventoryItems } from '@/lib/inventory/syncInventoryItems';
+import { decryptToken } from '@/lib/utils/encryption';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
 
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
       try {
         const cloverItems = await fetchCloverInventoryItems({
           merchantId: conn.merchant_id,
-          accessToken: conn.access_token,
+          accessToken: decryptToken(conn.access_token),
           environment: conn.environment as 'us' | 'eu',
         });
 

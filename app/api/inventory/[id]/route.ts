@@ -155,7 +155,7 @@ export async function PUT(
     if (error) {
       console.error('Error updating inventory:', error);
       return jsonResponse(
-        { error: 'Failed to update item', details: error.message },
+        { error: 'Failed to update item' },
         { status: 500 }
       );
     }
@@ -166,9 +166,8 @@ export async function PUT(
     });
   } catch (error: unknown) {
     console.error('Error in PUT /api/inventory/[id]:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -221,7 +220,7 @@ export async function PATCH(
     if (error) {
       console.error('Error patching inventory:', error);
       return jsonResponse(
-        { error: 'Failed to update item', details: error.message },
+        { error: 'Failed to update item' },
         { status: 500 }
       );
     }
@@ -232,9 +231,8 @@ export async function PATCH(
     });
   } catch (error: unknown) {
     console.error('Error in PATCH /api/inventory/[id]:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -278,7 +276,7 @@ export async function DELETE(
     if (error) {
       console.error('Error deleting inventory:', error);
       return jsonResponse(
-        { error: 'Failed to delete item', details: error.message },
+        { error: 'Failed to delete item' },
         { status: 500 }
       );
     }
@@ -289,9 +287,8 @@ export async function DELETE(
     });
   } catch (error: unknown) {
     console.error('Error in DELETE /api/inventory/[id]:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

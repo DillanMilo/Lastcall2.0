@@ -187,6 +187,8 @@ export async function POST(request: NextRequest) {
         throw new Error('Each item must have a name');
       }
 
+      const itemType = item.item_type === 'operational' ? 'operational' : 'stock';
+
       return {
         org_id,
         name: item.name,
@@ -197,6 +199,8 @@ export async function POST(request: NextRequest) {
         category: item.category || null,
         ai_label: item.ai_label || null,
         expiration_date: item.expiration_date || null,
+        item_type: itemType,
+        operational_category: itemType === 'operational' ? (item.operational_category || null) : null,
       };
     });
 
@@ -208,7 +212,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error inserting inventory:', error);
       return jsonResponse(
-        { error: 'Failed to create inventory items', details: error.message },
+        { error: 'Failed to create inventory items' },
         { status: 500 }
       );
     }

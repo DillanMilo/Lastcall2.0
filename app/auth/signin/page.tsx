@@ -216,6 +216,7 @@ function SignInContent() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDemoLogin = async () => {
     if (!demoEmail || !demoPassword) {
       setError(

@@ -5,7 +5,6 @@ import { sendEmail } from '@/lib/email';
 import { generateNewSignupNotificationEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 export async function POST(request: NextRequest) {
@@ -50,12 +49,8 @@ export async function POST(request: NextRequest) {
           name,
           subscription_tier,
           subscription_status,
-          stripe_customer_id,
-          stripe_subscription_id,
-          subscription_period_end,
-          payment_failed_at,
-          canceled_at,
-          is_read_only
+          is_read_only,
+          billing_exempt
         )
       `)
       .eq('user_id', userRecord.id);
@@ -398,7 +393,7 @@ export async function POST(request: NextRequest) {
         userEmail: user.email || '',
         userName: (user.user_metadata as { full_name?: string } | null)?.full_name || null,
         organizationName: targetOrg.name,
-        signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
+        signupDate: new Date().toISOString(),
       });
       const emailResult = await sendEmail({
         to: 'creativecurrentsx@gmail.com',

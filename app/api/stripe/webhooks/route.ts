@@ -159,14 +159,18 @@ async function updateOrgSubscription(
 ) {
   // Get the price ID from the subscription
   const subscriptionItem = subscription.items.data[0];
-  const priceId = subscriptionItem?.price.id;
+  if (!subscriptionItem) {
+    console.error(`No subscription items found for subscription ${subscription.id} (org: ${orgId})`);
+    return;
+  }
+  const priceId = subscriptionItem.price.id;
   const plan = priceId ? getPlanByPriceId(priceId) : null;
 
   const status = subscription.status;
   const isActive = status === 'active' || status === 'trialing';
 
   // Track subscription period end date (from the first subscription item)
-  const periodEndTimestamp = subscriptionItem?.current_period_end;
+  const periodEndTimestamp = subscriptionItem.current_period_end;
   const periodEnd = periodEndTimestamp
     ? new Date(periodEndTimestamp * 1000).toISOString()
     : null;

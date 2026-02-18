@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { fetchAllShopifyProducts } from '@/lib/integrations/shopify';
 import { syncInventoryItems } from '@/lib/inventory/syncInventoryItems';
+import { decryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     const items = await fetchAllShopifyProducts({
       storeDomain: org.shopify_store_domain,
-      accessToken: org.shopify_access_token,
+      accessToken: decryptToken(org.shopify_access_token),
     });
 
     if (items.length === 0) {

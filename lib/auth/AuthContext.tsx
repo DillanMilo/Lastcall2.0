@@ -94,28 +94,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Check if user has a pending invite - they need to accept it first
       if (payload.pendingInvite) {
         console.log('User has pending invite, checking for invite token...');
-        const pendingInviteToken = typeof window !== 'undefined'
-          ? localStorage.getItem("pendingInviteToken")
-          : null;
 
-        if (pendingInviteToken) {
-          // Redirect to invite page to accept
-          console.log('Redirecting to accept pending invite...');
-          window.location.href = `/auth/invite?token=${pendingInviteToken}`;
-          return { user: null, pendingInvite: true };
-        }
+        // Prevent infinite redirect loops: track attempts in sessionStorage
+        const redirectKey = 'pendingInviteRedirectCount';
+        const redirectCount = parseInt(sessionStorage.getItem(redirectKey) || '0', 10);
 
-        // No token stored, check API for pending invite
-        try {
-          const inviteResponse = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(payload.user.email)}`);
-          const inviteData = await inviteResponse.json();
-          if (inviteData.token) {
-            console.log('Found pending invite via API, redirecting...');
-            window.location.href = `/auth/invite?token=${inviteData.token}`;
+        if (redirectCount >= 3) {
+          console.warn('Max invite redirect attempts reached - clearing invite state to prevent loop');
+          sessionStorage.removeItem(redirectKey);
+          localStorage.removeItem("pendingInviteToken");
+          // Fall through to normal auth flow instead of redirecting
+        } else {
+          const pendingInviteToken = typeof window !== 'undefined'
+            ? localStorage.getItem("pendingInviteToken")
+            : null;
+
+          if (pendingInviteToken) {
+            sessionStorage.setItem(redirectKey, String(redirectCount + 1));
+            console.log('Redirecting to accept pending invite...');
+            window.location.href = `/auth/invite?token=${pendingInviteToken}`;
             return { user: null, pendingInvite: true };
           }
-        } catch (e) {
-          console.error('Error checking for pending invite:', e);
+
+          // No token stored, check API for pending invite
+          try {
+            const inviteResponse = await fetch(`/api/team/invites/pending?email=${encodeURIComponent(payload.user.email)}`);
+            const inviteData = await inviteResponse.json();
+            if (inviteData.token) {
+              sessionStorage.setItem(redirectKey, String(redirectCount + 1));
+              console.log('Found pending invite via API, redirecting...');
+              window.location.href = `/auth/invite?token=${inviteData.token}`;
+              return { user: null, pendingInvite: true };
+            }
+          } catch (e) {
+            console.error('Error checking for pending invite:', e);
+          }
         }
       }
 

@@ -41,13 +41,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* Prevent iOS from auto-zooming on input focus */}
         <meta name="format-detection" content="telephone=no" />
-        {/* Enable smooth scrolling */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          html { scroll-behavior: smooth; }
-          @media (prefers-reduced-motion: reduce) {
-            html { scroll-behavior: auto; }
-          }
-        `}} />
+        {/* Enable smooth scrolling - using global CSS instead of dangerouslySetInnerHTML */}
       </head>
       <body className="antialiased min-h-screen" style={{ minHeight: "100dvh" }}>
         <SuppressDevWarnings />

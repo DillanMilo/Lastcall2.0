@@ -36,7 +36,7 @@ export function createRouteHandlerClient(request: NextRequest) {
   function jsonResponse(body: unknown, init?: ResponseInit) {
     const res = NextResponse.json(body, init);
     pendingCookies.forEach(({ name, value, options }) =>
-      res.cookies.set(name, value, options as any)
+      res.cookies.set(name, value, options as Record<string, unknown>)
     );
     return res;
   }

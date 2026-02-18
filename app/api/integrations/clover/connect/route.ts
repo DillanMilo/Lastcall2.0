@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { testCloverConnection } from '@/lib/integrations/clover';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
+import { encryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -119,13 +120,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Save connection
+    // Save connection (encrypt access token)
+    const encryptedToken = encryptToken(access_token);
     const { error: insertError } = await adminClient
       .from('clover_connections')
       .insert({
         org_id: orgId,
         merchant_id,
-        access_token,
+        access_token: encryptedToken,
         label,
         environment,
         merchant_name: connectionTest.merchantName || null,
@@ -142,7 +144,7 @@ export async function POST(request: NextRequest) {
       .from('organizations')
       .update({
         clover_merchant_id: merchant_id,
-        clover_access_token: access_token,
+        clover_access_token: encryptedToken,
         clover_connected_at: new Date().toISOString(),
       })
       .eq('id', orgId);

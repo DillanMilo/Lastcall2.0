@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { decryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -39,11 +40,10 @@ async function isDuplicateHistoryEntry(
  */
 function verifyWebhookSignature(payload: string, signature: string | null): boolean {
   const secret = process.env.BIGCOMMERCE_WEBHOOK_SECRET;
-  
-  // If no secret configured, skip verification (not recommended for production)
+
   if (!secret) {
-    console.warn('BIGCOMMERCE_WEBHOOK_SECRET not configured - skipping signature verification');
-    return true;
+    console.error('BIGCOMMERCE_WEBHOOK_SECRET not configured - rejecting webhook for security');
+    return false;
   }
   
   if (!signature) {
@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
           productId,
           org.bigcommerce_store_hash,
           org.bigcommerce_client_id,
-          org.bigcommerce_access_token,
+          decryptToken(org.bigcommerce_access_token),
           org.id
         );
         
@@ -349,10 +349,6 @@ export async function POST(request: NextRequest) {
  * Health check endpoint for webhook verification
  */
 export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    message: 'BigCommerce webhook endpoint is active',
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json({ status: 'ok' });
 }
 

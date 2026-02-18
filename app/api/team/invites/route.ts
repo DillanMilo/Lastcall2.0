@@ -6,6 +6,7 @@ import type { PlanTier } from '@/lib/stripe/config';
 import { randomBytes } from 'crypto';
 import { sendEmail } from '@/lib/email';
 import { generateTeamInviteEmail } from '@/lib/email/templates';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/utils/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -127,6 +128,15 @@ export async function POST(request: NextRequest) {
       return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Rate limit invite creation
+    const rateCheck = checkRateLimit(`invite:${userOrg.orgId}`, RATE_LIMITS.email);
+    if (!rateCheck.allowed) {
+      return jsonResponse(
+        { error: 'Too many invite requests. Please wait a moment.' },
+        { status: 429 }
+      );
+    }
+
     // Only owners and admins can invite team members
     if (userOrg.role !== 'owner' && userOrg.role !== 'admin') {
       return jsonResponse(
@@ -182,11 +192,15 @@ export async function POST(request: NextRequest) {
     const totalUsers = (memberCount || 0) + (inviteCount || 0);
     const limitCheck = await checkUserLimit(adminClient, userOrg.orgId, tier);
 
-    if (!limitCheck.allowed || (limitCheck.limit !== -1 && totalUsers >= limitCheck.limit!)) {
+    const userLimit = limitCheck.limit ?? -1;
+    if (!limitCheck.allowed || (userLimit !== -1 && totalUsers >= userLimit)) {
+      const effectiveLimit = limitCheck.limit ?? 1;
       return jsonResponse(
         {
           error: 'User limit reached',
-          message: `Your ${tier} plan allows ${limitCheck.limit} team members. Upgrade to add more.`,
+          message: `Your ${tier} plan allows ${effectiveLimit} team members (including pending invites). Upgrade to add more.`,
+          currentCount: totalUsers,
+          limit: effectiveLimit,
           upgradeRequired: true,
         },
         { status: 403 }

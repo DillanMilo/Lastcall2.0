@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import OpenAI from 'openai';
 import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/utils/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -21,21 +22,23 @@ interface ActionResult {
 }
 
 /**
- * Verify user belongs to the organization
+ * Verify user belongs to the organization and has appropriate role
  */
-async function verifyUserOrg(request: NextRequest, orgId: string): Promise<boolean> {
+async function verifyUserOrg(request: NextRequest, orgId: string): Promise<{ authorized: boolean; role?: string }> {
   const { supabase } = createRouteHandlerClient(request);
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return { authorized: false };
 
   const { data: userData } = await supabase
     .from('users')
-    .select('org_id')
+    .select('org_id, role')
     .eq('id', user.id)
     .single();
 
-  return userData?.org_id === orgId;
+  if (userData?.org_id !== orgId) return { authorized: false };
+
+  return { authorized: true, role: userData.role };
 }
 
 /**
@@ -150,7 +153,9 @@ async function executeAction(
     query = query.eq('sku', filters.sku);
   }
   if (filters.name_contains) {
-    query = query.ilike('name', `%${filters.name_contains}%`);
+    // Sanitize input: limit length and escape LIKE special characters
+    const sanitized = filters.name_contains.slice(0, 100).replace(/[%_]/g, '\\$&');
+    query = query.ilike('name', `%${sanitized}%`);
   }
   if (filters.category) {
     query = query.eq('category', filters.category);
@@ -332,10 +337,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user authorization
-    const isAuthorized = await verifyUserOrg(request, orgId);
-    if (!isAuthorized) {
+    // Rate limit AI actions
+    const rateCheck = checkRateLimit(`ai:${orgId}`, RATE_LIMITS.ai);
+    if (!rateCheck.allowed) {
+      return jsonResponse(
+        { error: 'Too many requests. Please wait a moment and try again.' },
+        { status: 429 }
+      );
+    }
+
+    // Verify user authorization and role
+    const authCheck = await verifyUserOrg(request, orgId);
+    if (!authCheck.authorized) {
       return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only owners and admins can execute AI actions that modify inventory
+    if (authCheck.role !== 'owner' && authCheck.role !== 'admin') {
+      return jsonResponse(
+        { error: 'Only owners and admins can execute inventory actions' },
+        { status: 403 }
+      );
     }
 
     // Get inventory context for parsing

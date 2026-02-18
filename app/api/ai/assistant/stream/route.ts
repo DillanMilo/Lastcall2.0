@@ -5,6 +5,7 @@ import { StockMovement } from '@/lib/ai/inventoryAssistant';
 import { InventoryItem } from '@/types';
 import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/utils/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -110,6 +111,17 @@ export async function POST(request: NextRequest) {
         JSON.stringify({ error: 'Message is required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Rate limit AI assistant requests
+    if (orgId) {
+      const rateCheck = checkRateLimit(`ai:${orgId}`, RATE_LIMITS.ai);
+      if (!rateCheck.allowed) {
+        return new Response(
+          JSON.stringify({ error: 'Too many requests. Please wait a moment and try again.' }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     if (!orgId) {

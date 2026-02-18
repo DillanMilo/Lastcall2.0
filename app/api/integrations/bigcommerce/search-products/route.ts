@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@/lib/supabaseServer';
+import { decryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -91,7 +92,9 @@ export async function GET(request: NextRequest) {
       return jsonResponse({ products: [], message: 'BigCommerce not connected' });
     }
 
-    const { bigcommerce_store_hash, bigcommerce_client_id, bigcommerce_access_token } = org;
+    const bigcommerce_store_hash = org.bigcommerce_store_hash;
+    const bigcommerce_client_id = org.bigcommerce_client_id;
+    const bigcommerce_access_token = decryptToken(org.bigcommerce_access_token);
 
     // Search BigCommerce products by name
     const searchUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products?keyword=${encodeURIComponent(query)}&limit=10&include_fields=id,name,sku,inventory_level,price`;

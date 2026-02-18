@@ -40,10 +40,9 @@ async function isDuplicateHistoryEntry(
 function verifyWebhookSignature(payload: string, signature: string | null): boolean {
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
 
-  // If no secret configured, skip verification (not recommended for production)
   if (!secret) {
-    console.warn('SHOPIFY_WEBHOOK_SECRET not configured - skipping signature verification');
-    return true;
+    console.error('SHOPIFY_WEBHOOK_SECRET not configured - rejecting webhook for security');
+    return false;
   }
 
   if (!signature) {
@@ -352,9 +351,5 @@ export async function POST(request: NextRequest) {
  * Health check endpoint
  */
 export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    message: 'Shopify webhook endpoint is active',
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json({ status: 'ok' });
 }

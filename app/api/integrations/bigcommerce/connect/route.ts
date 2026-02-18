@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@/lib/supabaseServer';
 import { checkIntegrationAccess } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
+import { encryptToken } from '@/lib/utils/encryption';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -141,13 +142,13 @@ export async function POST(request: NextRequest) {
     const catalogData = await testResponse.json();
     const productCount = catalogData?.meta?.pagination?.total || 0;
 
-    // Save credentials to organization (reuse adminClient from tier check)
+    // Save credentials to organization (encrypt access token)
     const { error: updateError } = await adminClient
       .from('organizations')
       .update({
         bigcommerce_store_hash: store_hash,
         bigcommerce_client_id: client_id,
-        bigcommerce_access_token: access_token,
+        bigcommerce_access_token: encryptToken(access_token),
         bigcommerce_connected_at: new Date().toISOString(),
       })
       .eq('id', org_id);

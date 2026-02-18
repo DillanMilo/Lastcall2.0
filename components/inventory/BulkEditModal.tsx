@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ export function BulkEditModal({
   onClose,
   onSuccess,
 }: BulkEditModalProps) {
+  const { orgId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     new_invoice: invoice,
@@ -49,12 +51,17 @@ export function BulkEditModal({
         updates.expiration_date = formData.expiration_date;
       }
 
+      if (!orgId) {
+        throw new Error("No organization context available");
+      }
+
       // Only update if there are changes
       if (Object.keys(updates).length > 0) {
         const { error } = await supabase
           .from("inventory_items")
           .update(updates)
-          .eq("invoice", invoice);
+          .eq("invoice", invoice)
+          .eq("org_id", orgId);
 
         if (error) throw error;
       }
@@ -63,11 +70,12 @@ export function BulkEditModal({
       if (formData.adjust_quantity) {
         const adjustment = parseInt(formData.adjust_quantity);
         if (adjustment !== 0) {
-          // Get all items with this invoice
+          // Get all items with this invoice scoped to the org
           const { data: items, error: fetchError } = await supabase
             .from("inventory_items")
             .select("id, quantity")
-            .eq("invoice", formData.new_invoice || invoice);
+            .eq("invoice", formData.new_invoice || invoice)
+            .eq("org_id", orgId);
 
           if (fetchError) throw fetchError;
 
@@ -77,7 +85,8 @@ export function BulkEditModal({
             const { error: updateError } = await supabase
               .from("inventory_items")
               .update({ quantity: newQuantity })
-              .eq("id", item.id);
+              .eq("id", item.id)
+              .eq("org_id", orgId);
 
             if (updateError) throw updateError;
           }

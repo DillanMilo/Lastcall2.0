@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateAiLabel } from '@/lib/ai/labelGenerator';
 import { checkAIRequestLimit, logAIRequest } from '@/lib/stripe/tier-limits';
 import type { PlanTier } from '@/lib/stripe/config';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/utils/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -18,7 +19,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If orgId is provided, check rate limits
+    // Rate limit AI label requests
+    if (orgId) {
+      const rateCheck = checkRateLimit(`ai:${orgId}`, RATE_LIMITS.ai);
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { error: 'Too many AI requests. Please wait a moment.' },
+          { status: 429 }
+        );
+      }
+    }
+
+    // If orgId is provided, check tier-based limits
     if (orgId) {
       const supabase = createClient(supabaseUrl, serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
         auth: { persistSession: false, autoRefreshToken: false },

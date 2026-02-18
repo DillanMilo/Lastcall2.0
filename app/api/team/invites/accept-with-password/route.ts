@@ -27,9 +27,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
+        { error: 'Password must be at least 8 characters' },
+        { status: 400 }
+      );
+    }
+
+    // Check password complexity
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      return NextResponse.json(
+        { error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number' },
         { status: 400 }
       );
     }
@@ -167,10 +178,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark invite as accepted
-    await adminClient
+    const { error: acceptError } = await adminClient
       .from('team_invites')
       .update({ accepted_at: new Date().toISOString() })
       .eq('id', invite.id);
+
+    if (acceptError) {
+      console.error('Failed to mark invite as accepted (user already created):', acceptError);
+      // Non-fatal: user is already created and in the org, just log the error
+    }
 
     // Get organization details
     const { data: orgData } = await adminClient

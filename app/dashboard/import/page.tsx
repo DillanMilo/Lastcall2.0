@@ -8,9 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, FileSpreadsheet, Code2, Lightbulb } from "lucide-react";
 
 export default function ImportPage() {
-  const [orgId, setOrgId] = useState<string>(
-    "00000000-0000-0000-0000-000000000001"
-  );
+  const [orgId, setOrgId] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   const fetchUserOrg = useCallback(async () => {
