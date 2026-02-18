@@ -229,7 +229,7 @@ export function generateWelcomeEmail({
           <tr>
             <td align="center">
               <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
-                &copy; ${new Date().getFullYear()} LastCall. All rights reserved.
+                &copy; 2025 LastCall. All rights reserved.
               </p>
             </td>
           </tr>

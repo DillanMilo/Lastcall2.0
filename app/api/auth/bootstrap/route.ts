@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@/lib/supabaseServer';
+import { sendEmail } from '@/lib/email';
+import { generateNewSignupNotificationEmail } from '@/lib/email/templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -389,6 +391,26 @@ export async function POST(request: NextRequest) {
         role: 'owner',
         is_active: true,
       }, { onConflict: 'user_id,org_id' });
+
+    // Send new signup notification email
+    try {
+      const { subject, html } = generateNewSignupNotificationEmail({
+        userEmail: user.email || '',
+        userName: (user.user_metadata as { full_name?: string } | null)?.full_name || null,
+        organizationName: targetOrg.name,
+        signupDate: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
+      });
+      const emailResult = await sendEmail({
+        to: 'creativecurrentsx@gmail.com',
+        subject,
+        html,
+      });
+      if (!emailResult.success) {
+        console.error('Failed to send new signup notification email:', emailResult.error);
+      }
+    } catch (emailErr) {
+      console.error('Error sending new signup notification email:', emailErr);
+    }
 
     return buildResponse(newUser);
   }

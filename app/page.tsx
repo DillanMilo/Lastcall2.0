@@ -654,7 +654,7 @@ export default function Home() {
               <Link href="/auth/signup" className="hover:text-foreground transition-colors">Get Started</Link>
             </div>
             <p className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} LastCall. All rights reserved.
+              &copy; 2025 LastCall. All rights reserved.
             </p>
           </div>
         </div>

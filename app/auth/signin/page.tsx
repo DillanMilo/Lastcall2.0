@@ -380,15 +380,6 @@ function SignInContent() {
                 "Sign In"
               )}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleDemoLogin}
-              disabled={demoLoading || processingVerification}
-              className="w-full"
-            >
-              {demoLoading ? "Loading demo..." : "View live demo"}
-            </Button>
           </div>
         </form>
 
