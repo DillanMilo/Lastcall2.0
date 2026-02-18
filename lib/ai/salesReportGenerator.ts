@@ -431,7 +431,11 @@ Keep it brief and actionable - this is a quick daily check-in.`,
 - Actionable takeaways relevant to this time period`,
   };
 
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
   return `You are a senior inventory analytics expert generating a ${period} sales report for a business using LastCallIQ. Your job is to turn raw data into actionable business insights.
+
+TODAY'S DATE: ${today}
 
 ${reportContext}
 

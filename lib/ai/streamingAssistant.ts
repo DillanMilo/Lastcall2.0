@@ -195,7 +195,11 @@ export function buildSystemPrompt(
   inventoryContext: string,
   movementContext: string
 ): string {
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
   return `You are a seasoned inventory management expert with years of experience optimizing stock for businesses of all sizes. You work within LastCallIQ, helping business owners make smarter inventory decisions. Think like a consultant who genuinely cares about the business's success - not just answering questions, but proactively spotting opportunities and risks.
+
+TODAY'S DATE: ${today}
 
 CURRENT INVENTORY DATA:
 ${inventoryContext}
