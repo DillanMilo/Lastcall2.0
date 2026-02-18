@@ -329,13 +329,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // 1. Auth pages handle their own session management
           // 2. Email verification flows (hash params with tokens)
           // 3. Pending invite flows (user is accepting an invite)
+          // 4. User just navigated from an auth page (just signed in - Chrome fallback)
           const isAuthPage = typeof window !== 'undefined' &&
             (window.location.pathname.startsWith('/auth/') ||
              window.location.hash.includes('access_token'));
           const hasPendingInvite = typeof window !== 'undefined' &&
             localStorage.getItem("pendingInviteToken");
 
-          if (!hasActiveSession && !rememberMe && !isAuthPage && !hasPendingInvite) {
+          // Chrome fallback: detect if user just navigated from the sign-in page.
+          // In Chrome, there's a race condition where window.location.href navigation
+          // can fire before sessionStorage is fully readable on the new page.
+          let isFromAuthPage = false;
+          try {
+            if (typeof document !== 'undefined' && document.referrer) {
+              const referrerUrl = new URL(document.referrer);
+              isFromAuthPage = referrerUrl.origin === window.location.origin &&
+                referrerUrl.pathname.startsWith('/auth/');
+            }
+          } catch {
+            // Invalid referrer URL, ignore
+          }
+
+          if (!hasActiveSession && !rememberMe && !isAuthPage && !hasPendingInvite && !isFromAuthPage) {
             // User didn't want to be remembered and this is a new browser session
             console.log('Session found but user did not check "Remember Me" - signing out');
             await supabase.auth.signOut();

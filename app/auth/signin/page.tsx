@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getSiteUrl } from "@/lib/utils/site-url";
@@ -41,6 +41,7 @@ function SignInContent() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const navigatingRef = useRef(false);
 
   useEffect(() => {
     setEmail(prefilledEmail);
@@ -49,6 +50,15 @@ function SignInContent() {
 
   // Helper to handle redirect after successful authentication
   const handleSuccessfulAuth = useCallback(() => {
+    // Prevent double navigation - Chrome can fire both handleSignIn and
+    // onAuthStateChange simultaneously, causing a race condition where the
+    // second navigation interrupts cookie writes from the first
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
+
+    // Ensure activeSession is set before any navigation
+    sessionStorage.setItem("activeSession", "true");
+
     // Check for pending invite token first
     const pendingInviteToken = localStorage.getItem("pendingInviteToken");
     if (pendingInviteToken) {
@@ -168,6 +178,13 @@ function SignInContent() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    navigatingRef.current = false;
+
+    // Pre-set activeSession BEFORE signInWithPassword so it's guaranteed to be
+    // set before any onAuthStateChange callback fires. This prevents a Chrome-
+    // specific race condition where the auth state listener navigates to /dashboard
+    // before sessionStorage is set, causing AuthContext to sign the user out.
+    sessionStorage.setItem("activeSession", "true");
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -176,6 +193,10 @@ function SignInContent() {
       });
 
       if (error) {
+        // Sign-in failed - clean up the pre-set flag
+        sessionStorage.removeItem("activeSession");
+        navigatingRef.current = false;
+
         // Detect service outage (fetch failures, timeouts, CORS from downtime)
         if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError") || error.message.includes("fetch")) {
           setError("Our authentication service is temporarily unavailable. Please try again in a few minutes.");
@@ -193,19 +214,20 @@ function SignInContent() {
         return;
       }
 
-      // Store remember me preference and session state
+      // Store remember me preference
       if (rememberMe) {
         localStorage.setItem("rememberMe", "true");
-        sessionStorage.setItem("activeSession", "true");
       } else {
         localStorage.removeItem("rememberMe");
-        // Only set activeSession for this tab - session will end when tab closes
-        sessionStorage.setItem("activeSession", "true");
       }
 
       setMessage("Signing you in...");
       handleSuccessfulAuth();
     } catch (err: unknown) {
+      // Sign-in failed - clean up the pre-set flag
+      sessionStorage.removeItem("activeSession");
+      navigatingRef.current = false;
+
       const message = err instanceof Error ? err.message : "";
       if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("fetch")) {
         setError("Our authentication service is temporarily unavailable. Please try again in a few minutes.");
