@@ -342,11 +342,12 @@ function parseError(error: unknown, responseData?: Record<string, unknown>): Par
   };
 }
 
-function getWelcomeMessage(): Message {
+function getWelcomeMessage(userName?: string): Message {
+  const greeting = userName ? `Hey ${userName}!` : "Hey!";
   return {
     role: "assistant",
     content:
-      "Hey! I'm your inventory co-pilot. I can help you with smart ordering, expiry tracking, alerts, and reports. What do you need?",
+      `${greeting} I'm your inventory co-pilot. I can help you with smart ordering, expiry tracking, alerts, and reports. What do you need?`,
     timestamp: new Date(),
   };
 }
@@ -494,10 +495,10 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt, u
         // Increased from 10 to 20 for better context
         setMessages(messagesWithDates.slice(-20));
       } catch {
-        setMessages([getWelcomeMessage()]);
+        setMessages([getWelcomeMessage(userName)]);
       }
     } else {
-      setMessages([getWelcomeMessage()]);
+      setMessages([getWelcomeMessage(userName)]);
     }
   }, [orgId]);
 
@@ -942,7 +943,7 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt, u
 
   const handleClearHistory = () => {
     if (confirm("Clear conversation history?")) {
-      setMessages([getWelcomeMessage()]);
+      setMessages([getWelcomeMessage(userName)]);
       localStorage.removeItem(`ai-chat-${orgId}`);
     }
   };
