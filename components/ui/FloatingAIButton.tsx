@@ -99,6 +99,7 @@ export function FloatingAIButton() {
                 onClose={() => setShowAIAssistant(false)}
                 subscriptionTier={userWithOrg?.organization?.subscription_tier}
                 billingExempt={userWithOrg?.organization?.billing_exempt}
+                userName={userWithOrg?.full_name?.split(' ')[0]}
               />
             </div>
           </div>

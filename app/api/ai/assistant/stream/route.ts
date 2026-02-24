@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
 
   try {
-    const { message, orgId, conversationHistory } = await request.json();
+    const { message, orgId, userName, conversationHistory } = await request.json();
 
     if (!message || typeof message !== 'string') {
       return new Response(
@@ -184,10 +184,29 @@ export async function POST(request: NextRequest) {
 
     // Check if this is an action request
     const actionKeywords = [
+      // Expiry
       'set expiry', 'set expiration', 'update expiry', 'change expiry',
+      // Reorder
       'set reorder', 'update reorder', 'change reorder', 'reorder level', 'reorder threshold',
+      // Quantity
       'set quantity', 'update quantity', 'change quantity',
-      'set all', 'update all', 'apply recommend', 'use recommend'
+      'add quantity', 'subtract quantity', 'remove quantity',
+      'received', 'restock',
+      // Bulk
+      'set all', 'update all', 'apply recommend', 'use recommend',
+      // Add/create item
+      'add item', 'create item', 'add new', 'create new', 'add a new', 'new item',
+      'add product', 'create product',
+      // Delete item
+      'delete item', 'remove item', 'delete the', 'remove the',
+      // Edit item
+      'edit item', 'change name', 'rename', 'change category', 'update category',
+      'change sku', 'update sku', 'edit the',
+      // Order status
+      'mark ordered', 'mark as ordered', 'mark received', 'mark as received',
+      'order placed', 'received shipment', 'delivery received',
+      // SKU generation
+      'generate sku', 'create sku', 'assign sku', 'auto sku',
     ];
     const isLikelyAction = actionKeywords.some(keyword =>
       message.toLowerCase().includes(keyword)
@@ -253,7 +272,8 @@ export async function POST(request: NextRequest) {
             message,
             inventory as InventoryItem[],
             conversationHistory || [],
-            stockMovements.length > 0 ? stockMovements : undefined
+            stockMovements.length > 0 ? stockMovements : undefined,
+            userName
           );
 
           for await (const chunk of generator) {

@@ -19,7 +19,8 @@
       "Bash(vercel --version:*)",
       "Bash(git -C /Users/dillanmilosevich/Desktop/Lastcall2.0-3 status)",
       "Bash(git -C /Users/dillanmilosevich/Desktop/Lastcall2.0-3 diff)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ]
   }
 }

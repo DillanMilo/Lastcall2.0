@@ -192,6 +192,15 @@ function InventoryPageContent() {
     }
   }, [orgId, authLoading, user, fetchInventory]);
 
+  // Auto-refresh when AI assistant modifies inventory
+  useEffect(() => {
+    const handleInventoryUpdate = () => {
+      fetchInventory();
+    };
+    window.addEventListener('inventory-updated', handleInventoryUpdate);
+    return () => window.removeEventListener('inventory-updated', handleInventoryUpdate);
+  }, [fetchInventory]);
+
   // Low stock items exclude items that are already ordered
   const lowStockItems = items.filter(
     (item) => item.quantity <= item.reorder_threshold && item.order_status !== 'ordered'

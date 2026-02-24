@@ -71,6 +71,7 @@ interface AIAssistantProps {
   onClose?: () => void;
   subscriptionTier?: PlanTier | 'trial';
   billingExempt?: boolean;
+  userName?: string;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -454,7 +455,7 @@ function MessageBubble({ message, isLatest }: { message: Message; isLatest: bool
   );
 }
 
-export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }: AIAssistantProps) {
+export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt, userName }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -779,6 +780,7 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
         body: JSON.stringify({
           message: userMessage,
           orgId,
+          userName,
           conversationHistory: recentMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -824,6 +826,11 @@ export function AIAssistant({ orgId, onClose, subscriptionTier, billingExempt }:
             }
             return updated;
           });
+
+          // Trigger inventory refresh if an action was executed
+          if (data.actionExecuted) {
+            window.dispatchEvent(new CustomEvent('inventory-updated'));
+          }
           return;
         }
       }

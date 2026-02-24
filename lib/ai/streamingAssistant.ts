@@ -193,11 +193,16 @@ export function summarizeConversationHistory(
 // Build the system prompt
 export function buildSystemPrompt(
   inventoryContext: string,
-  movementContext: string
+  movementContext: string,
+  userName?: string
 ): string {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 
-  return `You are a seasoned inventory management expert with years of experience optimizing stock for businesses of all sizes. You work within LastCallIQ, helping business owners make smarter inventory decisions. Think like a consultant who genuinely cares about the business's success - not just answering questions, but proactively spotting opportunities and risks.
+  const userGreeting = userName
+    ? `The user's name is ${userName}. Address them by name naturally in conversation — use it occasionally to keep things personal, but don't overdo it.\n\n`
+    : '';
+
+  return `${userGreeting}You are a seasoned inventory management expert with years of experience optimizing stock for businesses of all sizes. You work within LastCallIQ, helping business owners make smarter inventory decisions. Think like a consultant who genuinely cares about the business's success - not just answering questions, but proactively spotting opportunities and risks.
 
 TODAY'S DATE: ${today}
 
@@ -231,6 +236,16 @@ YOUR EXPERTISE - CORE INVENTORY PRINCIPLES:
 - If many categories exist → larger operation, provide summarized insights
 - If items haven't moved → proactively flag as potential dead stock
 
+STOCK vs OPERATIONAL ITEMS:
+The inventory has two types:
+- **Stock items** (item_type: 'stock'): Products for sale - synced with POS systems. Track sales velocity, ordering recommendations, ABC analysis.
+- **Operational items** (item_type: 'operational'): Back-of-house supplies NOT synced with POS. Categories: cleaning, office, kitchen, packaging, tableware, maintenance, safety, other.
+When users add items, infer item_type from context:
+- Cleaning supplies, office supplies, kitchen supplies, packaging, tableware → operational
+- User says "operational" explicitly → operational
+- Products for sale, food items, beverages → stock
+- If unclear, default to stock
+
 YOUR CAPABILITIES:
 - **SMART ORDERING**: Analyze sales velocity and provide specific order quantities based on actual movement data
 - **REORDER LEVEL OPTIMIZATION**: Recommend and set optimal reorder points based on sales velocity and lead times
@@ -239,12 +254,22 @@ YOUR CAPABILITIES:
 - **SET EXPIRY DATES**: Update expiry dates via "set expiry for X to [date]"
 - **SET REORDER LEVELS**: Update reorder thresholds via "set reorder level for X to [number]"
 - **BULK UPDATES**: Update multiple items by invoice, name pattern, or category
+- **ADD ITEMS**: Create new inventory items via chat: "Add 50 Paper Towels as operational cleaning item" or "Create new item: Angus Biltong, category Snacks, 100 units"
+- **DELETE ITEMS**: Remove items: "Delete the expired Biltong" or "Remove item SKU CLN-PAPTOW-001"
+- **EDIT ITEMS**: Change details: "Rename Biltong 100g to Angus Biltong Original 100g" or "Change the category of Droewors to Meat Snacks"
+- **GENERATE SKUs**: Auto-generate smart SKUs: "Generate SKU for Paper Towels" or "Assign SKUs to all items without one"
+- **MARK ORDERED**: Track orders placed with suppliers: "Mark all low stock items as ordered" or "Mark Biltong as ordered"
+- **MARK RECEIVED**: Record deliveries: "Mark Biltong as received with 100 units" or "Received shipment for invoice INV-123"
 - Calculate days of stock remaining based on real sales rates
 - Identify fast-movers (your A-items) vs slow-movers (potential dead stock)
 - Predict stockout dates and alert before they happen
 - Spot items that should be marked down or discontinued
 - Compare performance across categories
 - Group items by invoice for batch operations
+
+SKU FORMAT:
+When creating items or generating SKUs, the system uses: {CATEGORY_PREFIX}-{NAME_ABBR}-{SEQUENCE}
+Examples: SNK-ANGBLT-001, CLN-PAPTOW-001, BEV-COLZER-001. These are auto-generated.
 
 SALES REPORTS:
 When users ask for sales reports, summaries, or performance data for specific time periods:
@@ -293,6 +318,15 @@ ACTION COMMANDS (guide users to these):
 - "Set expiry for all [product name] to [date]"
 - "Update invoice [INV-XXX] expiry to [date]"
 - "Set expiry for [category] products to [date]"
+- "Add 50 [product name] as [stock/operational] item"
+- "Create new item: [name], category [X], [N] units"
+- "Delete [item name]" or "Remove [item name]"
+- "Rename [item] to [new name]"
+- "Change category of [item] to [new category]"
+- "Mark [item] as ordered"
+- "Mark [item] as received with [N] units"
+- "Generate SKU for [item]"
+- "Assign SKUs to all items without one"
 
 REORDER LEVEL OPTIMIZATION RULES:
 When recommending or setting reorder levels, use this formula based on movement data:
@@ -374,7 +408,8 @@ export async function* createStreamingResponse(
   userMessage: string,
   inventory: InventoryItem[],
   conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
-  stockMovements?: StockMovement[]
+  stockMovements?: StockMovement[],
+  userName?: string
 ): AsyncGenerator<string, void, unknown> {
   if (!process.env.OPENAI_API_KEY) {
     yield "AI assistant is not configured. Please add OPENAI_API_KEY to your environment variables.";
@@ -384,7 +419,7 @@ export async function* createStreamingResponse(
   try {
     const inventoryContext = formatInventoryContext(inventory);
     const movementContext = stockMovements ? formatStockMovementContext(stockMovements) : '';
-    const systemPrompt = buildSystemPrompt(inventoryContext, movementContext);
+    const systemPrompt = buildSystemPrompt(inventoryContext, movementContext, userName);
 
     // Summarize history if too long
     const optimizedHistory = summarizeConversationHistory(conversationHistory);
@@ -432,7 +467,8 @@ export async function getImprovedAssistantResponse(
   userMessage: string,
   inventory: InventoryItem[],
   conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
-  stockMovements?: StockMovement[]
+  stockMovements?: StockMovement[],
+  userName?: string
 ): Promise<{ response: string; usedFallback: boolean }> {
   if (!process.env.OPENAI_API_KEY) {
     return {
@@ -444,7 +480,7 @@ export async function getImprovedAssistantResponse(
   try {
     const inventoryContext = formatInventoryContext(inventory);
     const movementContext = stockMovements ? formatStockMovementContext(stockMovements) : '';
-    const systemPrompt = buildSystemPrompt(inventoryContext, movementContext);
+    const systemPrompt = buildSystemPrompt(inventoryContext, movementContext, userName);
 
     // Summarize history if too long
     const optimizedHistory = summarizeConversationHistory(conversationHistory);
