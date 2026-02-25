@@ -140,6 +140,11 @@ IMPORTANT: For add_item, infer item_type from context:
 - Products for sale, food items, beverages → stock
 - If unclear, default to stock
 
+IMPORTANT: For ALL actions (not just add_item), ALWAYS set the item_type and operational_category filters when the user mentions operational items or operational categories:
+- If the user says "operational" or mentions cleaning/office/kitchen/packaging/tableware/maintenance/safety → set filters.item_type to "operational" AND set filters.operational_category to the specific category
+- If the user says "stock items" or "sellable items" or "products for sale" → set filters.item_type to "stock"
+- This ensures actions like generate_sku, update_quantity, set_expiry, etc. only affect the correct type of inventory and never accidentally touch the wrong items
+
 Examples:
 - "Set expiry for all Biltong to March 2026" → {"action":"set_expiry","filters":{"name_contains":"Biltong"},"value":"2026-03-31","confidence":0.9}
 - "Update invoice INV-123 expiry to June 30, 2026" → {"action":"set_expiry","filters":{"invoice":"INV-123"},"value":"2026-06-30","confidence":0.95}
@@ -160,6 +165,11 @@ Examples:
 - "Received shipment for invoice INV-123" → {"action":"mark_received","filters":{"invoice":"INV-123"},"confidence":0.9}
 - "Generate SKU for Paper Towels" → {"action":"generate_sku","filters":{"name_contains":"Paper Towels"},"confidence":0.95}
 - "Assign SKUs to all items without one" → {"action":"generate_sku","filters":{},"confidence":0.9}
+- "Generate SKUs for my operational cleaning items" → {"action":"generate_sku","filters":{"item_type":"operational","operational_category":"cleaning"},"confidence":0.9}
+- "Create a SKU for kitchen supplies" → {"action":"generate_sku","filters":{"item_type":"operational","operational_category":"kitchen"},"confidence":0.9}
+- "Add Dish Soap as an operational kitchen item with 20 units" → {"action":"add_item","item_data":{"name":"Dish Soap","quantity":20,"item_type":"operational","operational_category":"kitchen","reorder_threshold":5},"confidence":0.95}
+- "Update quantity of all cleaning items to 50" → {"action":"update_quantity","filters":{"item_type":"operational","operational_category":"cleaning"},"value":"50","confidence":0.9}
+- "Set reorder level for operational office supplies to 10" → {"action":"set_reorder_threshold","filters":{"item_type":"operational","operational_category":"office"},"value":"10","confidence":0.9}
 - "What's running low?" → {"action":"none","filters":{},"confidence":1.0}`,
       },
       {

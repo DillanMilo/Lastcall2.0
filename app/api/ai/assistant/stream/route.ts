@@ -11,6 +11,55 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
+ * Detect if a user message is an action request using flexible pattern matching.
+ * Uses regex patterns that allow natural phrasing like "create a SKU", "add some cleaning items", etc.
+ */
+function detectActionIntent(message: string): boolean {
+  const lower = message.toLowerCase();
+
+  // Exact phrase matches (high confidence, no flexibility needed)
+  const exactPhrases = [
+    'reorder level', 'reorder threshold', 'restock',
+    'apply recommend', 'use recommend',
+    'rename', 'order placed', 'received shipment', 'delivery received',
+  ];
+  if (exactPhrases.some(phrase => lower.includes(phrase))) return true;
+
+  // Regex patterns that allow words in between (e.g., "create a new SKU", "add 50 cleaning items")
+  const actionPatterns = [
+    // Mark ordered/received - "mark + (item name) + as ordered/received"
+    /\bmark\b.{0,30}\b(ordered|received)\b/,
+    // SKU operations - "create/generate/assign/add/enter/make + (any words) + sku(s)"
+    /\b(create|generate|assign|add|enter|make|give|set up)\b.{0,30}\bskus?\b/,
+    /\bskus?\b.{0,20}\b(for|to|on)\b/,
+    // Add/create items - "add/create + (any words) + item(s)/product(s)/inventory"
+    /\b(add|create|enter|new|register)\b.{0,30}\b(items?|products?|inventory|to inventory)\b/,
+    // Add with quantities - "add 50 paper towels" (add + number + item name)
+    /\b(add|create)\b\s+\d+\s+\w/,
+    // Operational items - "add/create + (any words) + operational/cleaning/office/kitchen/etc"
+    /\b(add|create|enter|new)\b.{0,40}\b(operational|cleaning|office|kitchen|packaging|tableware|maintenance|safety)\b/,
+    // Delete/remove items
+    /\b(delete|remove)\b.{0,30}\b(items?|products?|from inventory|the)\b/,
+    // Edit items - "change/update/edit + (any words) + name/category/sku"
+    /\b(change|update|edit|modify)\b.{0,30}\b(name|category|sku|categories)\b/,
+    // Set/update expiry
+    /\b(set|update|change)\b.{0,20}\b(expiry|expiration|expire)\b/,
+    // Set/update reorder
+    /\b(set|update|change)\b.{0,20}\breorder\b/,
+    // Quantity operations - "set/update/change + (any words) + quantity"
+    /\b(set|update|change)\b.{0,20}\bquantit/,
+    /\b(add|subtract|remove)\b.{0,20}\b(quantity|units|stock)\b/,
+    // Received stock - "received + number" or "received + item"
+    /\breceived\b\s+\d/,
+    /\breceived\b.{0,20}\b(units|shipment|delivery|order)\b/,
+    // Bulk operations
+    /\b(set|update)\s+all\b/,
+  ];
+
+  return actionPatterns.some(pattern => pattern.test(lower));
+}
+
+/**
  * Calculate stock movements from inventory history
  */
 async function getStockMovements(orgId: string): Promise<StockMovement[]> {
@@ -182,35 +231,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this is an action request
-    const actionKeywords = [
-      // Expiry
-      'set expiry', 'set expiration', 'update expiry', 'change expiry',
-      // Reorder
-      'set reorder', 'update reorder', 'change reorder', 'reorder level', 'reorder threshold',
-      // Quantity
-      'set quantity', 'update quantity', 'change quantity',
-      'add quantity', 'subtract quantity', 'remove quantity',
-      'received', 'restock',
-      // Bulk
-      'set all', 'update all', 'apply recommend', 'use recommend',
-      // Add/create item
-      'add item', 'create item', 'add new', 'create new', 'add a new', 'new item',
-      'add product', 'create product',
-      // Delete item
-      'delete item', 'remove item', 'delete the', 'remove the',
-      // Edit item
-      'edit item', 'change name', 'rename', 'change category', 'update category',
-      'change sku', 'update sku', 'edit the',
-      // Order status
-      'mark ordered', 'mark as ordered', 'mark received', 'mark as received',
-      'order placed', 'received shipment', 'delivery received',
-      // SKU generation
-      'generate sku', 'create sku', 'assign sku', 'auto sku',
-    ];
-    const isLikelyAction = actionKeywords.some(keyword =>
-      message.toLowerCase().includes(keyword)
-    );
+    // Check if this is an action request using flexible pattern matching
+    const isLikelyAction = detectActionIntent(message);
 
     if (isLikelyAction) {
       try {
