@@ -34,6 +34,8 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
   const [loading, setLoading] = useState(false);
   const [syncToBigCommerce, setSyncToBigCommerce] = useState(false);
   const [bigCommerceConnected, setBigCommerceConnected] = useState(false);
+  const [pushToClover, setPushToClover] = useState(false);
+  const [cloverConnected, setCloverConnected] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [syncMessage, setSyncMessage] = useState("");
   const [operationalCategory, setOperationalCategory] = useState<OperationalCategory | "">("");
@@ -54,9 +56,9 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check if BigCommerce is connected
+  // Check if BigCommerce and Clover are connected
   useEffect(() => {
-    const checkBigCommerceConnection = async () => {
+    const checkConnections = async () => {
       try {
         const { data: org } = await supabase
           .from("organizations")
@@ -70,9 +72,21 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
       } catch (error) {
         console.error("Error checking BigCommerce connection:", error);
       }
+
+      try {
+        const response = await fetch("/api/integrations/clover/connect", {
+          credentials: "include",
+        });
+        const data = await response.json();
+        if (response.ok && data.connections?.length > 0) {
+          setCloverConnected(true);
+        }
+      } catch (error) {
+        console.error("Error checking Clover connection:", error);
+      }
     };
 
-    checkBigCommerceConnection();
+    checkConnections();
   }, [orgId]);
 
   // Debounced search for BigCommerce products
@@ -207,6 +221,47 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
           setSyncStatus("error");
           setSyncMessage(`Item saved locally, but BigCommerce sync failed: ${syncMsg}`);
           // Still close after showing error briefly
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 3000);
+          return;
+        }
+      }
+
+      // If push to Clover is enabled, push to Clover (only for stock items)
+      if (!isOperational && pushToClover && cloverConnected && insertedId) {
+        setSyncStatus("syncing");
+        try {
+          const response = await fetch("/api/integrations/clover/push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              item_id: insertedId,
+              create_if_missing: true,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to push to Clover");
+          }
+
+          setSyncStatus("success");
+          setSyncMessage(data.message || "Pushed to Clover!");
+
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 1500);
+          return;
+        } catch (syncError) {
+          const syncMsg = syncError instanceof Error ? syncError.message : "Sync failed";
+          console.error("Clover push error:", syncError);
+          setSyncStatus("error");
+          setSyncMessage(`Item saved locally, but Clover push failed: ${syncMsg}`);
           setTimeout(() => {
             onSuccess();
             onClose();
@@ -466,6 +521,69 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
                         <>
                           <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                           <span>Syncing to BigCommerce...</span>
+                        </>
+                      )}
+                      {syncStatus === "success" && (
+                        <>
+                          <Check className="h-4 w-4" />
+                          <span>{syncMessage}</span>
+                        </>
+                      )}
+                      {syncStatus === "error" && (
+                        <>
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{syncMessage}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Clover Push Toggle - only for stock items */}
+              {!isOperational && cloverConnected && (
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <Label htmlFor="clover-toggle" className="font-medium cursor-pointer">
+                          Push to Clover
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Create this item in Clover POS with stock count
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      id="clover-toggle"
+                      role="switch"
+                      aria-checked={pushToClover}
+                      onClick={() => setPushToClover(!pushToClover)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        pushToClover ? "bg-primary" : "bg-input"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition-transform ${
+                          pushToClover ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Clover Sync Status Message */}
+                  {syncStatus !== "idle" && pushToClover && !syncToBigCommerce && (
+                    <div className={`mt-3 flex items-center gap-2 text-sm ${
+                      syncStatus === "success" ? "text-green-600" :
+                      syncStatus === "error" ? "text-destructive" :
+                      "text-muted-foreground"
+                    }`}>
+                      {syncStatus === "syncing" && (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          <span>Pushing to Clover...</span>
                         </>
                       )}
                       {syncStatus === "success" && (
