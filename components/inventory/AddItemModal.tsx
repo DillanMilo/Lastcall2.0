@@ -141,7 +141,7 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
 
     try {
       // First, add to local database
-      const { error } = await supabase.from("inventory_items").insert([
+      const { data: insertedRows, error } = await supabase.from("inventory_items").insert([
         {
           org_id: orgId,
           name: formData.name,
@@ -153,9 +153,11 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
           item_type: itemType,
           operational_category: isOperational && operationalCategory ? operationalCategory : null,
         },
-      ]);
+      ]).select("id");
 
       if (error) throw error;
+
+      const insertedId = insertedRows?.[0]?.id;
 
       // If sync to BigCommerce is enabled, push to BigCommerce (only for stock items)
       if (!isOperational && syncToBigCommerce && bigCommerceConnected) {
@@ -180,6 +182,14 @@ export function AddItemModal({ orgId, onClose, onSuccess, itemType = "stock" }: 
 
           if (!response.ok) {
             throw new Error(data.error || "Failed to sync to BigCommerce");
+          }
+
+          // Save the BigCommerce product ID back to the local record
+          if (insertedId && data.bigcommerce_product_id) {
+            await supabase
+              .from("inventory_items")
+              .update({ bigcommerce_product_id: String(data.bigcommerce_product_id) })
+              .eq("id", insertedId);
           }
 
           setSyncStatus("success");

@@ -14,6 +14,7 @@ interface CreateProductRequest {
   invoice?: string;
   expiration_date?: string;
   bigcommerce_product_id?: number; // If provided, update this product instead of creating new
+  action?: 'add' | 'set'; // 'add' adds quantity to existing (default), 'set' sets absolute value
 }
 
 /**
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const { jsonResponse } = createRouteHandlerClient(request);
     const body: CreateProductRequest = await request.json();
-    const { org_id, name, sku, quantity, invoice, expiration_date, bigcommerce_product_id } = body;
+    const { org_id, name, sku, quantity, invoice, expiration_date, bigcommerce_product_id, action = 'add' } = body;
 
     // Validate required fields
     if (!org_id || !name) {
@@ -141,9 +142,9 @@ export async function POST(request: NextRequest) {
 
       const productData = await getResponse.json();
       const currentInventory = productData.data?.inventory_level || 0;
-      const newInventory = currentInventory + quantity;
+      const newInventory = action === 'set' ? quantity : currentInventory + quantity;
 
-      // Update inventory level (add to existing)
+      // Update inventory level
       const updateUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}`;
       const updateResponse = await fetch(updateUrl, {
         method: 'PUT',
@@ -166,10 +167,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const message = action === 'set'
+        ? `Updated "${name}" inventory to ${newInventory} units (was ${currentInventory})`
+        : `Added ${quantity} units to "${name}" (${currentInventory} → ${newInventory})`;
+
       return jsonResponse({
         success: true,
         action: 'updated',
-        message: `Added ${quantity} units to "${name}" (${currentInventory} → ${newInventory})`,
+        message,
         bigcommerce_product_id: bigcommerce_product_id,
         previous_inventory: currentInventory,
         new_inventory: newInventory,

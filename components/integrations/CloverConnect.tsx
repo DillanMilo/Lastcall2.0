@@ -22,8 +22,10 @@ import {
   Unlink,
   RefreshCw,
   Plus,
+  Upload,
 } from "lucide-react";
 import { Organization } from "@/types";
+import { supabase } from "@/lib/supabaseClient";
 
 interface CloverConnectProps {
   organization: Organization | null;
@@ -53,6 +55,18 @@ interface SyncResult {
   error?: string;
 }
 
+interface PushResult {
+  success: boolean;
+  message?: string;
+  results?: {
+    updated: number;
+    created: number;
+    failed: number;
+    errors: string[];
+  };
+  error?: string;
+}
+
 export function CloverConnect({
   organization,
   onConnectionChange,
@@ -66,9 +80,11 @@ export function CloverConnect({
   const [connecting, setConnecting] = useState(false);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [pushResult, setPushResult] = useState<PushResult | null>(null);
 
   const hasConnections = connections.length > 0;
 
@@ -203,6 +219,51 @@ export function CloverConnect({
     }
   };
 
+  const handlePushAll = async () => {
+    if (!organization?.id) return;
+
+    setPushing(true);
+    setError(null);
+    setPushResult(null);
+
+    try {
+      const { data: items, error: fetchError } = await supabase
+        .from("inventory_items")
+        .select("id")
+        .eq("org_id", organization.id);
+
+      if (fetchError) throw fetchError;
+      if (!items || items.length === 0) {
+        setError("No inventory items to push.");
+        setPushing(false);
+        return;
+      }
+
+      const response = await fetch("/api/integrations/clover/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          item_ids: items.map((i) => i.id),
+          create_if_missing: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Push failed");
+
+      setPushResult(data);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to push inventory to Clover";
+      setError(message);
+    } finally {
+      setPushing(false);
+    }
+  };
+
+  const isValidationMode = organization?.thrive_validation_mode === true;
+
   return (
     <Card>
       <CardHeader>
@@ -260,26 +321,46 @@ export function CloverConnect({
           </div>
         ))}
 
-        {/* Sync All Button */}
+        {/* Sync & Push Buttons */}
         {hasConnections && (
-          <Button
-            variant="outline"
-            onClick={handleSync}
-            disabled={syncing}
-            className="w-full"
-          >
-            {syncing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Syncing all merchants...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync All Merchants
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSync}
+              disabled={syncing || pushing}
+              className="flex-1"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Pulling...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Pull from Clover
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handlePushAll}
+              disabled={pushing || syncing || isValidationMode}
+              className="flex-1"
+            >
+              {pushing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Pushing to Clover...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Push to Clover
+                </>
+              )}
+            </Button>
+          </div>
         )}
 
         {/* Validation Mode Warning */}
@@ -330,6 +411,51 @@ export function CloverConnect({
               ) : (
                 <p className="text-red-800 dark:text-red-200">
                   {syncResult.error || "Sync failed"}
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Push Results */}
+        {pushResult && (
+          <Alert
+            className={
+              pushResult.success
+                ? "border-green-200 bg-green-50 dark:bg-green-950"
+                : "border-red-200 bg-red-50 dark:bg-red-950"
+            }
+          >
+            {pushResult.success ? (
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-600" />
+            )}
+            <AlertDescription>
+              {pushResult.success ? (
+                <div className="space-y-1">
+                  <p className="font-medium text-green-800 dark:text-green-200">
+                    {pushResult.message || "Push completed!"}
+                  </p>
+                  {pushResult.results && (
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      Updated: {pushResult.results.updated} · Created:{" "}
+                      {pushResult.results.created} · Failed:{" "}
+                      {pushResult.results.failed}
+                    </p>
+                  )}
+                  {pushResult.results?.errors &&
+                    pushResult.results.errors.length > 0 && (
+                      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                        {pushResult.results.errors.map((e, i) => (
+                          <div key={i}>{e}</div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+              ) : (
+                <p className="text-red-800 dark:text-red-200">
+                  {pushResult.error || "Push failed"}
                 </p>
               )}
             </AlertDescription>

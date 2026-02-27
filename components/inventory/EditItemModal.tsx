@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { InventoryItem, OperationalCategory, OPERATIONAL_CATEGORIES } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { X, Trash2, Package, Boxes } from "lucide-react";
+import { X, Trash2, Package, Boxes, Upload, Check, AlertCircle } from "lucide-react";
 
 interface EditItemModalProps {
   item: InventoryItem;
@@ -28,6 +28,9 @@ export function EditItemModal({
 }: EditItemModalProps) {
   const isOperational = item.item_type === 'operational';
   const [loading, setLoading] = useState(false);
+  const [bigCommerceConnected, setBigCommerceConnected] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [syncMessage, setSyncMessage] = useState("");
   const [operationalCategory, setOperationalCategory] = useState<OperationalCategory | "">(
     item.operational_category || ""
   );
@@ -40,9 +43,36 @@ export function EditItemModal({
     expiration_date: item.expiration_date || "",
   });
 
+  const hasBigCommerceProduct = !!item.bigcommerce_product_id;
+
+  // Check if BigCommerce is connected
+  useEffect(() => {
+    if (isOperational || !hasBigCommerceProduct) return;
+
+    const checkConnection = async () => {
+      try {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("bigcommerce_store_hash")
+          .eq("id", item.org_id)
+          .single();
+
+        if (org?.bigcommerce_store_hash) {
+          setBigCommerceConnected(true);
+        }
+      } catch (error) {
+        console.error("Error checking BigCommerce connection:", error);
+      }
+    };
+
+    checkConnection();
+  }, [item.org_id, isOperational, hasBigCommerceProduct]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setSyncStatus("idle");
+    setSyncMessage("");
 
     try {
       const { error } = await supabase
@@ -59,6 +89,50 @@ export function EditItemModal({
         .eq("id", item.id);
 
       if (error) throw error;
+
+      // Sync to BigCommerce if this item is linked to a BC product
+      if (!isOperational && bigCommerceConnected && hasBigCommerceProduct) {
+        setSyncStatus("syncing");
+        try {
+          const response = await fetch("/api/integrations/bigcommerce/create-product", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              org_id: item.org_id,
+              name: formData.name,
+              sku: formData.sku || undefined,
+              quantity: parseInt(formData.quantity) || 0,
+              bigcommerce_product_id: parseInt(item.bigcommerce_product_id!),
+              action: 'set',
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to sync to BigCommerce");
+          }
+
+          setSyncStatus("success");
+          setSyncMessage(data.message || "Synced to BigCommerce!");
+
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 1500);
+          return;
+        } catch (syncError) {
+          const syncMsg = syncError instanceof Error ? syncError.message : "Sync failed";
+          console.error("BigCommerce sync error:", syncError);
+          setSyncStatus("error");
+          setSyncMessage(`Saved locally, but BigCommerce sync failed: ${syncMsg}`);
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 3000);
+          return;
+        }
+      }
 
       onSuccess();
       onClose();
@@ -234,6 +308,49 @@ export function EditItemModal({
                   }
                 />
               </div>
+
+              {/* BigCommerce Sync Indicator */}
+              {!isOperational && bigCommerceConnected && hasBigCommerceProduct && (
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <Upload className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Linked to BigCommerce</p>
+                      <p className="text-xs text-muted-foreground">
+                        Changes will automatically sync to BigCommerce
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sync Status Message */}
+                  {syncStatus !== "idle" && (
+                    <div className={`mt-3 flex items-center gap-2 text-sm ${
+                      syncStatus === "success" ? "text-green-600" :
+                      syncStatus === "error" ? "text-destructive" :
+                      "text-muted-foreground"
+                    }`}>
+                      {syncStatus === "syncing" && (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          <span>Syncing to BigCommerce...</span>
+                        </>
+                      )}
+                      {syncStatus === "success" && (
+                        <>
+                          <Check className="h-4 w-4" />
+                          <span>{syncMessage}</span>
+                        </>
+                      )}
+                      {syncStatus === "error" && (
+                        <>
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{syncMessage}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-between pt-4">
                 <Button
