@@ -13,7 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { X, Trash2, Package, Boxes, Upload, Check, AlertCircle } from "lucide-react";
+import { X, Trash2, Package, Boxes, Upload, Check, AlertCircle, Loader2, CheckCircle } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 
 interface EditItemModalProps {
   item: InventoryItem;
@@ -44,6 +45,10 @@ export function EditItemModal({
   });
 
   const hasBigCommerceProduct = !!item.bigcommerce_product_id;
+  const hasCloverLink = !!(item.clover_item_id || item.clover_merchant_id);
+  const [pushingToClover, setPushingToClover] = useState(false);
+  const [cloverPushStatus, setCloverPushStatus] = useState<"idle" | "success" | "error">("idle");
+  const [cloverPushMessage, setCloverPushMessage] = useState("");
 
   // Check if BigCommerce is connected
   useEffect(() => {
@@ -174,6 +179,40 @@ export function EditItemModal({
       alert("Failed to delete item: " + message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePushToClover = async () => {
+    setPushingToClover(true);
+    setCloverPushStatus("idle");
+    setCloverPushMessage("");
+
+    try {
+      const response = await fetch("/api/integrations/clover/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ item_id: item.id }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Push failed");
+
+      setCloverPushStatus("success");
+      setCloverPushMessage(data.message || "Pushed to Clover!");
+      setTimeout(() => {
+        setCloverPushStatus("idle");
+        setCloverPushMessage("");
+      }, 4000);
+    } catch (err) {
+      setCloverPushStatus("error");
+      setCloverPushMessage(err instanceof Error ? err.message : "Push failed");
+      setTimeout(() => {
+        setCloverPushStatus("idle");
+        setCloverPushMessage("");
+      }, 5000);
+    } finally {
+      setPushingToClover(false);
     }
   };
 
@@ -348,6 +387,64 @@ export function EditItemModal({
                         </>
                       )}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Clover Push Indicator */}
+              {hasCloverLink && (
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Linked to Clover</p>
+                        <p className="text-xs text-muted-foreground">
+                          Push this item&apos;s count to Clover POS
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePushToClover}
+                      disabled={loading || pushingToClover}
+                      className={cn(
+                        cloverPushStatus === "success" && "text-green-600 border-green-300",
+                        cloverPushStatus === "error" && "text-destructive border-destructive/30"
+                      )}
+                    >
+                      {pushingToClover ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Pushing...
+                        </>
+                      ) : cloverPushStatus === "success" ? (
+                        <>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Pushed!
+                        </>
+                      ) : cloverPushStatus === "error" ? (
+                        <>
+                          <AlertCircle className="mr-2 h-4 w-4" />
+                          Failed
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Push to Clover
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {cloverPushMessage && (
+                    <p className={cn(
+                      "mt-2 text-xs",
+                      cloverPushStatus === "success" ? "text-green-600" : "text-destructive"
+                    )}>
+                      {cloverPushMessage}
+                    </p>
                   )}
                 </div>
               )}

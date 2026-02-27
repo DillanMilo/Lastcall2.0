@@ -120,18 +120,19 @@ export async function POST(request: NextRequest) {
     const bigcommerce_client_id = org.bigcommerce_client_id;
     const bigcommerce_access_token = decryptToken(org.bigcommerce_access_token);
 
+    // Helper: standard BigCommerce headers
+    const bcHeaders = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-Auth-Token': bigcommerce_access_token,
+      'X-Auth-Client': bigcommerce_client_id,
+    };
+
     // If a BigCommerce product ID is provided, update that product directly
     if (bigcommerce_product_id) {
-      // First, get current inventory level
-      const getProductUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}`;
-      const getResponse = await fetch(getProductUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Auth-Token': bigcommerce_access_token,
-          'X-Auth-Client': bigcommerce_client_id,
-        },
-      });
+      // Get product with variants to check inventory_tracking type
+      const getProductUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}?include=variants`;
+      const getResponse = await fetch(getProductUrl, { headers: bcHeaders });
 
       if (!getResponse.ok) {
         return jsonResponse(
@@ -141,22 +142,67 @@ export async function POST(request: NextRequest) {
       }
 
       const productData = await getResponse.json();
-      const currentInventory = productData.data?.inventory_level || 0;
+      const product = productData.data;
+      const inventoryTracking = product?.inventory_tracking || 'product';
+
+      // Handle variant-level inventory tracking
+      if (inventoryTracking === 'variant') {
+        const variants = product?.variants || [];
+        if (variants.length === 0) {
+          return jsonResponse(
+            { error: 'Product uses variant tracking but has no variants' },
+            { status: 400 }
+          );
+        }
+
+        // Find the matching variant by SKU, or use the first/default variant
+        let targetVariant = variants[0];
+        if (sku) {
+          const skuMatch = variants.find((v: { sku?: string }) => v.sku === sku);
+          if (skuMatch) targetVariant = skuMatch;
+        }
+
+        const currentInventory = targetVariant.inventory_level || 0;
+        const newInventory = action === 'set' ? quantity : currentInventory + quantity;
+
+        const variantUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}/variants/${targetVariant.id}`;
+        const updateResponse = await fetch(variantUrl, {
+          method: 'PUT',
+          headers: bcHeaders,
+          body: JSON.stringify({ inventory_level: newInventory }),
+        });
+
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text();
+          return jsonResponse(
+            { error: 'Failed to update variant inventory', details: errorText },
+            { status: 400 }
+          );
+        }
+
+        const message = action === 'set'
+          ? `Updated "${name}" inventory to ${newInventory} units (was ${currentInventory})`
+          : `Added ${quantity} units to "${name}" (${currentInventory} → ${newInventory})`;
+
+        return jsonResponse({
+          success: true,
+          action: 'updated',
+          message,
+          bigcommerce_product_id: bigcommerce_product_id,
+          previous_inventory: currentInventory,
+          new_inventory: newInventory,
+        });
+      }
+
+      // Product-level inventory tracking
+      const currentInventory = product?.inventory_level || 0;
       const newInventory = action === 'set' ? quantity : currentInventory + quantity;
 
-      // Update inventory level
       const updateUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${bigcommerce_product_id}`;
       const updateResponse = await fetch(updateUrl, {
         method: 'PUT',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Auth-Token': bigcommerce_access_token,
-          'X-Auth-Client': bigcommerce_client_id,
-        },
-        body: JSON.stringify({
-          inventory_level: newInventory,
-        }),
+        headers: bcHeaders,
+        body: JSON.stringify({ inventory_level: newInventory }),
       });
 
       if (!updateResponse.ok) {
@@ -183,36 +229,54 @@ export async function POST(request: NextRequest) {
 
     // Check if product with this SKU already exists
     if (sku) {
-      const searchUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products?sku=${encodeURIComponent(sku)}`;
-      const searchResponse = await fetch(searchUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Auth-Token': bigcommerce_access_token,
-          'X-Auth-Client': bigcommerce_client_id,
-        },
-      });
+      const searchUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products?sku=${encodeURIComponent(sku)}&include=variants`;
+      const searchResponse = await fetch(searchUrl, { headers: bcHeaders });
 
       if (searchResponse.ok) {
         const searchData = await searchResponse.json();
         if (searchData.data && searchData.data.length > 0) {
-          // Product exists - update inventory instead
           const existingProduct = searchData.data[0];
           const productId = existingProduct.id;
+          const inventoryTracking = existingProduct.inventory_tracking || 'product';
 
-          // Update inventory level
+          // Handle variant-level tracking
+          if (inventoryTracking === 'variant') {
+            const variants = existingProduct.variants || [];
+            let targetVariant = variants[0];
+            const skuMatch = variants.find((v: { sku?: string }) => v.sku === sku);
+            if (skuMatch) targetVariant = skuMatch;
+
+            if (targetVariant) {
+              const variantUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${productId}/variants/${targetVariant.id}`;
+              const updateResponse = await fetch(variantUrl, {
+                method: 'PUT',
+                headers: bcHeaders,
+                body: JSON.stringify({ inventory_level: quantity }),
+              });
+
+              if (!updateResponse.ok) {
+                const errorText = await updateResponse.text();
+                return jsonResponse(
+                  { error: 'Failed to update variant inventory', details: errorText },
+                  { status: 400 }
+                );
+              }
+
+              return jsonResponse({
+                success: true,
+                action: 'updated',
+                message: `Updated inventory for existing product "${name}" to ${quantity} units`,
+                bigcommerce_product_id: productId,
+              });
+            }
+          }
+
+          // Product-level tracking
           const inventoryUrl = `https://api.bigcommerce.com/stores/${bigcommerce_store_hash}/v3/catalog/products/${productId}`;
           const updateResponse = await fetch(inventoryUrl, {
             method: 'PUT',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'X-Auth-Token': bigcommerce_access_token,
-              'X-Auth-Client': bigcommerce_client_id,
-            },
-            body: JSON.stringify({
-              inventory_level: quantity,
-            }),
+            headers: bcHeaders,
+            body: JSON.stringify({ inventory_level: quantity }),
           });
 
           if (!updateResponse.ok) {
@@ -272,12 +336,7 @@ export async function POST(request: NextRequest) {
 
     const createResponse = await fetch(createUrl, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-Auth-Token': bigcommerce_access_token,
-        'X-Auth-Client': bigcommerce_client_id,
-      },
+      headers: bcHeaders,
       body: JSON.stringify(productData),
     });
 

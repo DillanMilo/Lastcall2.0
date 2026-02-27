@@ -33,6 +33,9 @@ import {
   ShoppingCart,
   X,
   Clock,
+  Upload,
+  Loader2,
+  CheckCircle,
 } from "lucide-react";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
@@ -95,6 +98,8 @@ function InventoryPageContent() {
   const [showPendingOrders, setShowPendingOrders] = useState(false);
   const [markOrderedItems, setMarkOrderedItems] = useState<InventoryItem | InventoryItem[] | null>(null);
   const [markReceivedItem, setMarkReceivedItem] = useState<InventoryItem | null>(null);
+  const [pushingToClover, setPushingToClover] = useState(false);
+  const [pushResult, setPushResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Initialize low stock filter from URL params
   useEffect(() => {
@@ -242,6 +247,56 @@ function InventoryPageContent() {
     return acc;
   }, {} as Record<string, number>);
 
+  const hasCloverItems = items.some(item => item.clover_item_id || item.clover_merchant_id);
+
+  const handlePushToClover = async () => {
+    if (!orgId || pushingToClover) return;
+
+    setPushingToClover(true);
+    setPushResult(null);
+
+    try {
+      const { data: allItems, error: fetchError } = await supabase
+        .from("inventory_items")
+        .select("id")
+        .eq("org_id", orgId);
+
+      if (fetchError) throw fetchError;
+      if (!allItems || allItems.length === 0) {
+        setPushResult({ success: false, message: "No items to push." });
+        setPushingToClover(false);
+        return;
+      }
+
+      const response = await fetch("/api/integrations/clover/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          item_ids: allItems.map((i) => i.id),
+          create_if_missing: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Push failed");
+
+      setPushResult({
+        success: true,
+        message: data.message || "Push complete!",
+      });
+      setTimeout(() => setPushResult(null), 5000);
+    } catch (err) {
+      setPushResult({
+        success: false,
+        message: err instanceof Error ? err.message : "Push failed",
+      });
+      setTimeout(() => setPushResult(null), 6000);
+    } finally {
+      setPushingToClover(false);
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasNextPage = currentPage < totalPages - 1;
   const hasPrevPage = currentPage > 0;
@@ -265,11 +320,76 @@ function InventoryPageContent() {
             {totalCount > 0 ? `${totalCount.toLocaleString()} ${activeTab === 'stock' ? 'stock' : 'operational'} items` : `Manage your ${activeTab === 'stock' ? 'stock' : 'operational items'}`}
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
-          <Plus className="h-4 w-4 mr-2" />
-          Add {activeTab === 'stock' ? 'Stock' : 'Operational'} Item
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {hasCloverItems && (
+            <Button
+              variant="outline"
+              onClick={handlePushToClover}
+              disabled={pushingToClover}
+              className="w-full sm:w-auto"
+            >
+              {pushingToClover ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Pushing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Push to Clover
+                </>
+              )}
+            </Button>
+          )}
+          <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" />
+            Add {activeTab === 'stock' ? 'Stock' : 'Operational'} Item
+          </Button>
+        </div>
       </div>
+
+      {/* Push to Clover Result Banner */}
+      {pushResult && (
+        <div
+          className={`flex items-center gap-3 p-4 rounded-xl animate-fade-up ${
+            pushResult.success
+              ? "bg-green-500/10 border border-green-500/20"
+              : "bg-red-500/10 border border-red-500/20"
+          }`}
+        >
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+              pushResult.success ? "bg-green-500/20" : "bg-red-500/20"
+            }`}
+          >
+            {pushResult.success ? (
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p
+              className={`font-medium ${
+                pushResult.success
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }`}
+            >
+              {pushResult.success ? "Clover Push Complete" : "Clover Push Failed"}
+            </p>
+            <p className="text-sm text-muted-foreground">{pushResult.message}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPushResult(null)}
+            className="shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {/* Inventory Type Tabs */}
       <div
